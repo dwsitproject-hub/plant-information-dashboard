@@ -66,14 +66,14 @@ export function newestReading(rows) {
   return times.length ? new Date(Math.max(...times)) : null
 }
 
-/** Minutes after which a gauge reading no longer counts as live. */
+/** Minutes after which a gauge reading is flagged as old (TANK_GAUGING_STALE_MINUTES, default 120). */
 export function staleAfterMinutes(env = process.env) {
   const n = Number(env.TANK_GAUGING_STALE_MINUTES)
   return Number.isFinite(n) && n > 0 ? n : 120
 }
 
 /**
- * A reading is stale when it was fetched long ago, for example because the poller stopped.
+ * A reading is old when it was fetched long ago, for example because the poller stopped.
  * The gauge's own timestamp is not used: it may be the time a value last changed, which is old for
  * a tank that is simply standing still, and plant gauge clocks are not always set.
  */
@@ -86,11 +86,14 @@ export function isStale(row, now = new Date(), minutes = staleAfterMinutes()) {
 /**
  * A sounding in the shape Live Ops already reads, made from the latest reading.
  * A reading with nothing trustworthy in it shows as NO DATA with blank figures. So does a tank no longer
- * linked to a gauge, and a reading older than the stale limit, so neither keeps counting in stock.
+ * linked to a gauge, so it stops counting in stock.
+ *
+ * An old reading keeps its figures: blanking a whole site because the poller is late hides the last
+ * known stock. The screens show how old the reading is instead (readingAt, and `stale` below).
  */
-export function liveSounding(row, recordedOn, now = new Date()) {
+export function liveSounding(row, recordedOn) {
   const values = roundValues(row)
-  const usable = hasEvidence(values) && row.linked !== false && !isStale(row, now)
+  const usable = hasEvidence(values) && row.linked !== false
   return {
     roundIndex: 0,
     recordedOn,
@@ -112,6 +115,8 @@ export function gaugeMeta(row, kind, readingAt) {
     stockGroup: row.stock_group ?? null,
     readingKind: kind,
     readingAt: readingAt ? new Date(readingAt).toISOString() : null,
+    // A live reading fetched longer ago than TANK_GAUGING_STALE_MINUTES: the poller may have stopped.
+    stale: kind === 'live' && isStale(row),
     capacityLitre: num(row.max_capacity_litre),
     tankState: row.tank_state ?? null,
   }

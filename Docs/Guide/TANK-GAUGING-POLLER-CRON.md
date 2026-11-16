@@ -18,7 +18,9 @@ The latest reading is never purged, and the daily rounds live in `soundings`, so
 
 The units are slow, about one to two seconds a call, and the poller reads them one after another. Do not poll faster than every five minutes.
 
-Live Ops shows today's tanks from the latest reading. A reading fetched more than **120 minutes** ago shows as NO DATA and stops counting in stock, so a stopped poller is visible instead of freezing the totals. Change the limit with `TANK_GAUGING_STALE_MINUTES` on the API. A tank that no longer appears on its gauge (or whose gauge was removed) also shows as NO DATA; its history stays.
+Live Ops shows today's tanks from the latest reading, and says how old it is. A reading fetched more than **120 minutes** ago keeps its figures and is flagged as old (`stale` on the tank), so a late poller does not blank the site. Change the limit with `TANK_GAUGING_STALE_MINUTES` on the API. A tank that no longer appears on its gauge (or whose gauge was removed) shows as NO DATA and stops counting in stock; its history stays.
+
+If Live Ops shows readings hours old, check the cron job and its log first (see [Check that it works](#check-that-it-works)).
 
 Changing a gauge system's address in Master > Tank gauging moves its tanks to the new address. It does not create new tanks.
 
