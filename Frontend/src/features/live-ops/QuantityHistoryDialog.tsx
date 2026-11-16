@@ -1,11 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useRepository } from '../../data/OperationsContext.tsx'
-import { formatDay, formatKg, formatMeasure, tankLabel } from '../../domain/format.ts'
+import { formatDay, formatMeasure, tankLabel } from '../../domain/format.ts'
+import { displayOf } from '../../domain/qualityView.ts'
 import { profileOf } from '../../domain/tankStock.ts'
 import type { LabHistoryPoint, SoundingPoint } from '../../domain/types.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
-import { historySeries, isLabMetric, labHistorySeries, type HistoryDay, type HistoryMetric } from './quantitySeries.ts'
+import { useMass, type MassFormat } from './massUnit.ts'
+import { historySeries, isLabMetric, labCodeFor, labHistorySeries, type HistoryDay, type HistoryMetric } from './quantitySeries.ts'
+
+/**
+ * Bottom stock is quantity minus loadable. In api mode both come from the server, which used this
+ * site's own calibration. Without them (local mode) the bundled profile is the only source.
+ */
+function bottomStockOf(tankId: string | null, points: SoundingPoint[]): number | null {
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const point = points[index]
+    if (point.quantityKg != null && point.loadableKg != null) return point.quantityKg - point.loadableKg
+  }
+  if (points.some((point) => point.quantityKg !== undefined)) return null
+  return profileOf(tankId ?? '')?.bottomStockKg ?? null
+}
 
 export function QuantityHistoryDialog({
   tankId,
@@ -23,10 +38,12 @@ export function QuantityHistoryDialog({
   onClose: () => void
 }) {
   const { t, locale } = useLocale()
+  const mass = useMass()
   const repository = useRepository()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [soundings, setSoundings] = useState<{ tankId: string; points: SoundingPoint[] } | null>(null)
   const [labs, setLabs] = useState<{ tankId: string; points: LabHistoryPoint[] } | null>(null)
+  const [failedFor, setFailedFor] = useState<string | null>(null)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -38,14 +55,21 @@ export function QuantityHistoryDialog({
   useEffect(() => {
     if (!tankId) return
     let active = true
+    const fail = () => {
+      if (active) setFailedFor(tankId)
+    }
     if (isLabMetric(metric)) {
       repository.getLabHistory(tankId).then((next) => {
-        if (active) setLabs({ tankId, points: next })
-      })
+        if (!active) return
+        setLabs({ tankId, points: next })
+        setFailedFor(null)
+      }).catch(fail)
     } else {
       repository.getSoundingHistory(tankId).then((next) => {
-        if (active) setSoundings({ tankId, points: next })
-      })
+        if (!active) return
+        setSoundings({ tankId, points: next })
+        setFailedFor(null)
+      }).catch(fail)
     }
     return () => {
       active = false
@@ -55,11 +79,11 @@ export function QuantityHistoryDialog({
   const series = !tankId
     ? []
     : isLabMetric(metric)
-      ? labHistorySeries(labs?.tankId === tankId ? labs.points : [], start, end, metric === 'ffa' ? 'FFA' : 'MI')
+      ? labHistorySeries(labs?.tankId === tankId ? labs.points : [], start, end, labCodeFor(metric))
       : historySeries(tankId, soundings?.tankId === tankId ? soundings.points : [], start, end, metric)
   const hasValue = series.some((point) => point.value != null)
   const stats = seriesStats(series)
-  const bottomStock = metric === 'loadable' ? profileOf(tankId ?? '')?.bottomStockKg ?? null : null
+  const bottomStock = metric === 'loadable' ? bottomStockOf(tankId, soundings?.tankId === tankId ? soundings.points : []) : null
   const title = metricTitle(metric, t)
 
   return (
@@ -71,26 +95,28 @@ export function QuantityHistoryDialog({
           <dl className="qty-stats">
             <div>
               <dt>{t.rangeAverage}</dt>
-              <dd>{stats ? formatTip(metric, stats.average) : t.unavailable}</dd>
+              <dd>{stats ? formatTip(metric, stats.average, mass) : t.unavailable}</dd>
             </div>
             <div>
               <dt>{t.rangeMax}</dt>
-              <dd>{stats ? formatTip(metric, stats.max) : t.unavailable}</dd>
+              <dd>{stats ? formatTip(metric, stats.max, mass) : t.unavailable}</dd>
             </div>
             <div>
               <dt>{t.rangeMin}</dt>
-              <dd>{stats ? formatTip(metric, stats.min) : t.unavailable}</dd>
+              <dd>{stats ? formatTip(metric, stats.min, mass) : t.unavailable}</dd>
             </div>
             {metric === 'loadable' && (
               <div>
                 <dt>{t.bottomStock}</dt>
-                <dd>{bottomStock == null ? t.unavailable : `${formatKg(bottomStock)} kg`}</dd>
+                <dd>{bottomStock == null ? t.unavailable : `${mass.amount(bottomStock)} ${mass.symbol}`}</dd>
               </div>
             )}
           </dl>
-          {hasValue
-            ? <QuantityChart series={series} metric={metric} title={title} />
-            : <p className="empty">{t.unavailable}</p>}
+          {failedFor === tankId
+            ? <p className="page-error" role="alert">{t.loadFailed}</p>
+            : hasValue
+              ? <QuantityChart series={series} metric={metric} title={title} />
+              : <p className="empty">{t.unavailable}</p>}
           <ul className="qty-legend">
             <li><span className="qty-dot qty-dot--measured" aria-hidden="true" />{isLabMetric(metric) ? t.analysisDay : t.soundingDay}</li>
           </ul>
@@ -116,7 +142,10 @@ function dialogHeading(tankId: string, commodity: string, metricLabel: string): 
   return `${tank} - ${commodity} - ${metricLabel}`
 }
 
-function metricTitle(metric: HistoryMetric, t: { levelAxis: string; quantity: string; emptySpace: string; loadable: string; tankLevelPct: string; tempAxis: string }): string {
+function metricTitle(
+  metric: HistoryMetric,
+  t: { levelAxis: string; quantity: string; emptySpace: string; loadable: string; tankLevelPct: string; tempAxis: string; colourRLov: string; colourYLov: string },
+): string {
   if (metric === 'level') return t.levelAxis
   if (metric === 'quantity') return t.quantity
   if (metric === 'emptySpace') return t.emptySpace
@@ -124,11 +153,15 @@ function metricTitle(metric: HistoryMetric, t: { levelAxis: string; quantity: st
   if (metric === 'levelTank') return t.tankLevelPct
   if (metric === 'temperature') return t.tempAxis
   if (metric === 'ffa') return 'FFA'
-  return 'M&I'
+  if (metric === 'moisture') return 'M&I'
+  if (metric === 'colorR') return t.colourRLov
+  if (metric.startsWith('lab:')) return displayOf(metric.slice(4)).label
+  return t.colourYLov
 }
 
 function QuantityChart({ series, metric, title }: { series: HistoryDay[]; metric: HistoryMetric; title: string }) {
   const { locale } = useLocale()
+  const mass = useMass()
   const wide = metric === 'quantity' || metric === 'emptySpace' || metric === 'loadable'
   return (
     <div className="chart-frame qty-chart">
@@ -145,7 +178,7 @@ function QuantityChart({ series, metric, title }: { series: HistoryDay[]; metric
           <YAxis
             tick={{ fontSize: 11 }}
             width={wide ? 72 : 48}
-            tickFormatter={(value: number) => formatAxis(metric, value)}
+            tickFormatter={(value: number) => formatAxis(metric, value, mass)}
           />
           <Tooltip content={<QuantityTooltip locale={locale} metric={metric} title={title} />} />
           <Line
@@ -209,28 +242,36 @@ function QuantityTooltip({
   metric: HistoryMetric
   title: string
 }) {
+  const mass = useMass()
   const row = payload?.[0]?.payload
   if (!active || !row || row.value == null || row.kind === 'gap') return null
   return (
     <div className="chart-tip">
       <strong>{formatDay(label == null ? null : String(label), locale)}</strong>
-      <p>{title}: {formatTip(metric, row.value)}</p>
+      <p>{title}: {formatTip(metric, row.value, mass)}</p>
     </div>
   )
 }
 
-function formatAxis(metric: HistoryMetric, value: number): string {
-  if (metric === 'quantity' || metric === 'emptySpace' || metric === 'loadable') return formatKg(value).replace(/\.00$/, '')
+function formatAxis(metric: HistoryMetric, value: number, mass: MassFormat): string {
+  if (metric === 'quantity' || metric === 'emptySpace' || metric === 'loadable') return mass.axis(value)
   if (metric === 'levelTank') return `${Math.round(value)}%`
   if (metric === 'temperature') return formatMeasure(value, 0)
   if (metric === 'level') return formatMeasure(value, 1)
+  if (metric === 'colorR' || metric === 'colorY') return formatMeasure(value, 1)
+  if (metric.startsWith('lab:')) return formatMeasure(value, Math.min(2, displayOf(metric.slice(4)).digits))
   return formatMeasure(value, 2)
 }
 
-function formatTip(metric: HistoryMetric, value: number): string {
-  if (metric === 'quantity' || metric === 'emptySpace' || metric === 'loadable') return `${formatKg(value)} kg`
+function formatTip(metric: HistoryMetric, value: number, mass: MassFormat): string {
+  if (metric === 'quantity' || metric === 'emptySpace' || metric === 'loadable') return `${mass.amount(value)} ${mass.symbol}`
   if (metric === 'level') return `${formatMeasure(value, 3)} m`
   if (metric === 'levelTank') return `${value.toFixed(1)}%`
   if (metric === 'temperature') return `${formatMeasure(value, 1)} °C`
+  if (metric === 'colorR' || metric === 'colorY') return formatMeasure(value, 1)
+  if (metric.startsWith('lab:')) {
+    const display = displayOf(metric.slice(4))
+    return `${formatMeasure(value, display.digits)}${display.unit ? ` ${display.unit}` : ''}`
+  }
   return `${formatMeasure(value)}%`
 }

@@ -1,5 +1,6 @@
 # Spreadsheets and PDFs stay local. Markdown, text, images, and other docs are tracked.
 *.pdf
+!Docs/Guide/Dedicated-PC-Logsheet-Sync.pdf
 *.xlsx
 
 # Dependencies and build output
@@ -11,9 +12,22 @@ dist-ssr/
 .env
 .env.*
 !.env.example
+!.env.*.example
 
 # Editor
 .vscode/
 .idea/
 .DS_Store
 *.local
+
+# Queued logsheet payloads waiting to be sent to staging.
+Docs/exports/staging-outbox/
+
+# Staging database dumps (contain production-like data)
+pid_staging.dump
+*.dump
+.env.staging.smoke
+Backend/.env.staging.smoke
+
+# Gauge data exported for loading into staging
+Backend/backups/gauge-data-*.json

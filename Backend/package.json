@@ -1,0 +1,28 @@
+{
+  "name": "plant-information-dashboard-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed-from-mockup.js",
+    "seed:admin": "node scripts/seed-admin.js",
+    "test": "node --test src/datahub/datahub.test.js src/tankgauging/tankgauging.test.js src/tankgauging/capacity.test.js src/domain/portfolio.test.js src/domain/lab.test.js src/security.test.js src/dataIntegrity.test.js src/qualityRules.test.js",
+    "poll:loop": "node scripts/poll-loop.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jose": "^5.10.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.13.1"
+  }
+}

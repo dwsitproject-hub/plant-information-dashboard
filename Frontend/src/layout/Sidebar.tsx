@@ -1,5 +1,7 @@
-import { FlaskConical, Ship, Truck, Building2, ChevronLeft, ChevronRight, ClipboardList, Droplets, Factory, Filter, Layers, LayoutGrid, MapPin, Package, Radio, Scale, Warehouse } from 'lucide-react'
+import { ChartColumn, ArrowLeftRight, FlaskConical, Ship, TestTube, Truck, Building2, ChevronLeft, ChevronRight, ClipboardList, Droplet, Droplets, Factory, Filter, Flame, Gauge, Layers, LayoutGrid, MapPin, Mountain, Package, Radio, Scale, Shield, Tractor, Warehouse, Waves } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useActiveSite } from '../data/ActiveSiteContext.tsx'
+import { useAuth } from '../data/AuthContext.tsx'
 import { useLocale } from '../i18n/LocaleContext.tsx'
 
 export function Sidebar({
@@ -12,6 +14,9 @@ export function Sidebar({
   onToggleCollapsed: () => void
 }) {
   const { t } = useLocale()
+  const { can, user } = useAuth()
+  const { hasModule } = useActiveSite()
+  const hasSites = (user?.sites.length ?? 0) > 0
   const className = [
     'sidebar',
     mobileOpen ? 'open' : '',
@@ -40,11 +45,26 @@ export function Sidebar({
           </div>
         </div>
         <nav className="sidebar-nav">
+          {hasSites && can('management-stock', 'view') ? (
+            <>
+          <p className="sidebar-nav__section">{t.managementGroup}</p>
+          <NavLink to="/management" title={t.stockOverview} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+            <ChartColumn className="sidebar-nav__icon" size={16} aria-hidden="true" />
+            <span className="sidebar-nav__label">{t.stockOverview}</span>
+          </NavLink>
+            </>
+          ) : null}
+          {hasSites && hasModule('live-ops') && can('live-ops', 'view') ? (
+            <>
           <p className="sidebar-nav__section">{t.tankFarm}</p>
           <NavLink to="/" end title={t.liveOps} className={({ isActive }) => (isActive ? 'active' : undefined)}>
             <Radio className="sidebar-nav__icon" size={16} aria-hidden="true" />
             <span className="sidebar-nav__label">{t.liveOps}</span>
           </NavLink>
+            </>
+          ) : null}
+          {hasSites && hasModule('qc') && can('qc', 'view') ? (
+            <>
           <p className="sidebar-nav__section">{t.qualityControl}</p>
           <NavLink to="/qc" end title={t.qcTitle} className={({ isActive }) => (isActive ? 'active' : undefined)}>
             <FlaskConical className="sidebar-nav__icon" size={16} aria-hidden="true" />
@@ -63,7 +83,50 @@ export function Sidebar({
               <Truck className="sidebar-nav__icon" size={16} aria-hidden="true" />
               <span className="sidebar-nav__label">{t.qcTruck}</span>
             </NavLink>
+            <NavLink to="/qc/refinery" title={t.refineryQuality} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <TestTube className="sidebar-nav__icon" size={16} aria-hidden="true" />
+              <span className="sidebar-nav__label">{t.refineryQuality}</span>
+            </NavLink>
+            <NavLink to="/qc/movements" title={t.qcMovements} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <ArrowLeftRight className="sidebar-nav__icon" size={16} aria-hidden="true" />
+              <span className="sidebar-nav__label">{t.qcMovements}</span>
+            </NavLink>
           </div>
+            </>
+          ) : null}
+          {hasSites && hasModule('utility') && can('utility', 'view') ? (
+            <>
+          <p className="sidebar-nav__section">{t.utility}</p>
+          <NavLink to="/utility" end title={t.utilityOverview} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+            <Gauge className="sidebar-nav__icon" size={16} aria-hidden="true" />
+            <span className="sidebar-nav__label">{t.utilityOverview}</span>
+          </NavLink>
+          <div className="sidebar-nav__children">
+            <NavLink to="/utility/boiler" title={t.utilityBoiler} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <Flame className="sidebar-nav__icon" size={16} aria-hidden="true" />
+              <span className="sidebar-nav__label">{t.utilityBoiler}</span>
+            </NavLink>
+            <NavLink to="/utility/coal" title={t.utilityCoal} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <Mountain className="sidebar-nav__icon" size={16} aria-hidden="true" />
+              <span className="sidebar-nav__label">{t.utilityCoal}</span>
+            </NavLink>
+            <NavLink to="/utility/water" title={t.utilityWater} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <Droplet className="sidebar-nav__icon" size={16} aria-hidden="true" />
+              <span className="sidebar-nav__label">{t.utilityWater}</span>
+            </NavLink>
+            <NavLink to="/utility/effluent" title={t.utilityEffluent} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <Waves className="sidebar-nav__icon" size={16} aria-hidden="true" />
+              <span className="sidebar-nav__label">{t.utilityEffluent}</span>
+            </NavLink>
+            <NavLink to="/utility/loader" title={t.utilityLoader} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+              <Tractor className="sidebar-nav__icon" size={16} aria-hidden="true" />
+              <span className="sidebar-nav__label">{t.utilityLoader}</span>
+            </NavLink>
+          </div>
+            </>
+          ) : null}
+          {hasSites && hasModule('daily-production') && can('daily-production', 'view') ? (
+            <>
           <p className="sidebar-nav__section">{t.productionGroup}</p>
           <NavLink to="/daily-production" end title={t.dailyProduction} className={({ isActive }) => (isActive ? 'active' : undefined)}>
             <ClipboardList className="sidebar-nav__icon" size={16} aria-hidden="true" />
@@ -95,6 +158,10 @@ export function Sidebar({
               <span className="sidebar-nav__label">{t.supportingMaterials}</span>
             </NavLink>
           </div>
+            </>
+          ) : null}
+          {hasSites && can('master-companies', 'view') ? (
+            <>
           <p className="sidebar-nav__section">{t.masterMenu}</p>
           <NavLink to="/master" end title={t.masterMenuTitle} className={({ isActive }) => (isActive ? 'active' : undefined)}>
             <LayoutGrid className="sidebar-nav__icon" size={16} aria-hidden="true" />
@@ -108,10 +175,6 @@ export function Sidebar({
             <MapPin className="sidebar-nav__icon" size={16} aria-hidden="true" />
             <span className="sidebar-nav__label">{t.site}</span>
           </NavLink>
-          <NavLink to="/master/plants" title={t.plants} className={({ isActive }) => (isActive ? 'active' : undefined)}>
-            <Factory className="sidebar-nav__icon" size={16} aria-hidden="true" />
-            <span className="sidebar-nav__label">{t.plants}</span>
-          </NavLink>
           <NavLink to="/master/commodities" title={t.commodities} className={({ isActive }) => (isActive ? 'active' : undefined)}>
             <Droplets className="sidebar-nav__icon" size={16} aria-hidden="true" />
             <span className="sidebar-nav__label">{t.commodities}</span>
@@ -124,6 +187,21 @@ export function Sidebar({
             <Warehouse className="sidebar-nav__icon" size={16} aria-hidden="true" />
             <span className="sidebar-nav__label">{t.tankFarm}</span>
           </NavLink>
+          <NavLink to="/master/tank-gauging" title={t.tankGauging} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+            <Gauge className="sidebar-nav__icon" size={16} aria-hidden="true" />
+            <span className="sidebar-nav__label">{t.tankGauging}</span>
+          </NavLink>
+            </>
+          ) : null}
+          {can('admin-users', 'view') || can('admin-roles', 'view') || can('admin-datahub', 'view') || can('master-sites', 'view') ? (
+            <>
+          <p className="sidebar-nav__section">{t.administration}</p>
+          <NavLink to="/admin" end title={t.adminMenuTitle} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+            <Shield className="sidebar-nav__icon" size={16} aria-hidden="true" />
+            <span className="sidebar-nav__label">{t.administration}</span>
+          </NavLink>
+            </>
+          ) : null}
         </nav>
         </div>
       </div>

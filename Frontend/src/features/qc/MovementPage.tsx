@@ -1,22 +1,33 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { useQcFile } from '../../data/QcContext.tsx'
 import { formatDay } from '../../domain/format.ts'
-import { QC, commodityFamily, movementDirection, type MovementRow } from '../../domain/qc.ts'
+import { commodityFamily, inRange, movementDirection, type MovementRow } from '../../domain/qc.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
-import { Kpi, QcChrome } from './qcChrome.tsx'
+import { QcChrome } from './qcChrome.tsx'
+import { MovementDetail, QcDetailDialog, QcPanelOpen } from './qcDialogs.tsx'
+import { QcKpi } from './qcKpi.tsx'
+import { DirectionTrack, ProductPill } from './qcVisual.tsx'
 import { SortHeader, sortRows, useColumnSort, useQcRange } from './qcNav.tsx'
+
+type MovementDialog = null | 'count' | 'outbound' | 'inbound' | 'unknown' | 'commodity' | 'detail'
 
 export function MovementPage() {
   const { t, locale } = useLocale()
+  const qc = useQcFile()
   const { start, end, setRange } = useQcRange()
   const familySort = useColumnSort()
   const detailSort = useColumnSort()
-  const rows = QC.movements.rows
+  const [dialog, setDialog] = useState<MovementDialog>(null)
+  const rows = useMemo(
+    () => qc.movements.rows.filter((row) => row.movementDate == null || inRange(row.movementDate, start, end)),
+    [end, qc.movements.rows, start],
+  )
   const counted = useMemo(() => rows.map((row) => ({ ...row, direction: movementDirection(row.sealIn, row.sealOut), family: commodityFamily(row.commodity) })), [rows])
   const inbound = counted.filter((row) => row.direction === 'inbound').length
   const outbound = counted.filter((row) => row.direction === 'outbound').length
   const unknown = counted.filter((row) => row.direction === 'unknown').length
-  const period = QC.movements.periodStart && QC.movements.periodEnd
-    ? `${formatDay(QC.movements.periodStart, locale)} – ${formatDay(QC.movements.periodEnd, locale)}`
+  const period = qc.movements.periodStart && qc.movements.periodEnd
+    ? `${formatDay(qc.movements.periodStart, locale)} – ${formatDay(qc.movements.periodEnd, locale)}`
     : ''
 
   const families = new Map<string, { family: string; count: number; inbound: number; outbound: number; unknown: number }>()
@@ -46,40 +57,34 @@ export function MovementPage() {
       note={t.gatePeriodNote.replace('{period}', period)}
     >
       <section className="prod-kpis" aria-label={t.qcMovements}>
-        <Kpi label={t.movementCount} value={String(rows.length)} />
-        <Kpi label={t.outbound} value={String(outbound)} />
-        <Kpi label={t.inbound} value={String(inbound)} />
-        <Kpi label={t.notClassified} value={String(unknown)} />
+        <QcKpi label={t.movementCount} value={String(rows.length)} onOpen={() => setDialog('count')} />
+        <QcKpi label={t.outbound} value={String(outbound)} onOpen={() => setDialog('outbound')} />
+        <QcKpi label={t.inbound} value={String(inbound)} onOpen={() => setDialog('inbound')} />
+        <QcKpi label={t.notClassified} value={String(unknown)} onOpen={() => setDialog('unknown')} />
       </section>
-      <section className="prod-panel">
-        <h2 className="card__title">{t.commodity}</h2>
+      <QcPanelOpen title={t.commodity} onOpen={() => setDialog('commodity')}>
         <div className="prod-scroll">
           <table className="prod-table prod-table--fit">
             <thead>
               <tr>
                 <SortHeader label={t.commodity} column="family" sort={familySort} />
                 <SortHeader label={t.movementCount} column="count" sort={familySort} align="right" />
-                <SortHeader label={t.inbound} column="inbound" sort={familySort} align="right" />
-                <SortHeader label={t.outbound} column="outbound" sort={familySort} align="right" />
-                <SortHeader label={t.notClassified} column="unknown" sort={familySort} align="right" />
+                <SortHeader label={t.direction} column="inbound" sort={familySort} />
               </tr>
             </thead>
             <tbody>
               {familyRows.map((row) => (
                 <tr key={row.family}>
-                  <td>{row.family}</td>
+                  <td><ProductPill name={row.family} /></td>
                   <td className="num">{row.count}</td>
-                  <td className="num">{row.inbound}</td>
-                  <td className="num">{row.outbound}</td>
-                  <td className="num">{row.unknown}</td>
+                  <td><DirectionTrack inbound={row.inbound} outbound={row.outbound} unknown={row.unknown} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </section>
-      <section className="prod-panel">
-        <h2 className="card__title">{t.writtenAs}</h2>
+      </QcPanelOpen>
+      <QcPanelOpen title={t.writtenAs} onOpen={() => setDialog('detail')}>
         <div className="prod-scroll">
           <table className="prod-table">
             <thead>
@@ -106,7 +111,7 @@ export function MovementPage() {
                   <td>{row.customer ?? '-'}</td>
                   <td>{row.sealIn ?? '-'}</td>
                   <td>{row.sealOut ?? '-'}</td>
-                  <td>{directionLabel[row.direction]}</td>
+                  <td><span className={`badge qc-direction qc-direction--${row.direction}`}>{directionLabel[row.direction]}</span></td>
                   <td>{row.operator ?? '-'}</td>
                   <td>{row.remark ?? '-'}</td>
                 </tr>
@@ -114,7 +119,31 @@ export function MovementPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </QcPanelOpen>
+      <QcDetailDialog
+        open={dialog != null}
+        title={dialog === 'commodity' ? t.commodity : dialog === 'detail' ? t.writtenAs : t.qcMovements}
+        start={start}
+        end={end}
+        onClose={() => setDialog(null)}
+      >
+        {dialog != null ? (
+          <MovementDetail rows={counted
+            .filter((row) => (
+              dialog === 'outbound' ? row.direction === 'outbound'
+                : dialog === 'inbound' ? row.direction === 'inbound'
+                  : dialog === 'unknown' ? row.direction === 'unknown'
+                    : true
+            ))
+            .map((row) => ({
+              vehicle: row.vehicle,
+              commodity: row.commodity,
+              timeIn: row.timeIn,
+              timeOut: row.timeOut,
+              direction: directionLabel[row.direction],
+            }))} />
+        ) : null}
+      </QcDetailDialog>
     </QcChrome>
   )
 }

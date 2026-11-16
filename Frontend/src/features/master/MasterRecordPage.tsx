@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { SaveResult } from '../../domain/master.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
@@ -30,6 +30,10 @@ interface MasterRecordPageProps<T extends { id: string }> {
   onRefresh: () => void
   editHref?: (row: T) => string
   identityLabel?: string
+  /** Rows are managed elsewhere (DataHub). Hides add, edit and remove. */
+  readOnly?: boolean
+  /** Extra controls in each row's action cell. Shown even when read-only. */
+  rowActions?: (row: T) => ReactNode
 }
 
 export function MasterRecordPage<T extends { id: string }>({
@@ -46,6 +50,8 @@ export function MasterRecordPage<T extends { id: string }>({
   onRefresh,
   editHref,
   identityLabel,
+  readOnly = false,
+  rowActions,
 }: MasterRecordPageProps<T>) {
   const { t } = useLocale()
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -147,11 +153,12 @@ export function MasterRecordPage<T extends { id: string }>({
       <Link className="master-back" to="/master">{t.backToMaster}</Link>
 
       <section className="master-panel">
+        {readOnly ? <p className="admin-sub">{t.managedInDataHub}</p> : null}
         <div className="master-panel__head">
           <h2>{listTitle}</h2>
           <div className="master-panel__actions">
             <button type="button" className="btn btn--secondary" onClick={refresh}>{t.refresh}</button>
-            <button type="button" className="btn btn--primary" onClick={openCreate}>{t.add} {entityLabel}</button>
+            {readOnly ? null : <button type="button" className="btn btn--primary" onClick={openCreate}>{t.add} {entityLabel}</button>}
           </div>
         </div>
         {pageError && <p className="master-error">{pageError}</p>}
@@ -194,7 +201,8 @@ export function MasterRecordPage<T extends { id: string }>({
                 <tr key={row.id}>
                   {columns.map((column) => <td key={column.key}>{column.value(row)}</td>)}
                   <td>
-                    <div className="master-row-actions">
+                    {rowActions ? <div className="master-row-actions">{rowActions(row)}</div> : null}
+                    {readOnly ? null : <div className="master-row-actions">
                       {editHref
                         ? <Link className="btn-text" to={editHref(row)}>{t.edit}</Link>
                         : <button type="button" className="btn-text" onClick={() => openEdit(row)}>{t.edit}</button>}
@@ -202,7 +210,7 @@ export function MasterRecordPage<T extends { id: string }>({
                         <button type="button" className="btn-text" onClick={() => openEdit(row)}>{identityLabel}</button>
                       )}
                       <button type="button" className="btn-text" onClick={() => remove(row.id)}>{t.remove}</button>
-                    </div>
+                    </div>}
                   </td>
                 </tr>
               ))}

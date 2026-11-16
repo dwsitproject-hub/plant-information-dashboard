@@ -1,38 +1,110 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { tankLabel } from '../../domain/format.ts'
+import { useSearchParams } from 'react-router-dom'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { formatDay, tankLabel } from '../../domain/format.ts'
 import {
   STORAGE_TANK_IDS,
   ageAtSnapshot,
+  breachFor,
   historyForTank,
   latestByTank,
+  productRange,
+  qualityHistoryForTank,
   retestDue,
   storageInRange,
+  tankFill,
+  type NumericStorageField,
   type StorageRow,
 } from '../../domain/qc.ts'
+import { formatVariancePct, varianceFrom, type VarianceAlert } from '../../domain/qualityVariance.ts'
+import { useQcFile } from '../../data/QcContext.tsx'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
-import { Kpi, Num, QcChrome } from './qcChrome.tsx'
-import { SortHeader, sortRows, useColumnSort, useQcRange } from './qcNav.tsx'
+import { Num, QcChrome, useParam, type ParamCode } from './qcChrome.tsx'
+import { QcDetailDialog, QcPanelOpen, StorageLatestDetail, VarianceDetail, type VarianceRow } from './qcDialogs.tsx'
+import { QcKpi } from './qcKpi.tsx'
+import { SortHeader, sortRows, useColumnSort, useQcRange, type SortDir } from './qcNav.tsx'
+import { AgeDot, Bullet, Identity, Legend, ProductBoard, fill, type LegendItem } from './qcVisual.tsx'
 
 type Slot = { tankId: string; row: StorageRow | null }
+type View = 'table' | 'cards'
+type Group = 'sample' | 'core' | 'oxidation' | 'composition' | 'notes'
+type StorageDialog = null | 'tanks' | 'retest' | 'oils' | 'variance' | 'spec'
+
+type Column = {
+  column: string
+  group: Group
+  label: string
+  code?: ParamCode
+  field?: NumericStorageField
+  text?: (row: StorageRow) => string | null
+}
 
 export function StoragePage() {
-  const { t } = useLocale()
+  const { t, locale } = useLocale()
+  const qc = useQcFile()
   const { start, end, setRange } = useQcRange()
+  const [params, setParams] = useSearchParams()
   const sort = useColumnSort()
-  const [openTank, setOpenTank] = useState<string | null>(null)
+  const [view, setView] = useState<View>('table')
+  const [dialog, setDialog] = useState<StorageDialog>(null)
+  const openTank = params.get('tank')
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const inSpan = useMemo(() => storageInRange(start, end), [start, end])
+  const inSpan = useMemo(() => storageInRange(start, end, qc), [qc, start, end])
   const latest = useMemo(() => latestByTank(inSpan), [inSpan])
   const roster = useMemo(
     () => STORAGE_TANK_IDS.map((tankId) => ({ tankId, row: latest.get(tankId) ?? null })),
     [latest],
   )
-  const withResult = roster.filter((slot) => slot.row)
-  const retests = withResult.filter((slot) => slot.row && retestDue(slot.row)).length
-  const families = new Set(withResult.map((slot) => slot.row?.oil).filter(Boolean)).size
+  const withResult = roster.filter((slot): slot is { tankId: string; row: StorageRow } => slot.row != null)
+  const retests = withResult.filter((slot) => retestDue(slot.row)).length
+  const { outOfSpec, hasSpecs, anyReject, anyWatch, anyNoSpec } = specSummary(withResult.map((slot) => slot.row))
+  const families = new Set(withResult.map((slot) => slot.row.oil).filter(Boolean)).size
+  const columns = useStorageColumns().filter((column) => withResult.some((slot) => {
+    const value = column.field ? slot.row[column.field] : column.text?.(slot.row)
+    return value != null && value !== ''
+  }))
+  const varianceColumns = useMemo(() => columns.filter((column) => column.field && column.code && column.column !== 'temp'), [columns])
+  const varianceByTank = useMemo(() => {
+    const map = new Map<string, Partial<Record<string, VarianceAlert>>>()
+    for (const slot of withResult) {
+      const row = slot.row
+      const history = qualityHistoryForTank(row.tankId, row.oil)
+      const entry: Partial<Record<string, VarianceAlert>> = {}
+      for (const column of varianceColumns) {
+        const field = column.field as NumericStorageField
+        const points = history.map((item) => ({ date: item.snapshotOn, value: item[field] }))
+        const alert = varianceFrom(column.code as ParamCode, points)
+        if (alert) entry[column.column] = alert
+      }
+      if (Object.keys(entry).length > 0) map.set(row.tankId, entry)
+    }
+    return map
+  }, [withResult, varianceColumns])
+  const varianceRows: VarianceRow[] = [...varianceByTank.entries()].flatMap(([tankId, entry]) => {
+    const row = latest.get(tankId)
+    return Object.entries(entry).flatMap(([columnName, alert]) => {
+      const column = varianceColumns.find((item) => item.column === columnName)
+      if (!alert || !column) return []
+      return [{ tankId, oil: row?.oil ?? null, label: column.label, code: column.code as ParamCode, alert }]
+    })
+  })
+  const varianceTankCount = varianceByTank.size
   const rows = sortRows(roster, sort.key, sort.dir, slotValue)
   const history = openTank ? historyForTank(inSpan, openTank) : []
   const openLatest = openTank ? latest.get(openTank) ?? null : null
+  const rangeCaption = (product: string, count: number) => fill(t.rangeFor, {
+    product,
+    from: formatDay(start <= end ? start : end, locale),
+    to: formatDay(start <= end ? end : start, locale),
+    count,
+  })
+
+  const setOpenTank = (tankId: string | null) => {
+    const next = new URLSearchParams(params)
+    if (tankId) next.set('tank', tankId)
+    else next.delete('tank')
+    setParams(next, { replace: true })
+  }
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -41,45 +113,119 @@ export function StoragePage() {
     if (!openTank && dialog.open) dialog.close()
   }, [openTank])
 
+  const legend: LegendItem[] = ['missing']
+  if (anyNoSpec) legend.unshift('nospec')
+  if (varianceTankCount > 0) legend.unshift('variance')
+  if (retests > 0) legend.unshift('retest')
+  if (anyWatch) legend.unshift('watch')
+  if (anyReject) legend.unshift('over')
+
   return (
-    <QcChrome title={t.qcStorage} start={start} end={end} setRange={setRange} note={t.storageSpecNote}>
+    <QcChrome
+      title={t.qcStorage}
+      start={start}
+      end={end}
+      setRange={setRange}
+      note={hasSpecs ? t.storageSpecNoteSet : t.storageSpecNote}
+      legend={<Legend items={legend} labels={{ over: t.outOfSpec }} />}
+    >
       <section className="prod-kpis" aria-label={t.qcStorage}>
-        <Kpi label={t.tanksLogged} value={String(withResult.length)} />
-        <Kpi label={t.retestDue} value={String(retests)} tone={retests > 0 ? 'alert' : undefined} />
-        <Kpi label={t.oilTypes} value={String(families)} />
+        <QcKpi label={t.tanksLogged} value={String(withResult.length)} onOpen={() => setDialog('tanks')} />
+        {hasSpecs ? (
+          <QcKpi label={t.outOfSpec} value={String(outOfSpec.length)} tone={outOfSpec.length > 0 ? 'alert' : undefined} onOpen={() => setDialog('spec')} />
+        ) : null}
+        <QcKpi label={t.retestDue} value={String(retests)} tone={retests > 0 ? 'alert' : undefined} onOpen={() => setDialog('retest')} />
+        <QcKpi label={t.varianceAlerts} value={String(varianceTankCount)} tone={varianceTankCount > 0 ? 'alert' : undefined} onOpen={() => setDialog('variance')} />
+        <QcKpi label={t.oilTypes} value={String(families)} onOpen={() => setDialog('oils')} />
       </section>
-      <section className="prod-panel">
-        <h2 className="card__title">{t.qcStorage}</h2>
-        <div className="prod-scroll">
-          <table className="prod-table">
-            <thead>
-              <tr>
-                <SortHeader label={t.tank} column="tank" sort={sort} />
-                <SortHeader label={t.oilTypes} column="oil" sort={sort} />
-                <SortHeader label={t.analysisDate} column="analysis" sort={sort} />
-                <SortHeader label={t.ageDays} column="age" sort={sort} align="right" />
-                <LabHeaders sort={sort} />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((slot) => (
-                <tr key={slot.tankId} className="qc-pick" onClick={() => setOpenTank(slot.tankId)}>
-                  <td>
-                    <button
-                      type="button"
-                      className="prod-plant-link"
-                      onClick={() => setOpenTank(slot.tankId)}
-                    >
-                      {tankLabel(slot.tankId)}
-                    </button>
-                  </td>
-                  <ResultCells row={slot.row} />
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <ProductBoard rows={withResult.map((slot) => slot.row)} slots={STORAGE_TANK_IDS.length} onOpen={setOpenTank} />
+      <QcPanelOpen title={t.qcStorage} onOpen={() => setDialog('tanks')}>
+        <div className="section-head">
+          <div className="section-head__tools">
+            <div className="view-toggle" role="group" aria-label={t.qcStorage}>
+              <button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')}>{t.tableView}</button>
+              <button type="button" aria-pressed={view === 'cards'} onClick={() => setView('cards')}>{t.gridView}</button>
+            </div>
+          </div>
         </div>
-      </section>
+        {view === 'table' ? (
+          <div className="prod-scroll">
+            <table className="prod-table">
+              <thead>
+                <GroupRow columns={columns} />
+                <tr>
+                  <IdentityHeader sort={sort} />
+                  {columns.map((column, index) => (
+                    <SortHeader
+                      key={column.column}
+                      label={column.label}
+                      column={column.column}
+                      sort={sort}
+                      align={column.text ? 'left' : 'right'}
+                      className={edge(columns, index) ? 'qc-group--edge' : undefined}
+                    />
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((slot) => {
+                  const names = ['qc-pick']
+                  if (!slot.row) names.push('prod-row--empty')
+                  else if (slot.row.verdict === 'quarantine') names.push('prod-row--quarantine')
+                  else if (retestDue(slot.row)) names.push('qc-retest')
+                  return (
+                    <tr key={slot.tankId} className={names.join(' ')} onClick={() => setOpenTank(slot.tankId)}>
+                      <td className="qc-sticky">
+                        <Identity
+                          place={(
+                            <button type="button" className="prod-plant-link" onClick={(event) => { event.stopPropagation(); setOpenTank(slot.tankId) }}>
+                              {tankLabel(slot.tankId)}
+                            </button>
+                          )}
+                          product={slot.row?.oil ?? null}
+                        />
+                        <SpecBadge row={slot.row} />
+                      </td>
+                      <ResultCells row={slot.row} columns={columns} variance={slot.row ? varianceByTank.get(slot.row.tankId) : undefined} />
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="tank-grid">
+            {withResult.length === 0 && <p className="empty">{t.noQcRows}</p>}
+            {sortRows(withResult, sort.key, sort.dir, slotValue).map((slot) => (
+              <StorageCard
+                key={slot.tankId}
+                row={slot.row}
+                range={productRange(inSpan, slot.row.oil, 'ffa')}
+                rangeCaption={rangeCaption}
+                variance={varianceByTank.get(slot.tankId)}
+                onOpen={() => setOpenTank(slot.tankId)}
+              />
+            ))}
+          </div>
+        )}
+      </QcPanelOpen>
+      <QcDetailDialog
+        open={dialog != null}
+        title={dialog === 'spec' ? t.outOfSpec : dialog === 'retest' ? t.retestDue : dialog === 'oils' ? t.oilTypes : dialog === 'variance' ? t.varianceAlerts : t.tanksLogged}
+        start={start}
+        end={end}
+        onClose={() => setDialog(null)}
+      >
+        {dialog === 'spec' ? (
+          <StorageLatestDetail rows={outOfSpec} />
+        ) : dialog === 'retest' ? (
+          <StorageLatestDetail rows={withResult.filter((slot) => retestDue(slot.row)).map((slot) => slot.row)} />
+        ) : dialog === 'variance' ? (
+          <VarianceDetail rows={varianceRows} />
+        ) : (
+          <StorageLatestDetail rows={withResult.map((slot) => slot.row)} />
+        )}
+      </QcDetailDialog>
       <dialog
         ref={dialogRef}
         className="qc-dialog"
@@ -96,25 +242,33 @@ export function StoragePage() {
               {history.length === 0 ? (
                 <p className="empty">{t.noQcRows}</p>
               ) : (
-                <table className="prod-table">
-                  <thead>
-                    <tr>
-                      <th className="num">{t.revisionShort}</th>
-                      <th>{t.oilTypes}</th>
-                      <th>{t.analysisDate}</th>
-                      <th className="num">{t.ageDays}</th>
-                      <LabHeaders />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((row) => (
-                      <tr key={`${row.snapshotOn}-${row.revision}`}>
-                        <td className="num">{row.revision}</td>
-                        <ResultCells row={row} />
+                <>
+                  <FfaHistory
+                    history={history}
+                    oil={openLatest?.oil ?? history[0].oil}
+                    range={productRange(inSpan, openLatest?.oil ?? history[0].oil, 'ffa')}
+                  />
+                  <table className="prod-table">
+                    <thead>
+                      <tr>
+                        <th className="num">{t.revisionShort}</th>
+                        <th>{t.oilTypes}</th>
+                        {columns.map((column) => (
+                          <th key={column.column} className={column.text ? undefined : 'num'}>{column.label}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {history.map((row) => (
+                        <tr key={`${row.snapshotOn}-${row.revision}`}>
+                          <td className="num">{row.revision}</td>
+                          <td>{row.oil || '-'}</td>
+                          <ResultCells row={row} columns={columns} />
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </div>
             <div className="stock-dialog__actions">
@@ -127,61 +281,289 @@ export function StoragePage() {
   )
 }
 
-function LabHeaders({ sort }: { sort?: ReturnType<typeof useColumnSort> }) {
-  const { t } = useLocale()
-  const columns: Array<{ label: string; column: string }> = [
-    { label: t.tempAxis, column: 'temp' },
-    { label: 'FFA', column: 'ffa' },
-    { label: 'M&I', column: 'moisture' },
-    { label: t.colourR, column: 'colorR' },
-    { label: t.colourY, column: 'colorY' },
-    { label: 'IV', column: 'iv' },
-    { label: 'PV', column: 'pv' },
-    { label: t.slipPoint, column: 'smp' },
-    { label: t.cloudPoint, column: 'cloud' },
-    { label: 'AnV', column: 'anv' },
-    { label: t.carotene, column: 'carotene' },
-    { label: t.phosphorus, column: 'phosphorus' },
-    { label: 'DOBI', column: 'dobi' },
-    { label: t.totox, column: 'totox' },
-    { label: t.odor, column: 'odor' },
-    { label: t.remark, column: 'remark' },
+function useStorageColumns(): Column[] {
+  const { t, locale } = useLocale()
+  return [
+    { column: 'analysis', group: 'sample', label: t.analysisDate, text: (row) => (row.analysisDate ? formatDay(row.analysisDate, locale) : null) },
+    { column: 'age', group: 'sample', label: t.ageDays, text: (row) => row.analysisDate },
+    { column: 'temp', group: 'sample', label: t.tempC, code: 'temp', field: 'temperatureC' },
+    { column: 'ffa', group: 'core', label: t.ffaPct, code: 'ffa', field: 'ffa' },
+    { column: 'moisture', group: 'core', label: t.moisturePct, code: 'moisture', field: 'moisture' },
+    { column: 'colorR', group: 'core', label: t.colourRLov, code: 'colorR', field: 'colorR' },
+    { column: 'colorY', group: 'core', label: t.colourYLov, code: 'colorY', field: 'colorY' },
+    { column: 'pv', group: 'oxidation', label: 'PV', code: 'pv', field: 'pv' },
+    { column: 'anv', group: 'oxidation', label: 'AnV', code: 'anv', field: 'anv' },
+    { column: 'totox', group: 'oxidation', label: t.totox, code: 'totox', field: 'totox' },
+    { column: 'iv', group: 'composition', label: 'IV', code: 'iv', field: 'iv' },
+    { column: 'smp', group: 'composition', label: t.slipPoint, code: 'smp', field: 'smp' },
+    { column: 'cloud', group: 'composition', label: t.cloudPoint, code: 'cloud', field: 'cloudPoint' },
+    { column: 'carotene', group: 'composition', label: t.carotene, code: 'carotene', field: 'carotene' },
+    { column: 'phosphorus', group: 'composition', label: t.phosphorus, code: 'phosphorus', field: 'phosphorus' },
+    { column: 'dobi', group: 'composition', label: 'DOBI', code: 'dobi', field: 'dobi' },
+    { column: 'odor', group: 'notes', label: t.odor, text: (row) => row.odor },
+    { column: 'remark', group: 'notes', label: t.remark, text: (row) => row.remark },
   ]
-  return columns.map((column) => (
-    sort
-      ? <SortHeader key={column.column} label={column.label} column={column.column} sort={sort} align={column.column === 'odor' || column.column === 'remark' ? 'left' : 'right'} />
-      : <th key={column.column} className={column.column === 'odor' || column.column === 'remark' ? undefined : 'num'}>{column.label}</th>
-  ))
 }
 
-function ResultCells({ row }: { row: StorageRow | null }) {
+function edge(columns: Column[], index: number): boolean {
+  return index === 0 || columns[index - 1].group !== columns[index].group
+}
+
+function GroupRow({ columns }: { columns: Column[] }) {
   const { t } = useLocale()
-  const age = row ? ageAtSnapshot(row.analysisDate, row.snapshotOn) : null
+  const names: Record<Group, string> = {
+    sample: t.groupSample,
+    core: t.groupCore,
+    oxidation: t.groupOxidation,
+    composition: t.groupComposition,
+    notes: t.groupNotes,
+  }
+  const spans: Array<{ group: Group; span: number }> = []
+  for (const column of columns) {
+    const last = spans.at(-1)
+    if (last && last.group === column.group) last.span += 1
+    else spans.push({ group: column.group, span: 1 })
+  }
+  return (
+    <tr className="qc-groups">
+      <th className="qc-sticky" aria-hidden="true" />
+      {spans.map((item) => (
+        <th key={item.group} colSpan={item.span} scope="colgroup" className="qc-group--edge">{names[item.group]}</th>
+      ))}
+    </tr>
+  )
+}
+
+function IdentityHeader({ sort }: { sort: { key: string | null; dir: SortDir; toggle: (column: string) => void } }) {
+  const { t } = useLocale()
+  const mark = (column: string) => (sort.key === column ? (sort.dir === 'asc' ? '↑' : '↓') : '↕')
+  const active = sort.key === 'tank' || sort.key === 'oil'
+  return (
+    <th className="qc-sticky" aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <span className="qc-identity-head">
+        <button type="button" className="prod-sort" onClick={() => sort.toggle('tank')}>
+          {t.tank}
+          <span className={sort.key === 'tank' ? 'prod-sort__mark prod-sort__mark--on' : 'prod-sort__mark'}>{mark('tank')}</span>
+        </button>
+        <button type="button" className="prod-sort" onClick={() => sort.toggle('oil')}>
+          {t.oilTypes}
+          <span className={sort.key === 'oil' ? 'prod-sort__mark prod-sort__mark--on' : 'prod-sort__mark'}>{mark('oil')}</span>
+        </button>
+      </span>
+    </th>
+  )
+}
+
+function ResultCells({
+  row,
+  columns,
+  variance,
+}: {
+  row: StorageRow | null
+  columns: Column[]
+  variance?: Partial<Record<string, VarianceAlert>>
+}) {
+  const { t } = useLocale()
   return (
     <>
-      <td>{row?.oil || '-'}</td>
-      <td>{row?.analysisDate ?? '-'}</td>
-      <td className={age == null ? 'num num--empty' : 'num'}>
-        {age == null ? '-' : age}
-        {row && retestDue(row) ? <span className="badge badge--warning qc-badge">{t.retest}</span> : null}
-      </td>
-      <Num value={row?.temperatureC ?? null} digits={1} />
-      <Num value={row?.ffa ?? null} />
-      <Num value={row?.moisture ?? null} />
-      <Num value={row?.colorR ?? null} />
-      <Num value={row?.colorY ?? null} />
-      <Num value={row?.iv ?? null} />
-      <Num value={row?.pv ?? null} />
-      <Num value={row?.smp ?? null} />
-      <Num value={row?.cloudPoint ?? null} />
-      <Num value={row?.anv ?? null} />
-      <Num value={row?.carotene ?? null} />
-      <Num value={row?.phosphorus ?? null} />
-      <Num value={row?.dobi ?? null} />
-      <Num value={row?.totox ?? null} />
-      <td>{row?.odor ?? '-'}</td>
-      <td className="qc-wrap">{row?.remark ?? '-'}</td>
+      {columns.map((column, index) => {
+        const className = edge(columns, index) ? 'qc-group--edge' : ''
+        if (column.column === 'age') {
+          const age = row ? ageAtSnapshot(row.analysisDate, row.snapshotOn) : null
+          return (
+            <td key={column.column} className={className}>
+              <AgeDot age={age} />
+              {row && retestDue(row) ? <span className="badge badge--warning qc-badge">{t.retest}</span> : null}
+            </td>
+          )
+        }
+        if (column.text) {
+          const value = row ? column.text(row) : null
+          const wrap = column.column === 'remark' ? 'qc-wrap' : ''
+          const failed = column.column === 'odor' ? breachFor(row, 'odor') : null
+          const tone = failed ? (failed.severity === 'reject' ? 'num--neg' : 'num--watch') : ''
+          return (
+            <td
+              key={column.column}
+              className={[className, wrap, tone].filter(Boolean).join(' ') || undefined}
+              title={failed ? `${column.label}: ${t.specsMustPass}` : undefined}
+            >
+              {value || '-'}
+            </td>
+          )
+        }
+        const broken = column.field ? breachFor(row, column.field) : null
+        return (
+          <Num
+            key={column.column}
+            className={className || undefined}
+            value={row && column.field ? row[column.field] : null}
+            code={column.code ?? 'ffa'}
+            variance={variance?.[column.column] ?? null}
+            breach={broken?.severity === 'reject'}
+            watch={broken?.severity === 'watch'}
+            limitTitle={broken ? fill(t.specBreachTitle, {
+              label: column.label,
+              value: String(broken.value),
+              bound: broken.bound === 'max' ? '≤' : '≥',
+              limit: String(broken.limit ?? ''),
+            }) : undefined}
+          />
+        )
+      })}
     </>
+  )
+}
+
+function StorageCard({
+  row,
+  range,
+  rangeCaption,
+  variance,
+  onOpen,
+}: {
+  row: StorageRow
+  range: ReturnType<typeof productRange>
+  rangeCaption: (product: string, count: number) => string
+  variance?: Partial<Record<string, VarianceAlert>>
+  onOpen: () => void
+}) {
+  const { t, locale } = useLocale()
+  const param = useParam()
+  const ratio = tankFill(row)
+  const retest = retestDue(row)
+  const percent = ratio == null ? null : Math.round(ratio * 100)
+  const varianceCount = variance ? Object.keys(variance).length : 0
+  return (
+    <article className={retest ? 'tank-card qc-card--retest' : 'tank-card'}>
+      <header className="tank-card__head">
+        <Identity
+          place={<button type="button" className="prod-plant-link" onClick={onOpen}>{tankLabel(row.tankId)}</button>}
+          product={row.oil}
+        />
+        <span>
+          <SpecBadge row={row} />
+          <AgeDot age={ageAtSnapshot(row.analysisDate, row.snapshotOn)} />
+          {retest ? <span className="badge badge--warning qc-badge">{t.retest}</span> : null}
+          {varianceCount > 0 ? (
+            <span className="badge badge--variance qc-badge" title={varianceTitle(variance ?? {}, locale)}>
+              {t.varianceAlert} {varianceCount}
+            </span>
+          ) : null}
+        </span>
+      </header>
+      <div className="qc-card__fill">
+        {t.tankFill}
+        <span className="qc-board__track" aria-hidden="true"><span style={{ width: `${percent ?? 0}%` }} /></span>
+        {percent == null ? t.unavailable : `${percent}%`}
+      </div>
+      <Bullet
+        code="ffa"
+        label={t.ffaPct}
+        value={row.ffa}
+        context={{ kind: 'range', range, caption: rangeCaption(row.oil || '-', range?.count ?? 0) }}
+      />
+      <dl className="tank-card__metrics">
+        <div><dt>{t.moisturePct}</dt><dd>{param('moisture', row.moisture)}<VarianceMark alert={variance?.moisture} /></dd></div>
+        <div><dt>{t.colourRLov}</dt><dd>{param('colorR', row.colorR)}<VarianceMark alert={variance?.colorR} /></dd></div>
+        <div><dt>{t.colourYLov}</dt><dd>{param('colorY', row.colorY)}<VarianceMark alert={variance?.colorY} /></dd></div>
+        <div><dt>{t.tempC}</dt><dd>{param('temp', row.temperatureC)}</dd></div>
+      </dl>
+    </article>
+  )
+}
+
+/** Verdicts from each commodity's limits on Master > Commodities (api mode only). */
+function specSummary(rows: StorageRow[]) {
+  const severities = rows.flatMap((row) => (row.breaches ?? []).map((breach) => breach.severity))
+  return {
+    outOfSpec: rows.filter((row) => row.verdict === 'quarantine'),
+    hasSpecs: rows.some((row) => row.verdict != null && row.verdict !== 'spec-pending'),
+    anyReject: severities.includes('reject'),
+    anyWatch: severities.includes('watch'),
+    anyNoSpec: rows.some((row) => (row.verdict ?? 'spec-pending') === 'spec-pending'),
+  }
+}
+
+/** In spec or out of spec against the commodity's limits. Nothing when no limit applies. */
+function SpecBadge({ row }: { row: StorageRow | null }) {
+  const { t } = useLocale()
+  if (!row?.verdict || row.verdict === 'spec-pending') return null
+  if (row.verdict === 'quarantine') return <span className="badge badge--danger qc-badge">{t.outOfSpec}</span>
+  return <span className="badge badge--pass qc-badge">{t.inSpec}</span>
+}
+
+/** Small direction arrow shown next to a card metric that moved 15%+ from its last result. */
+function VarianceMark({ alert }: { alert?: VarianceAlert }) {
+  if (!alert) return null
+  return (
+    <span
+      className={alert.pctChange >= 0 ? 'num-variance-arrow num-variance-arrow--up' : 'num-variance-arrow num-variance-arrow--down'}
+      aria-hidden="true"
+    >
+      {alert.pctChange >= 0 ? '\u25b2' : '\u25bc'}
+    </span>
+  )
+}
+
+function varianceTitle(variance: Partial<Record<string, VarianceAlert>>, locale: 'en' | 'id'): string {
+  return Object.entries(variance)
+    .map(([column, alert]) => `${column} ${formatVariancePct((alert as VarianceAlert).pctChange)} (${(alert as VarianceAlert).currentDate ? formatDay((alert as VarianceAlert).currentDate as string, locale) : ''})`)
+    .join(', ')
+}
+
+function FfaHistory({
+  history,
+  oil,
+  range,
+}: {
+  history: StorageRow[]
+  oil: string
+  range: ReturnType<typeof productRange>
+}) {
+  const { t, locale } = useLocale()
+  const param = useParam()
+  const revisions = new Set(history.map((row) => row.snapshotOn)).size !== history.length
+  const data = [...history].reverse().map((row) => ({
+    label: `${row.snapshotOn ? formatDay(row.snapshotOn, locale) : '-'}${revisions ? ` r${row.revision}` : ''}`,
+    ffa: row.ffa,
+  }))
+  const values = data.map((point) => point.ffa).filter((value): value is number => value != null)
+  if (values.length === 0) return null
+  const low = Math.min(...values, range?.low ?? Infinity)
+  const high = Math.max(...values, range?.high ?? -Infinity)
+  const pad = Math.max((high - low) * 0.2, Math.abs(high) * 0.02, 0.002)
+  return (
+    <figure className="qc-figure chart-frame qty-chart">
+      <h3 className="qc-dialog__chart-title">{oil} · {t.ffaPct}</h3>
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+          <CartesianGrid stroke="#E0E0E0" vertical={false} />
+          {range && range.count >= 3 ? (
+            <ReferenceArea y1={range.low} y2={range.high} fill="#C4C4C4" fillOpacity={0.35} stroke="none" ifOverflow="extendDomain" />
+          ) : null}
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} height={32} />
+          <YAxis
+            tick={{ fontSize: 11 }}
+            width={56}
+            domain={[low - pad, high + pad]}
+            tickFormatter={(value: number) => param('ffa', value)}
+          />
+          <Tooltip formatter={(value) => [`${param('ffa', value == null ? null : Number(value))} %`, t.ffaPct]} />
+          <Line
+            type="monotone"
+            dataKey="ffa"
+            name={t.ffaPct}
+            stroke="#114C5A"
+            strokeWidth={2}
+            connectNulls={false}
+            isAnimationActive={false}
+            dot
+          />
+        </LineChart>
+      </ResponsiveContainer>
+      <figcaption>{t.ffaBySnapshot}</figcaption>
+    </figure>
   )
 }
 

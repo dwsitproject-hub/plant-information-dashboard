@@ -6,6 +6,23 @@ export interface Messages {
   brandMark: string
   brandTitle: string
   brandSub: string
+  corpName: string
+  loginPitch: string
+  welcomeBack: string
+  signInContinue: string
+  loginUsername: string
+  loginUsernamePlaceholder: string
+  loginPassword: string
+  loginPasswordPlaceholder: string
+  showPassword: string
+  hidePassword: string
+  signIn: string
+  signInViaDwsHub: string
+  backToSignIn: string
+  ssoErrorTitle: string
+  ssoErrorFallback: string
+  loginRequired: string
+  copyright: string
   liveOps: string
   opsAnalytics: string
   analyticsTitle: string
@@ -38,6 +55,16 @@ export interface Messages {
   tempSpikeHint: string
   ffaAgeHint: string
   emptySpace: string
+  labShort: string
+  labNotConnected: string
+  labNotOnCertificate: string
+  labNoResult: string
+  colourRangeHint: string
+  colourOneTank: string
+  tankEmptyWord: string
+  tankNoDataWord: string
+  capacityOf: string
+  capacityNotSet: string
   loadable: string
   rangeAverage: string
   rangeMax: string
@@ -46,10 +73,36 @@ export interface Messages {
   totalQuantity: string
   avgLevel: string
   avgTemp: string
+  storageUtilization: string
+  activeVsEmpty: string
+  activeEmptySub: string
+  criticalAlerts: string
+  criticalAlertsSub: string
+  tanksHolding: string
+  avgQuality: string
+  selectDay: string
+  massUnit: string
+  unitTon: string
+  unitKg: string
+  kpiDetailHint: string
+  activeTanks: string
+  emptyTanks: string
+  reasonOverfill: string
+  reasonHotTemp: string
+  noCriticalAlerts: string
+  alertRule: string
+  gateSamplesWindow: string
+  vehicle: string
+  sampleDay: string
+  modeVessel: string
+  modeTruck: string
+  noRows: string
   throughput: string
   approvalRate: string
   unavailable: string
   period: string
+  periodDaily: string
+  periodMonthly: string
   tank: string
   status: string
   levelTemp: string
@@ -98,6 +151,8 @@ export interface Messages {
   tankFarm: string
   tanks: string
   tankFarmBlurb: string
+  tankGauging: string
+  tankGaugingBlurb: string
   badgeDatahub: string
   badgeThisPlant: string
   openPage: string
@@ -250,6 +305,31 @@ export interface Messages {
   qcVessel: string
   qcTruck: string
   qcMovements: string
+  refineryQuality: string
+  hoursLogged: string
+  finishedFfa: string
+  feedFfa: string
+  byproductFfa: string
+  streamsTitle: string
+  readingsTitle: string
+  declaredNotTested: string
+  rangeLow: string
+  rangeHigh: string
+  time: string
+  fromTank: string
+  flowRate: string
+  finishedOil: string
+  feedOil: string
+  colour: string
+  toTank: string
+  rawMaterial: string
+  bleachingOil: string
+  finishedGood: string
+  byProduct: string
+  spentEarth: string
+  bleachRed: string
+  spentEarthOc: string
+  noSample: string
   tanksLogged: string
   retestDue: string
   oilTypes: string
@@ -304,6 +384,479 @@ export interface Messages {
   resultValue: string
   incomplete: string
   noSampleDate: string
+  needsAttention: string
+  nothingNeedsAttention: string
+  moreItems: string
+  overMax: string
+  watch: string
+  noSpec: string
+  qualityAverageOf: string
+  qualityLimit: string
+  qualityOutTanks: string
+  qualityWatchTanks: string
+  qualityAverageOut: string
+  qualityChange: string
+  qualityChangedFlag: string
+  qualityOdourFailed: string
+  qualityByProduct: string
+  qualityHint: string
+  specsTitle: string
+  specsBlurb: string
+  specsSite: string
+  specsLimitsCount: string
+  specsNone: string
+  specsEdit: string
+  specsView: string
+  specsFor: string
+  specsReadAs: string
+  specsParameter: string
+  specsBound: string
+  specsLimit: string
+  specsEffect: string
+  specsBoundMax: string
+  specsBoundMin: string
+  specsMustPass: string
+  specsEffectReject: string
+  specsEffectWatch: string
+  specsAdd: string
+  specsRemove: string
+  specsSave: string
+  specsSaved: string
+  specsEmptyEditor: string
+  specsNeedApi: string
+  specsUpdated: string
+  specsErrUnknownParameter: string
+  specsErrLimitRequired: string
+  specsErrDuplicate: string
+  specsErrMinAboveMax: string
+  specsErrInvalid: string
+  specsErrSite: string
+  storageSpecNoteSet: string
+  outOfSpec: string
+  inSpec: string
+  specBreachTitle: string
+  notRecorded: string
+  rangeFor: string
+  tooFewToCompare: string
+  tanksWithoutResult: string
+  tankCount: string
+  tankCountOne: string
+  retestCount: string
+  contractMax: string
+  floorAbove: string
+  watchBand: string
+  dailyLowHigh: string
+  groupSample: string
+  groupCore: string
+  groupOxidation: string
+  groupComposition: string
+  groupNotes: string
+  tankFill: string
+  productsInTanks: string
+  passMix: string
+  dayFlow: string
+  ffaPct: string
+  moisturePct: string
+  tempC: string
+  colourRLov: string
+  colourYLov: string
+  varianceAlert: string
+  varianceAlerts: string
+  varianceTooltip: string
+  varianceNone: string
+  varianceRuleNote: string
+  parameter: string
+  previousResult: string
+  change: string
+  current: string
+  truckScatter: string
+  vesselScatter: string
+  palkaStrip: string
+  ffaBySnapshot: string
+  dailyBandCaption: string
+  hourlyCaption: string
+  reasonOver: string
+  reasonRetest: string
+  reasonWatch: string
+  view: string
+  ageDaysShort: string
+  legend: string
+  loading: string
+  loginInvalid: string
+  loginThrottled: string
+  signingIn: string
+  administration: string
+  adminMenuTitle: string
+  adminIntro: string
+  userManagement: string
+  userManagementBlurb: string
+  roleManagement: string
+  roleManagementBlurb: string
+  dataHub: string
+  dataHubCode: string
+  inUse: string
+  liveLabel: string
+  lastReading: string
+  siteModules: string
+  siteModulesBlurb: string
+  siteModulesIntro: string
+  siteModulesSaved: string
+  moduleNotEnabled: string
+  moduleNotEnabledBody: string
+  switchSite: string
+  allLabel: string
+  notInUse: string
+  inactiveInDataHub: string
+  searchCompanies: string
+  searchSites: string
+  allCompanies: string
+  companiesShown: string
+  sitesShown: string
+  noCompaniesYet: string
+  noSitesYet: string
+  pullFromDataHub: string
+  sitesInUse: string
+  activatedNotice: string
+  deactivatedNotice: string
+  timezoneSaved: string
+  invalidTimezone: string
+  searchRoles: string
+  rolesShown: string
+  roleAccess: string
+  roleInUseHint: string
+  deleteRoleTitle: string
+  deleteRoleBody: string
+  detailsTab: string
+  permissionsTab: string
+  presets: string
+  presetReadOnly: string
+  presetFull: string
+  presetClear: string
+  selectAllFor: string
+  systemRoleNote: string
+  newRoleHint: string
+  rolesSummary: string
+  allUsers: string
+  noEmail: string
+  noSiteAccess: string
+  searchUsers: string
+  allRoles: string
+  usersShown: string
+  clearFilters: string
+  deleteUserTitle: string
+  deleteUserBody: string
+  accountTab: string
+  newUserHint: string
+  activeHelp: string
+  sitesSelected: string
+  sitesKept: string
+  noAccessWarning: string
+  activated: string
+  notActivated: string
+  activate: string
+  deactivate: string
+  activationNeedsCompany: string
+  activationHasSites: string
+  managedInDataHub: string
+  backToAdmin: string
+  users: string
+  user: string
+  addUser: string
+  editUser: string
+  username: string
+  displayName: string
+  email: string
+  password: string
+  newPasswordOptional: string
+  active: string
+  roles: string
+  siteAccess: string
+  search: string
+  allStatuses: string
+  activeStatus: string
+  inactiveStatus: string
+  noUsers: string
+  noMatch: string
+  userSaved: string
+  userDeleted: string
+  deleteUserConfirm: string
+  saving: string
+  systemSuffix: string
+  rolesHelp: string
+  sitesHelp: string
+  searchSite: string
+  selectVisible: string
+  clearVisible: string
+  noRoles: string
+  noSites: string
+  accessNotConfigured: string
+  noSiteBody: string
+  accessDenied: string
+  accessDeniedBody: string
+  changePassword: string
+  signOut: string
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+  passwordUpdated: string
+  permissionView: string
+  permissionEdit: string
+  permissionDelete: string
+  roleSaved: string
+  roleDeleted: string
+  deleteRoleConfirm: string
+  addRole: string
+  editRole: string
+  roleName: string
+  description: string
+  usersCount: string
+  noRolesYet: string
+  pages: string
+  operationsGroup: string
+  managementGroup: string
+  stockOverview: string
+  mgPrint: string
+  mgCopyLink: string
+  mgLinkCopied: string
+  mgAllSites: string
+  mgKpiStock: string
+  mgKpiCapacity: string
+  mgKpiFill: string
+  mgKpiTanks: string
+  mgKpiFree: string
+  mgCardFreeTitle: string
+  mgCardFreeNote: string
+  mgVsYesterday: string
+  mgNeedsAttention: string
+  mgNothingToFlag: string
+  mgAttNearFull: string
+  mgAttOver: string
+  mgAttEmpty: string
+  mgAttNoData: string
+  mgAttStale: string
+  mgBySite: string
+  mgByCommodity: string
+  mgColSite: string
+  mgColStockCap: string
+  mgColFill: string
+  mgColMix: string
+  mgColChange: string
+  mgColData: string
+  mgColClass: string
+  mgColTank: string
+  mgColProduct: string
+  mgColQty: string
+  mgColCap: string
+  mgColTemp: string
+  mgColStatus: string
+  mgColTanks: string
+  mgStOk: string
+  mgStNearFull: string
+  mgStOver: string
+  mgStEmpty: string
+  mgStNoData: string
+  mgRounds: string
+  mgOldData: string
+  mgAgoMin: string
+  mgAgoHour: string
+  mgAgoDay: string
+  mgAgoToday: string
+  mgTanksReporting: string
+  mgClassRefined: string
+  mgClassGlycerin: string
+  mgClassChemical: string
+  mgClassOther: string
+  mgSplitLabel: string
+  mgSplitGrouped: string
+  mgSplitProducts: string
+  mgSplitShow: string
+  mgSplitHide: string
+  mgCardProducts: string
+  mgClassCpo: string
+  mgClassFame: string
+  mgClassPfad: string
+  mgClassPkfad: string
+  mgClassCpko: string
+  mgShortCpo: string
+  mgShortFame: string
+  mgShortPfad: string
+  mgShortPkfad: string
+  mgShortCpko: string
+  mgClassPome: string
+  mgClassRpome: string
+  mgClassLimbah: string
+  mgClassSludge: string
+  mgShortPome: string
+  mgShortRpome: string
+  mgShortLimbah: string
+  mgShortSludge: string
+  mgShortRefined: string
+  mgShortGlycerin: string
+  mgShortChemical: string
+  mgShortOther: string
+  mgHistory: string
+  mgHistoryNone: string
+  mgSiteFailed: string
+  mgLoadFailed: string
+  mgNoSites: string
+  mgCapacityNote: string
+  mgNearFullFrom: string
+  mgBackTo: string
+  mgClose: string
+  mgNoTanks: string
+  mgTipShare: string
+  mgTipLargest: string
+  mgTipOpen: string
+  dsSource: string
+  dsAtg: string
+  dsLogsheet: string
+  dsAtgHint: string
+  dsLogsheetHint: string
+  mgCardFreeSpace: string
+  mgCardNotCounted: string
+  mgCardSpread: string
+  mgCardFullest: string
+  mgCardOpenSite: string
+  mgCardOpenCommodity: string
+  mgCardStockTitle: string
+  mgCardCapTitle: string
+  mgCardFillTitle: string
+  mgCardTanksTitle: string
+  mgCardCounted: string
+  mgCardNoReading: string
+  masterGroup: string
+  refineryFractionation: string
+  utility: string
+  utilityOverview: string
+  utilityBoiler: string
+  utilityCoal: string
+  utilityWater: string
+  utilityEffluent: string
+  utilityLoader: string
+  utilityPower: string
+  utilityNote: string
+  latestDay: string
+  logged: string
+  emptySheet: string
+  notSubmitted: string
+  notLogged: string
+  outsidePrinted: string
+  checklistNo: string
+  printedRange: string
+  periodRange: string
+  readingCount: string
+  daysLogged: string
+  daysLoggedOf: string
+  formsSubmitted: string
+  byHour: string
+  labBandCaption: string
+  date: string
+  shift: string
+  boilerDaysLogged: string
+  coalBuckets: string
+  coalRatio: string
+  printedRatio: string
+  attentionItems: string
+  sourceBoard: string
+  coalAndRatio: string
+  coalRatioCaption: string
+  waterCoverage: string
+  roCleaning: string
+  performedOn: string
+  doneBy: string
+  roVerifications: string
+  checkYes: string
+  checkNo: string
+  reasonOutside: string
+  reasonNotLogged: string
+  reasonEmpty: string
+  reasonChecklistNo: string
+  noUtilityRows: string
+  noDataDay: string
+  controlRoom: string
+  localPanel: string
+  boilerNote: string
+  hourlyLog: string
+  latestAgainstPrinted: string
+  boilerChemicals: string
+  chemicalNote: string
+  chemical: string
+  lastRemaining: string
+  lastLog: string
+  usedOnLogDays: string
+  daysWithLog: string
+  coalSteamNote: string
+  steamDistribution: string
+  steamMeterCaption: string
+  incomingCoalDays: string
+  incomingCoal: string
+  utilityPeriod: string
+  form: string
+  shiftLog: string
+  fuelClockLog: string
+  steamMeter: string
+  waterNote: string
+  boilerWaterGroup: string
+  wtpGroup: string
+  testsRecorded: string
+  samplePointsLogged: string
+  daysSinceRo: string
+  samplePoint: string
+  test: string
+  printedSpec: string
+  labRoster: string
+  wwtpCoverage: string
+  effluentCoverage: string
+  inletCod: string
+  outletCod: string
+  outletTss: string
+  inletVsOutlet: string
+  inlet: string
+  outlet: string
+  generalLevels: string
+  loaderNote: string
+  hoursRun: string
+  runs: string
+  fuelWritten: string
+  fuelRuns: string
+  checklistNoItems: string
+  dailyHours: string
+  loaderCaption: string
+  checklist: string
+  checklistAllYes: string
+  yesItems: string
+  runRoster: string
+  hourStart: string
+  hourEnd: string
+  printedTotal: string
+  fuelL: string
+  oilL: string
+  coverage: string
+  logsheetCatalog: string
+  qualityRules: string
+  requestFailed: string
+  loadFailed: string
+  usernameRequired: string
+  passwordRequired: string
+  passwordShort: string
+  usernameTaken: string
+  emailTaken: string
+  lastAdmin: string
+  cannotGrantRole: string
+  cannotGrantPermission: string
+  cannotManageUser: string
+  cannotChangeOwnRoles: string
+  selfDeactivate: string
+  selfDelete: string
+  currentPasswordRequired: string
+  newPasswordRequired: string
+  samePassword: string
+  badCurrentPassword: string
+  confirmMismatch: string
+  roleNameRequired: string
+  roleNameTaken: string
+  systemRoleLocked: string
+  roleInUse: string
 }
 
 export const MESSAGES: Record<Locale, Messages> = {
@@ -313,6 +866,23 @@ export const MESSAGES: Record<Locale, Messages> = {
     brandMark: 'PI',
     brandTitle: 'Plant Information',
     brandSub: 'Dashboard',
+    corpName: 'KPN CORP',
+    loginPitch: 'Watch tank stock, quality, and daily production from one place.',
+    welcomeBack: 'Welcome back',
+    signInContinue: 'Sign in to continue to Plant Information Dashboard',
+    loginUsername: 'Username or email',
+    loginUsernamePlaceholder: 'Enter username or email',
+    loginPassword: 'Password',
+    loginPasswordPlaceholder: 'Enter password',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
+    signIn: 'Sign In',
+    signInViaDwsHub: 'Sign in via Dws Hub',
+    backToSignIn: 'Back to sign in',
+    ssoErrorTitle: 'Sign-in could not be completed',
+    ssoErrorFallback: 'Downstream Hub could not sign you in. Try again, or use your username and password.',
+    loginRequired: 'Enter your username and password.',
+    copyright: '© {{year}} KPN Corporation. All rights reserved.',
     liveOps: 'Tank & Stock Dashboard',
     opsAnalytics: 'Tank Level & Temperature',
     analyticsTitle: 'Tank Level & Temperature',
@@ -345,6 +915,16 @@ export const MESSAGES: Record<Locale, Messages> = {
     tempSpikeHint: 'Red when the temperature is more than 30% above the average temperature.',
     ffaAgeHint: 'Red when the latest lab result is more than 7 days old.',
     emptySpace: 'Empty space',
+    labShort: 'Lab',
+    labNotConnected: 'Lab results are not connected for this site yet.',
+    labNotOnCertificate: 'Not on the latest certificate for this product',
+    labNoResult: 'No lab result yet',
+    colourRangeHint: 'Average. Range across tanks: R {r} · Y {y}',
+    colourOneTank: 'One tank: its latest certificate',
+    tankEmptyWord: 'Empty',
+    tankNoDataWord: 'No data',
+    capacityOf: 'of {cap}',
+    capacityNotSet: 'Capacity not set',
     loadable: 'Loadable',
     rangeAverage: 'Average',
     rangeMax: 'Max',
@@ -353,10 +933,36 @@ export const MESSAGES: Record<Locale, Messages> = {
     totalQuantity: 'Total quantity',
     avgLevel: 'Average tank level',
     avgTemp: 'Avg temp',
+    storageUtilization: 'Overall storage utilization',
+    activeVsEmpty: 'Active vs empty tanks',
+    activeEmptySub: 'active / empty',
+    criticalAlerts: 'Critical alerts',
+    criticalAlertsSub: 'Over 95% full or temperature anomaly',
+    tanksHolding: '{held} of {total} tanks',
+    avgQuality: 'Avg quality',
+    selectDay: 'Day',
+    massUnit: 'Quantity unit',
+    unitTon: 'Ton',
+    unitKg: 'Kg',
+    kpiDetailHint: 'Show details',
+    activeTanks: 'Active tanks',
+    emptyTanks: 'Empty tanks',
+    reasonOverfill: 'Over 95% full ({value})',
+    reasonHotTemp: '{value} against the {avg} average',
+    noCriticalAlerts: 'No tank is over 95% full or running hot.',
+    alertRule: 'A tank is critical when it is more than 95% full, or more than 30% hotter than the farm average temperature ({avg}).',
+    gateSamplesWindow: 'Judged incoming CPO samples, {start} – {end}',
+    vehicle: 'Vessel / truck',
+    sampleDay: 'Sampled',
+    modeVessel: 'Vessel',
+    modeTruck: 'Truck',
+    noRows: 'Nothing to show.',
     throughput: 'Throughput (mass)',
     approvalRate: 'Lab approval rate',
     unavailable: '—',
     period: 'Period',
+    periodDaily: 'Daily',
+    periodMonthly: 'Monthly',
     tank: 'Tank',
     status: 'Status',
     levelTemp: 'Tank level & temperature',
@@ -405,6 +1011,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     tankFarm: 'Tank Farm',
     tanks: 'Tanks',
     tankFarmBlurb: 'Tanks and the calibration numbers the Tank & Stock Dashboard uses for quantity. Managed in this application.',
+    tankGauging: 'Tank gauging',
+    tankGaugingBlurb: 'Tanks read from the gauge system (TankVision): which units a site is read from, when daily rounds are taken, and what each tank reads now.',
     badgeDatahub: 'DataHub',
     badgeThisPlant: 'This plant',
     openPage: 'Open →',
@@ -557,6 +1165,31 @@ export const MESSAGES: Record<Locale, Messages> = {
     qcVessel: 'Incoming by Vessel',
     qcTruck: 'Incoming by Truck',
     qcMovements: 'Oil in and out',
+    refineryQuality: 'Refinery quality',
+    hoursLogged: 'Hours logged',
+    finishedFfa: 'Finished FFA',
+    feedFfa: 'Feed FFA',
+    byproductFfa: 'By-product FFA',
+    streamsTitle: 'Streams',
+    readingsTitle: 'Readings',
+    declaredNotTested: 'Declared, not tested',
+    rangeLow: 'Low',
+    rangeHigh: 'High',
+    time: 'Time',
+    fromTank: 'From tank',
+    flowRate: 'Flow',
+    finishedOil: 'Finished oil',
+    feedOil: 'Feed oil',
+    colour: 'Colour',
+    toTank: 'To tank',
+    rawMaterial: 'Raw material',
+    bleachingOil: 'Bleaching',
+    finishedGood: 'Finished good',
+    byProduct: 'By-product',
+    spentEarth: 'Spent earth',
+    bleachRed: 'Bleach R',
+    spentEarthOc: 'Spent earth OC',
+    noSample: 'No sample',
     tanksLogged: 'Tanks logged',
     retestDue: 'Retest due',
     oilTypes: 'Oil types',
@@ -567,7 +1200,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     vesselTickets: 'Vessel tickets',
     palkaSamples: 'Palka samples',
     movementCount: 'Movements',
-    gatePeriodNote: 'Gate counts cover the full printed period {period}, not the date range above.',
+    gatePeriodNote: 'Counts follow the date range above. The sheet spans {period}.',
     analysisDate: 'Analysis date',
     ageDays: 'Age (days)',
     slipPoint: 'Slip point',
@@ -611,6 +1244,479 @@ export const MESSAGES: Record<Locale, Messages> = {
     resultValue: 'Value',
     incomplete: 'Incomplete',
     noSampleDate: 'No sampling date',
+    needsAttention: 'Needs attention',
+    nothingNeedsAttention: 'Nothing needs attention in this range.',
+    moreItems: '+{count} more',
+    overMax: 'Over max',
+    watch: 'Watch',
+    noSpec: 'No spec',
+    qualityAverageOf: 'Average of {n} tanks',
+    qualityLimit: 'Limit {range}',
+    qualityOutTanks: '{n} of {total} tanks out of spec',
+    qualityWatchTanks: '{n} of {total} tanks on watch',
+    qualityAverageOut: 'The average is outside the limit',
+    qualityChange: '{pct} since yesterday (was {previous})',
+    qualityChangedFlag: 'Changed since yesterday',
+    qualityOdourFailed: 'Odour failed in {n} tanks',
+    qualityByProduct: 'Quality by product',
+    qualityHint: 'Average lab result of the tanks holding stock. Red: outside a limit set on Master > Commodities. Amber: outside a watch limit. Arrow: moved 15% or more since yesterday.',
+    specsTitle: 'Storage quality limits',
+    specsBlurb: 'Each oil is judged against its own limits at each site. A result that breaks an "Out of spec" limit puts the tank out of spec on QC Storage and Live Ops; a "Watch" limit only marks the figure. An oil with no limits stays "No spec".',
+    specsSite: 'Site',
+    specsLimitsCount: '{n} limits',
+    specsNone: 'No limits',
+    specsEdit: 'Edit limits',
+    specsView: 'View limits',
+    specsFor: '{name} at {site}',
+    specsReadAs: 'Read from logsheets as: {aliases}',
+    specsParameter: 'Parameter',
+    specsBound: 'Bound',
+    specsLimit: 'Limit',
+    specsEffect: 'If broken',
+    specsBoundMax: 'Max',
+    specsBoundMin: 'Min',
+    specsMustPass: 'Must pass',
+    specsEffectReject: 'Out of spec',
+    specsEffectWatch: 'Watch',
+    specsAdd: 'Add limit',
+    specsRemove: 'Remove limit',
+    specsSave: 'Save limits',
+    specsSaved: 'Limits for {name} at {site} saved.',
+    specsEmptyEditor: 'No limits yet. Results for this oil show "No spec" until you add one.',
+    specsNeedApi: 'Quality limits are kept on the server. Run the app with VITE_DATA_SOURCE=api to edit them.',
+    specsUpdated: 'Last changed {day}',
+    specsErrUnknownParameter: 'Pick a parameter for every limit.',
+    specsErrLimitRequired: 'Enter a number for every limit.',
+    specsErrDuplicate: 'A parameter can have one Max and one Min.',
+    specsErrMinAboveMax: 'A Min is above the Max for the same parameter.',
+    specsErrInvalid: 'The limits could not be saved. Check each row.',
+    specsErrSite: 'This site is not available to you.',
+    storageSpecNoteSet: 'Each oil is judged against its own limits, set per commodity on Master > Commodities. A red figure breaks an Out of spec limit; an amber figure breaks a Watch limit. A retest badge means the analysis is more than 2 days older than the snapshot. Figures are shown as written on the form.',
+    outOfSpec: 'Out of spec',
+    inSpec: 'In spec',
+    specBreachTitle: '{label} {value}, limit {bound} {limit}',
+    notRecorded: 'Not recorded',
+    rangeFor: 'Range for {product}, {from}–{to} · {count} results',
+    tooFewToCompare: 'Too few results to compare',
+    tanksWithoutResult: '{count} tanks without a result',
+    tankCount: '{count} tanks',
+    tankCountOne: '1 tank',
+    retestCount: '{count} retest',
+    contractMax: 'max {value}',
+    floorAbove: 'above {value}',
+    watchBand: 'watch band {low}–{high}',
+    dailyLowHigh: 'daily low–high',
+    groupSample: 'Sample',
+    groupCore: 'Core',
+    groupOxidation: 'Oxidation',
+    groupComposition: 'Composition',
+    groupNotes: 'Notes',
+    tankFill: 'Fill',
+    productsInTanks: 'Products in tanks',
+    passMix: 'Pass mix',
+    dayFlow: 'Product flow',
+    ffaPct: 'FFA %',
+    moisturePct: 'M&I %',
+    tempC: 'Temp °C',
+    colourRLov: 'R (Lovibond)',
+    colourYLov: 'Y (Lovibond)',
+    varianceAlert: 'Variance',
+    varianceAlerts: 'Variance alerts',
+    varianceTooltip: 'Moved {pct} from {previous} on {day}',
+    varianceNone: 'No parameter moved 15% or more from its last recorded result.',
+    varianceRuleNote: 'Flagged when a result moves 15% or more from the tank\u2019s last recorded result for that parameter, past a small floor so near-zero readings do not trigger it.',
+    parameter: 'Parameter',
+    previousResult: 'Previous result',
+    change: 'Change',
+    current: 'Current',
+    truckScatter: 'FFA % against M&I % · one dot per truck · lines at the contract max',
+    vesselScatter: 'Composite FFA % against M&I % · one dot per ticket · lines at the contract max',
+    palkaStrip: 'FFA % per hold sample · line at the contract max',
+    ffaBySnapshot: 'FFA % by snapshot · shaded band is the product range',
+    dailyBandCaption: 'Shaded band runs from the daily low to the daily high. Click a day to open its hours.',
+    hourlyCaption: 'Finished FFA % by hour. Shading marks each finished-product run.',
+    reasonOver: '{param} {value} over max {max}',
+    reasonRetest: 'Analysis {days} days old',
+    reasonWatch: '{param} {value} outside the watch band',
+    view: 'View',
+    ageDaysShort: '{days} d',
+    legend: 'Legend',
+    loading: 'Loading…',
+    loginInvalid: 'Invalid username or password.',
+    loginThrottled: 'Too many failed sign-in attempts. Wait 15 minutes and try again.',
+    signingIn: 'Signing in…',
+    administration: 'Administration',
+    adminMenuTitle: 'Administration',
+    adminIntro: 'Manage who can sign in, which sites they see, and what each role may do.',
+    userManagement: 'User Management',
+    userManagementBlurb: 'Create users, assign roles, and assign sites.',
+    roleManagement: 'Role Management',
+    roleManagementBlurb: 'Define roles and the pages they can view, edit, or delete.',
+    dataHub: 'DataHub',
+    dataHubCode: 'DataHub code',
+    inUse: 'In use',
+    liveLabel: 'Live',
+    lastReading: 'Last reading',
+    siteModules: 'Site modules',
+    siteModulesBlurb: 'Choose which modules each site uses, such as the Tank & Stock Dashboard, quality control or utility.',
+    siteModulesIntro: 'Tick the modules a site has data for. A module that is off disappears from the menu of that site, and its screens and data are closed.',
+    siteModulesSaved: 'Saved',
+    moduleNotEnabled: 'Not available for this site',
+    moduleNotEnabledBody: 'This module is not switched on for the site you are viewing. Pick another site, or ask an administrator to turn it on.',
+    switchSite: 'Switch site',
+    allLabel: 'All',
+    notInUse: 'Not in use',
+    inactiveInDataHub: 'Inactive in DataHub',
+    searchCompanies: 'Search name or code',
+    searchSites: 'Search site, company or code',
+    allCompanies: 'All companies',
+    companiesShown: '{n} of {total} companies',
+    sitesShown: '{n} of {total} sites',
+    noCompaniesYet: 'No companies yet. Pull them from DataHub.',
+    noSitesYet: 'No sites yet. Pull them from DataHub.',
+    pullFromDataHub: 'Pull from DataHub',
+    sitesInUse: '{n} of {total} sites in use',
+    activatedNotice: '{name} is now in use.',
+    deactivatedNotice: '{name} is no longer in use.',
+    timezoneSaved: '{name} timezone set to {zone}.',
+    invalidTimezone: 'That timezone is not valid.',
+    searchRoles: 'Search roles',
+    rolesShown: '{n} of {total} roles',
+    roleAccess: 'Access',
+    roleInUseHint: 'Assigned to {n} user(s). Remove it from them first.',
+    deleteRoleTitle: 'Delete this role?',
+    deleteRoleBody: '{name} will be removed. This cannot be undone.',
+    detailsTab: 'Details',
+    permissionsTab: 'Permissions',
+    presets: 'Presets',
+    presetReadOnly: 'Read only',
+    presetFull: 'Full access',
+    presetClear: 'Clear all',
+    selectAllFor: 'Select all: {what}',
+    systemRoleNote: 'System roles keep their name.',
+    newRoleHint: 'Name the role and choose what it may do',
+    rolesSummary: 'View {v} · Edit {e} · Delete {d}',
+    allUsers: 'All users',
+    noEmail: 'No email',
+    noSiteAccess: 'No site access',
+    searchUsers: 'Search name, email, role or site',
+    allRoles: 'All roles',
+    usersShown: '{n} of {total} users',
+    clearFilters: 'Clear filters',
+    deleteUserTitle: 'Delete this user?',
+    deleteUserBody: '{name} will no longer be able to sign in. This cannot be undone.',
+    accountTab: 'Account',
+    newUserHint: 'Set up a sign-in, roles and site access',
+    activeHelp: 'Inactive users cannot sign in.',
+    sitesSelected: '{n} of {total} sites selected',
+    sitesKept: '{n} more kept as they are',
+    noAccessWarning: 'No site selected: this user cannot open any data.',
+    activated: 'Activated',
+    notActivated: 'Not activated',
+    activate: 'Activate',
+    deactivate: 'Deactivate',
+    activationNeedsCompany: 'Activate the company first.',
+    activationHasSites: 'Deactivate its sites first.',
+    managedInDataHub: 'Managed in DataHub. Pull changes from Administration, DataHub.',
+    backToAdmin: '← Back to Administration',
+    users: 'Users',
+    user: 'User',
+    addUser: 'Add User',
+    editUser: 'Edit User',
+    username: 'Username',
+    displayName: 'Display name',
+    email: 'Email',
+    password: 'Password',
+    newPasswordOptional: 'New password (optional)',
+    active: 'Active',
+    roles: 'Roles',
+    siteAccess: 'Site access',
+    search: 'Search',
+    allStatuses: 'All statuses',
+    activeStatus: 'Active',
+    inactiveStatus: 'Inactive',
+    noUsers: 'No users yet.',
+    noMatch: 'No entries match the current filters.',
+    userSaved: 'User saved. {n} site(s) assigned.',
+    userDeleted: 'User deleted.',
+    deleteUserConfirm: 'Delete this user? They will no longer be able to sign in.',
+    saving: 'Saving…',
+    systemSuffix: '(system)',
+    rolesHelp: 'Roles control which pages this user can view, edit, or delete.',
+    sitesHelp: 'A user with no site assigned cannot open operational or master data.',
+    searchSite: 'Search site…',
+    selectVisible: 'Select visible',
+    clearVisible: 'Clear visible',
+    noRoles: 'No roles found.',
+    noSites: 'No sites found.',
+    accessNotConfigured: 'Access not configured',
+    noSiteBody: 'No site assigned. Contact a Plant Information Dashboard administrator.',
+    accessDenied: 'Access denied',
+    accessDeniedBody: 'You do not have permission to view this page.',
+    changePassword: 'Change password',
+    signOut: 'Sign out',
+    currentPassword: 'Current password',
+    newPassword: 'New password',
+    confirmPassword: 'Confirm password',
+    passwordUpdated: 'Your password has been updated.',
+    permissionView: 'View',
+    permissionEdit: 'Edit',
+    permissionDelete: 'Delete',
+    roleSaved: 'Role saved.',
+    roleDeleted: 'Role deleted.',
+    deleteRoleConfirm: 'Delete this role?',
+    addRole: 'Add Role',
+    editRole: 'Edit Role',
+    roleName: 'Role name',
+    description: 'Description',
+    usersCount: 'Users',
+    noRolesYet: 'No roles yet.',
+    pages: 'Page',
+    operationsGroup: 'Operations',
+    managementGroup: 'Management',
+    stockOverview: 'Stock Overview',
+    mgPrint: 'Print',
+    mgCopyLink: 'Copy link',
+    mgLinkCopied: 'Link copied',
+    mgAllSites: 'All sites',
+    mgKpiStock: 'Stock',
+    mgKpiCapacity: 'Capacity',
+    mgKpiFill: 'Fill level',
+    mgKpiTanks: 'Tanks reporting',
+    mgKpiFree: 'Free space',
+    mgCardFreeTitle: 'Free space by site',
+    mgCardFreeNote: 'Free space is capacity minus stock, for tanks that have a reading and a capacity.',
+    mgVsYesterday: 'vs yesterday',
+    mgNeedsAttention: 'Needs attention',
+    mgNothingToFlag: 'Nothing needs attention.',
+    mgAttNearFull: '{count} tanks at {pct}% full or more',
+    mgAttOver: '{count} tanks over capacity, check the data',
+    mgAttEmpty: '{count} empty tanks',
+    mgAttNoData: '{count} tanks with no data',
+    mgAttStale: '{count} sites with old data',
+    mgBySite: 'By site',
+    mgByCommodity: 'By commodity',
+    mgColSite: 'Site',
+    mgColStockCap: 'Stock vs capacity',
+    mgColFill: 'Fill',
+    mgColMix: 'Mix (t)',
+    mgColChange: 'Change',
+    mgColData: 'Data',
+    mgColClass: 'Commodity',
+    mgColTank: 'Tank',
+    mgColProduct: 'Product',
+    mgColQty: 'Stock (t)',
+    mgColCap: 'Capacity (t)',
+    mgColTemp: 'Temp (°C)',
+    mgColStatus: 'Status',
+    mgColTanks: 'Tanks',
+    mgStOk: 'Normal',
+    mgStNearFull: 'Near full',
+    mgStOver: 'Over capacity',
+    mgStEmpty: 'Empty',
+    mgStNoData: 'No data',
+    mgRounds: 'Rounds',
+    mgOldData: 'Old data',
+    mgAgoMin: '{n}m ago',
+    mgAgoHour: '{n}h ago',
+    mgAgoDay: '{n}d ago',
+    mgAgoToday: 'today',
+    mgTanksReporting: '{a} of {b} tanks',
+    mgClassRefined: 'Refined oils',
+    mgClassGlycerin: 'Glycerin & fatty matter',
+    mgClassChemical: 'Chemicals',
+    mgClassOther: 'Other',
+    mgSplitLabel: 'Grouped commodities',
+    mgSplitGrouped: 'Grouped',
+    mgSplitProducts: 'By product',
+    mgSplitShow: 'Show products',
+    mgSplitHide: 'Hide products',
+    mgCardProducts: 'Products',
+    mgClassCpo: 'CPO',
+    mgClassFame: 'FAME',
+    mgClassPfad: 'PFAD',
+    mgClassPkfad: 'PKFAD',
+    mgClassCpko: 'CPKO',
+    mgShortCpo: 'CPO',
+    mgShortFame: 'FAME',
+    mgShortPfad: 'PFAD',
+    mgShortPkfad: 'PKFAD',
+    mgShortCpko: 'CPKO',
+    mgClassPome: 'POME',
+    mgClassRpome: 'RPOME',
+    mgClassLimbah: 'LIMBAH',
+    mgClassSludge: 'SLUDGE',
+    mgShortPome: 'POME',
+    mgShortRpome: 'RPOME',
+    mgShortLimbah: 'Limbah',
+    mgShortSludge: 'Sludge',
+    mgShortRefined: 'Refined',
+    mgShortGlycerin: 'Glycerin',
+    mgShortChemical: 'Chemicals',
+    mgShortOther: 'Other',
+    mgHistory: 'History',
+    mgHistoryNone: 'No history for this tank yet.',
+    mgSiteFailed: '{site} could not be loaded.',
+    mgLoadFailed: 'The overview could not be loaded.',
+    mgNoSites: 'No site with the Tank farm module is available to you.',
+    mgCapacityNote: 'Capacity is each tank’s nameplate capacity. Fill level counts only tanks that have both a reading and a capacity.',
+    mgNearFullFrom: 'Near full from {pct}%',
+    mgBackTo: 'Back to {where}',
+    mgClose: 'Close',
+    mgNoTanks: 'No tanks to show.',
+    mgTipShare: '{pct} of site stock',
+    mgTipLargest: 'Largest tanks',
+    mgTipOpen: 'Open {cls} at {site}',
+    dsSource: 'Data source',
+    dsAtg: 'ATG Tank Vision',
+    dsLogsheet: 'Logsheet',
+    dsAtgHint: 'Read automatically from the tank gauging system.',
+    dsLogsheetHint: 'Entered by operators on the daily logsheets.',
+    mgCardFreeSpace: 'Free space',
+    mgCardNotCounted: 'No reading from {tanks} tanks, so {cap} t of capacity is not in the fill level.',
+    mgCardSpread: 'Tank fill spread',
+    mgCardFullest: 'Closest to full',
+    mgCardOpenSite: 'Open {site}',
+    mgCardOpenCommodity: 'Open {cls} across sites',
+    mgCardStockTitle: 'Stock by site',
+    mgCardCapTitle: 'Capacity by site',
+    mgCardFillTitle: 'Fill level by site',
+    mgCardTanksTitle: 'Tank status',
+    mgCardCounted: 'In fill level',
+    mgCardNoReading: 'No reading',
+    masterGroup: 'Master data',
+    refineryFractionation: 'Refinery and fractionation',
+    utility: 'Utility',
+    utilityOverview: 'Utility overview',
+    utilityBoiler: 'Boiler',
+    utilityCoal: 'Coal & fuel',
+    utilityWater: 'Water',
+    utilityEffluent: 'Effluent',
+    utilityLoader: 'Loader',
+    utilityPower: 'Power',
+    utilityNote: 'Values are shown as written on the utility logsheets. A range printed on the sheet is context, not a pass or fail. Boiler steam meters are not added to the refinery steam on the production report.',
+    latestDay: 'Latest day',
+    logged: 'Logged',
+    emptySheet: 'Empty sheet',
+    notSubmitted: 'Not submitted',
+    notLogged: 'Not logged',
+    outsidePrinted: 'Outside printed range',
+    checklistNo: 'Checklist no',
+    printedRange: 'printed {spec}',
+    periodRange: 'range in this period · {count} results',
+    readingCount: '{count} readings',
+    daysLogged: 'Days logged',
+    daysLoggedOf: '{logged} of {days} days',
+    formsSubmitted: '{submitted} of {total} forms submitted',
+    byHour: 'by hour',
+    labBandCaption: 'Shaded band runs from the daily low to the daily high. The grey band or dashed line is the range printed on the sheet.',
+    date: 'Date',
+    shift: 'Shift',
+    boilerDaysLogged: 'Boiler days logged (F/UTI-001)',
+    coalBuckets: 'Coal consumed (buckets)',
+    coalRatio: 'Latest coal ratio (kg/mt steam)',
+    printedRatio: 'Printed ratio (kg/mt steam)',
+    attentionItems: 'Items needing attention',
+    sourceBoard: 'Logsheets in this range',
+    coalAndRatio: 'Coal and ratio',
+    coalRatioCaption: 'Coal buckets per day, with the last printed ratio of each day on its own axis. A day without a sheet is a gap.',
+    waterCoverage: 'Water coverage',
+    roCleaning: 'RO cleaning',
+    performedOn: 'Performed on',
+    doneBy: 'Done by',
+    roVerifications: '{count} verifications after cleaning',
+    checkYes: 'Yes',
+    checkNo: 'No',
+    reasonOutside: '{value}, printed {spec}',
+    reasonNotLogged: 'Last log {date}',
+    reasonEmpty: 'Sheet for {date} has no rows',
+    reasonChecklistNo: 'Answered no on {date}',
+    noUtilityRows: 'No utility logs in this range.',
+    noDataDay: 'The sheet for this day has no readings.',
+    controlRoom: 'Control Room',
+    localPanel: 'Local',
+    boilerNote: 'Taihu 15 TPH. Wuxi 15 TPH has no submissions. The steam flowmeter is a meter reading and is not refinery steam. Click a number to see that tag across the range.',
+    hourlyLog: 'Hourly log',
+    latestAgainstPrinted: 'Latest hour against the printed range',
+    boilerChemicals: 'Boiler chemicals',
+    chemicalNote: 'Logged on {count} days in this range. Remaining is a spot reading, not a stock balance.',
+    chemical: 'Chemical',
+    lastRemaining: 'Last remaining',
+    lastLog: 'Last log',
+    usedOnLogDays: 'Used on log days',
+    daysWithLog: 'Days with a log',
+    coalSteamNote: 'Steam on this tab is the boiler meter. It is not added to the refinery steam on the production report. The ratio is shown as printed.',
+    steamDistribution: 'Steam distribution (kg, meter)',
+    steamMeterCaption: 'Steam distribution per day from the coal logsheet. A day without a sheet is a gap.',
+    incomingCoalDays: 'Days with incoming coal',
+    incomingCoal: 'Incoming coal (kg)',
+    utilityPeriod: '{start} – {end}',
+    form: 'Form',
+    shiftLog: 'Shift log',
+    fuelClockLog: 'Fuel clock log',
+    steamMeter: 'Steam (meter reading)',
+    waterNote: 'Each result is compared only with the range printed in its own tag. Click a result to see that test across the range.',
+    boilerWaterGroup: 'Boiler water',
+    wtpGroup: 'WTP & WWTP',
+    testsRecorded: 'Tests recorded',
+    samplePointsLogged: 'Sample points logged',
+    daysSinceRo: 'Days since RO cleaning',
+    samplePoint: 'Sample point',
+    test: 'Test',
+    printedSpec: 'Printed range',
+    labRoster: 'Results',
+    wwtpCoverage: 'WWTP log coverage',
+    effluentCoverage: '{logged} of {days} days in this range have a WWTP log.',
+    inletCod: 'Inlet COD',
+    outletCod: 'Outlet COD',
+    outletTss: 'Outlet TSS',
+    inletVsOutlet: 'Inlet and outlet',
+    inlet: 'Inlet',
+    outlet: 'Outlet',
+    generalLevels: 'General levels',
+    loaderNote: 'Totals are shown as printed on the sheet. Fuel and oil appear only on the runs where they were written.',
+    hoursRun: 'Hours run',
+    runs: 'Runs',
+    fuelWritten: 'Fuel written (L)',
+    fuelRuns: '{count} runs with fuel',
+    checklistNoItems: 'Checklist no items (latest day)',
+    dailyHours: 'Daily hours',
+    loaderCaption: 'Printed hours per day. Green dots mark the days fuel was written.',
+    checklist: 'Checklist',
+    checklistAllYes: 'Every item was answered yes.',
+    yesItems: '{count} yes items',
+    runRoster: 'Hour meter runs',
+    hourStart: 'Hour meter start',
+    hourEnd: 'Hour meter end',
+    printedTotal: 'Total (printed)',
+    fuelL: 'Fuel (L)',
+    oilL: 'Oil (L)',
+    coverage: 'Coverage',
+    logsheetCatalog: 'Logsheet catalog',
+    qualityRules: 'Quality rules',
+    requestFailed: 'The request could not be completed.',
+    loadFailed: 'Some data could not be loaded, so figures on this page may be missing. Refresh the page to try again.',
+    usernameRequired: 'Username is required.',
+    passwordRequired: 'Password is required for a new user.',
+    passwordShort: 'Password must be at least 6 characters.',
+    usernameTaken: 'Username is already in use.',
+    emailTaken: 'Email is already in use.',
+    lastAdmin: 'At least one active administrator must remain.',
+    cannotGrantRole: 'You can only give or remove roles whose rights you hold yourself. Only an Administrator can give the Administrator role.',
+    cannotGrantPermission: 'You can only give a role rights that you hold yourself.',
+    cannotManageUser: 'This user has a role with more rights than yours. Ask an Administrator.',
+    cannotChangeOwnRoles: 'You cannot change your own roles. Ask an Administrator.',
+    selfDeactivate: 'You cannot deactivate your own account.',
+    selfDelete: 'You cannot delete your own account.',
+    currentPasswordRequired: 'Current password is required.',
+    newPasswordRequired: 'New password is required.',
+    samePassword: 'New password must be different from your current password.',
+    badCurrentPassword: 'Invalid current password.',
+    confirmMismatch: 'New password and confirmation do not match.',
+    roleNameRequired: 'Role name is required.',
+    roleNameTaken: 'Role name is already in use.',
+    systemRoleLocked: 'A system role cannot be deleted.',
+    roleInUse: 'This role is still assigned to a user.',
   },
   id: {
     appTitle: 'Dasbor Informasi Pabrik',
@@ -618,6 +1724,23 @@ export const MESSAGES: Record<Locale, Messages> = {
     brandMark: 'PI',
     brandTitle: 'Informasi Pabrik',
     brandSub: 'Dasbor',
+    corpName: 'KPN CORP',
+    loginPitch: 'Pantau stok tangki, kualitas, dan produksi harian dari satu tempat.',
+    welcomeBack: 'Selamat datang kembali',
+    signInContinue: 'Masuk untuk melanjutkan ke Dasbor Informasi Pabrik',
+    loginUsername: 'Nama pengguna atau email',
+    loginUsernamePlaceholder: 'Masukkan nama pengguna atau email',
+    loginPassword: 'Kata sandi',
+    loginPasswordPlaceholder: 'Masukkan kata sandi',
+    showPassword: 'Tampilkan kata sandi',
+    hidePassword: 'Sembunyikan kata sandi',
+    signIn: 'Masuk',
+    signInViaDwsHub: 'Masuk via Dws Hub',
+    backToSignIn: 'Kembali ke halaman masuk',
+    ssoErrorTitle: 'Masuk tidak dapat diselesaikan',
+    ssoErrorFallback: 'Downstream Hub tidak dapat memasukkan Anda. Coba lagi, atau gunakan nama pengguna dan kata sandi.',
+    loginRequired: 'Masukkan nama pengguna dan kata sandi.',
+    copyright: '© {{year}} KPN Corporation. Hak cipta dilindungi.',
     liveOps: 'Dasbor Tangki & Stok',
     opsAnalytics: 'Level & Suhu Tangki',
     analyticsTitle: 'Level & Suhu Tangki',
@@ -650,6 +1773,16 @@ export const MESSAGES: Record<Locale, Messages> = {
     tempSpikeHint: 'Merah jika suhu lebih dari 30% di atas suhu rata-rata.',
     ffaAgeHint: 'Merah jika hasil lab terbaru berumur lebih dari 7 hari.',
     emptySpace: 'Ruang kosong',
+    labShort: 'Lab',
+    labNotConnected: 'Hasil lab belum terhubung untuk site ini.',
+    labNotOnCertificate: 'Tidak ada di sertifikat terbaru untuk produk ini',
+    labNoResult: 'Belum ada hasil lab',
+    colourRangeHint: 'Rata-rata. Rentang antar tangki: R {r} · Y {y}',
+    colourOneTank: 'Satu tangki: sertifikat terbarunya',
+    tankEmptyWord: 'Kosong',
+    tankNoDataWord: 'Tanpa data',
+    capacityOf: 'dari {cap}',
+    capacityNotSet: 'Kapasitas belum diatur',
     loadable: 'Loadable',
     rangeAverage: 'Rata-rata',
     rangeMax: 'Maks',
@@ -658,10 +1791,36 @@ export const MESSAGES: Record<Locale, Messages> = {
     totalQuantity: 'Total kuantitas',
     avgLevel: 'Rata-rata level tangki',
     avgTemp: 'Suhu rata-rata',
+    storageUtilization: 'Utilisasi penyimpanan',
+    activeVsEmpty: 'Tangki aktif vs kosong',
+    activeEmptySub: 'aktif / kosong',
+    criticalAlerts: 'Peringatan kritis',
+    criticalAlertsSub: 'Isi di atas 95% atau anomali suhu',
+    tanksHolding: '{held} dari {total} tangki',
+    avgQuality: 'Rata-rata mutu',
+    selectDay: 'Tanggal',
+    massUnit: 'Satuan kuantitas',
+    unitTon: 'Ton',
+    unitKg: 'Kg',
+    kpiDetailHint: 'Lihat detail',
+    activeTanks: 'Tangki aktif',
+    emptyTanks: 'Tangki kosong',
+    reasonOverfill: 'Isi di atas 95% ({value})',
+    reasonHotTemp: '{value} terhadap rata-rata {avg}',
+    noCriticalAlerts: 'Tidak ada tangki di atas 95% atau bersuhu tinggi.',
+    alertRule: 'Tangki kritis bila isinya di atas 95%, atau suhunya lebih dari 30% di atas rata-rata suhu tangki ({avg}).',
+    gateSamplesWindow: 'Sampel CPO masuk yang sudah dinilai, {start} – {end}',
+    vehicle: 'Kapal / truk',
+    sampleDay: 'Disampling',
+    modeVessel: 'Kapal',
+    modeTruck: 'Truk',
+    noRows: 'Tidak ada data.',
     throughput: 'Throughput (massa)',
     approvalRate: 'Tingkat kelulusan lab',
     unavailable: '—',
     period: 'Periode',
+    periodDaily: 'Harian',
+    periodMonthly: 'Bulanan',
     tank: 'Tangki',
     status: 'Status',
     levelTemp: 'Level tangki & suhu',
@@ -710,6 +1869,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     tankFarm: 'Tank Farm',
     tanks: 'Tangki',
     tankFarmBlurb: 'Tangki dan angka kalibrasi yang dipakai Dasbor Tangki & Stok untuk kuantitas. Dikelola di aplikasi ini.',
+    tankGauging: 'Pengukuran tangki',
+    tankGaugingBlurb: 'Tangki yang dibaca dari sistem pengukuran (TankVision): unit mana yang dibaca untuk sebuah site, kapan ronde harian diambil, dan pembacaan terkini tiap tangki.',
     badgeDatahub: 'DataHub',
     badgeThisPlant: 'Pabrik ini',
     openPage: 'Buka →',
@@ -862,6 +2023,31 @@ export const MESSAGES: Record<Locale, Messages> = {
     qcVessel: 'Masuk Kapal',
     qcTruck: 'Masuk Truk',
     qcMovements: 'Minyak masuk dan keluar',
+    refineryQuality: 'Mutu refinery',
+    hoursLogged: 'Jam tercatat',
+    finishedFfa: 'FFA produk jadi',
+    feedFfa: 'FFA bahan baku',
+    byproductFfa: 'FFA produk samping',
+    streamsTitle: 'Aliran',
+    readingsTitle: 'Pembacaan',
+    declaredNotTested: 'Dinyatakan, belum diuji',
+    rangeLow: 'Terendah',
+    rangeHigh: 'Tertinggi',
+    time: 'Waktu',
+    fromTank: 'Dari tangki',
+    flowRate: 'Aliran',
+    finishedOil: 'Minyak jadi',
+    feedOil: 'Minyak bahan baku',
+    colour: 'Warna',
+    toTank: 'Ke tangki',
+    rawMaterial: 'Bahan baku',
+    bleachingOil: 'Pemucatan',
+    finishedGood: 'Produk jadi',
+    byProduct: 'Produk samping',
+    spentEarth: 'Spent earth',
+    bleachRed: 'R pemucatan',
+    spentEarthOc: 'OC spent earth',
+    noSample: 'Tidak ada sampel',
     tanksLogged: 'Tangki tercatat',
     retestDue: 'Perlu uji ulang',
     oilTypes: 'Jenis minyak',
@@ -872,7 +2058,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     vesselTickets: 'Tiket kapal',
     palkaSamples: 'Sampel palka',
     movementCount: 'Pergerakan',
-    gatePeriodNote: 'Angka gerbang mencakup seluruh periode tercetak {period}, bukan rentang tanggal di atas.',
+    gatePeriodNote: 'Angka mengikuti rentang tanggal di atas. Lembar mencakup {period}.',
     analysisDate: 'Tanggal analisa',
     ageDays: 'Umur (hari)',
     slipPoint: 'Slip point',
@@ -916,5 +2102,519 @@ export const MESSAGES: Record<Locale, Messages> = {
     resultValue: 'Nilai',
     incomplete: 'Belum lengkap',
     noSampleDate: 'Tanpa tanggal sampling',
+    needsAttention: 'Perlu tindakan',
+    nothingNeedsAttention: 'Tidak ada yang perlu ditindaklanjuti pada rentang ini.',
+    moreItems: '+{count} lainnya',
+    overMax: 'Melewati batas',
+    watch: 'Pantau',
+    noSpec: 'Tanpa spek',
+    qualityAverageOf: 'Rata-rata {n} tangki',
+    qualityLimit: 'Batas {range}',
+    qualityOutTanks: '{n} dari {total} tangki di luar spek',
+    qualityWatchTanks: '{n} dari {total} tangki dipantau',
+    qualityAverageOut: 'Rata-rata di luar batas',
+    qualityChange: '{pct} sejak kemarin (sebelumnya {previous})',
+    qualityChangedFlag: 'Berubah sejak kemarin',
+    qualityOdourFailed: 'Bau tidak lolos di {n} tangki',
+    qualityByProduct: 'Mutu per produk',
+    qualityHint: 'Rata-rata hasil lab tangki yang berisi stok. Merah: di luar batas di Master > Komoditas. Kuning: di luar batas pantau. Panah: berubah 15% atau lebih sejak kemarin.',
+    specsTitle: 'Batas mutu penyimpanan',
+    specsBlurb: 'Setiap minyak dinilai dengan batasnya sendiri di setiap site. Hasil yang melanggar batas "Di luar spek" membuat tangki di luar spek di QC Storage dan Live Ops; batas "Pantau" hanya menandai angkanya. Minyak tanpa batas tetap "Tanpa spek".',
+    specsSite: 'Site',
+    specsLimitsCount: '{n} batas',
+    specsNone: 'Tanpa batas',
+    specsEdit: 'Ubah batas',
+    specsView: 'Lihat batas',
+    specsFor: '{name} di {site}',
+    specsReadAs: 'Terbaca dari logsheet sebagai: {aliases}',
+    specsParameter: 'Parameter',
+    specsBound: 'Batas',
+    specsLimit: 'Nilai',
+    specsEffect: 'Jika dilanggar',
+    specsBoundMax: 'Maks',
+    specsBoundMin: 'Min',
+    specsMustPass: 'Harus lolos',
+    specsEffectReject: 'Di luar spek',
+    specsEffectWatch: 'Pantau',
+    specsAdd: 'Tambah batas',
+    specsRemove: 'Hapus batas',
+    specsSave: 'Simpan batas',
+    specsSaved: 'Batas {name} di {site} tersimpan.',
+    specsEmptyEditor: 'Belum ada batas. Hasil minyak ini tampil "Tanpa spek" sampai batas ditambahkan.',
+    specsNeedApi: 'Batas mutu disimpan di server. Jalankan aplikasi dengan VITE_DATA_SOURCE=api untuk mengubahnya.',
+    specsUpdated: 'Terakhir diubah {day}',
+    specsErrUnknownParameter: 'Pilih parameter untuk setiap batas.',
+    specsErrLimitRequired: 'Isi angka untuk setiap batas.',
+    specsErrDuplicate: 'Satu parameter hanya boleh punya satu Maks dan satu Min.',
+    specsErrMinAboveMax: 'Nilai Min lebih tinggi dari Maks untuk parameter yang sama.',
+    specsErrInvalid: 'Batas tidak dapat disimpan. Periksa setiap baris.',
+    specsErrSite: 'Site ini tidak tersedia untuk Anda.',
+    storageSpecNoteSet: 'Setiap minyak dinilai dengan batasnya sendiri, diatur per komoditas di Master > Komoditas. Angka merah melanggar batas Di luar spek; angka kuning melanggar batas Pantau. Lencana uji ulang berarti analisis lebih dari 2 hari dari tanggal snapshot. Angka ditampilkan sesuai formulir.',
+    outOfSpec: 'Di luar spek',
+    inSpec: 'Sesuai spek',
+    specBreachTitle: '{label} {value}, batas {bound} {limit}',
+    notRecorded: 'Tidak dicatat',
+    rangeFor: 'Rentang {product}, {from}–{to} · {count} hasil',
+    tooFewToCompare: 'Hasil terlalu sedikit untuk dibandingkan',
+    tanksWithoutResult: '{count} tangki tanpa hasil',
+    tankCount: '{count} tangki',
+    tankCountOne: '1 tangki',
+    retestCount: '{count} uji ulang',
+    contractMax: 'maks {value}',
+    floorAbove: 'di atas {value}',
+    watchBand: 'pita pantau {low}–{high}',
+    dailyLowHigh: 'rendah–tinggi harian',
+    groupSample: 'Sampel',
+    groupCore: 'Utama',
+    groupOxidation: 'Oksidasi',
+    groupComposition: 'Komposisi',
+    groupNotes: 'Catatan',
+    tankFill: 'Isi',
+    productsInTanks: 'Produk di tangki',
+    passMix: 'Komposisi hasil',
+    dayFlow: 'Alur produk',
+    ffaPct: 'FFA %',
+    moisturePct: 'M&I %',
+    tempC: 'Suhu °C',
+    colourRLov: 'R (Lovibond)',
+    colourYLov: 'Y (Lovibond)',
+    varianceAlert: 'Variasi',
+    varianceAlerts: 'Peringatan variasi',
+    varianceTooltip: 'Bergerak {pct} dari {previous} pada {day}',
+    varianceNone: 'Tidak ada parameter yang bergerak 15% atau lebih dari hasil tercatat sebelumnya.',
+    varianceRuleNote: 'Ditandai saat hasil bergerak 15% atau lebih dari hasil tercatat terakhir tangki untuk parameter itu, melewati batas kecil agar pembacaan mendekati nol tidak memicunya.',
+    parameter: 'Parameter',
+    previousResult: 'Hasil sebelumnya',
+    change: 'Perubahan',
+    current: 'Saat ini',
+    truckScatter: 'FFA % terhadap M&I % · satu titik per truk · garis pada batas kontrak',
+    vesselScatter: 'FFA % komposit terhadap M&I % · satu titik per tiket · garis pada batas kontrak',
+    palkaStrip: 'FFA % per sampel palka · garis pada batas kontrak',
+    ffaBySnapshot: 'FFA % per snapshot · pita arsir adalah rentang produk',
+    dailyBandCaption: 'Pita arsir dari nilai terendah ke tertinggi harian. Klik hari untuk membuka per jam.',
+    hourlyCaption: 'FFA % produk jadi per jam. Arsiran menandai tiap jalannya produk.',
+    reasonOver: '{param} {value} melewati maks {max}',
+    reasonRetest: 'Analisa berumur {days} hari',
+    reasonWatch: '{param} {value} di luar pita pantau',
+    view: 'Lihat',
+    ageDaysShort: '{days} h',
+    legend: 'Keterangan',
+    loading: 'Memuat…',
+    loginInvalid: 'Nama pengguna atau kata sandi salah.',
+    loginThrottled: 'Terlalu banyak percobaan masuk yang gagal. Tunggu 15 menit lalu coba lagi.',
+    signingIn: 'Masuk…',
+    administration: 'Administrasi',
+    adminMenuTitle: 'Administrasi',
+    adminIntro: 'Kelola siapa yang dapat masuk, site yang mereka lihat, dan apa yang boleh dilakukan setiap peran.',
+    userManagement: 'Manajemen Pengguna',
+    userManagementBlurb: 'Buat pengguna, tetapkan peran, dan tetapkan site.',
+    roleManagement: 'Manajemen Peran',
+    roleManagementBlurb: 'Atur peran dan halaman yang dapat dilihat, diubah, atau dihapus.',
+    dataHub: 'DataHub',
+    dataHubCode: 'Kode DataHub',
+    inUse: 'Digunakan',
+    liveLabel: 'Langsung',
+    lastReading: 'Pembacaan terakhir',
+    siteModules: 'Modul site',
+    siteModulesBlurb: 'Pilih modul yang dipakai setiap site, seperti Dasbor Tangki & Stok, kendali mutu, atau utilitas.',
+    siteModulesIntro: 'Centang modul yang datanya dimiliki site. Modul yang dimatikan hilang dari menu site tersebut, dan layar serta datanya ditutup.',
+    siteModulesSaved: 'Tersimpan',
+    moduleNotEnabled: 'Tidak tersedia untuk site ini',
+    moduleNotEnabledBody: 'Modul ini tidak diaktifkan untuk site yang sedang Anda lihat. Pilih site lain, atau minta administrator mengaktifkannya.',
+    switchSite: 'Ganti site',
+    allLabel: 'Semua',
+    notInUse: 'Tidak digunakan',
+    inactiveInDataHub: 'Nonaktif di DataHub',
+    searchCompanies: 'Cari nama atau kode',
+    searchSites: 'Cari site, perusahaan, atau kode',
+    allCompanies: 'Semua perusahaan',
+    companiesShown: '{n} dari {total} perusahaan',
+    sitesShown: '{n} dari {total} site',
+    noCompaniesYet: 'Belum ada perusahaan. Tarik dari DataHub.',
+    noSitesYet: 'Belum ada site. Tarik dari DataHub.',
+    pullFromDataHub: 'Tarik dari DataHub',
+    sitesInUse: '{n} dari {total} site digunakan',
+    activatedNotice: '{name} sekarang digunakan.',
+    deactivatedNotice: '{name} tidak lagi digunakan.',
+    timezoneSaved: 'Zona waktu {name} diatur ke {zone}.',
+    invalidTimezone: 'Zona waktu tidak valid.',
+    searchRoles: 'Cari peran',
+    rolesShown: '{n} dari {total} peran',
+    roleAccess: 'Akses',
+    roleInUseHint: 'Dipakai {n} pengguna. Lepaskan dari mereka terlebih dahulu.',
+    deleteRoleTitle: 'Hapus peran ini?',
+    deleteRoleBody: '{name} akan dihapus. Tindakan ini tidak dapat dibatalkan.',
+    detailsTab: 'Detail',
+    permissionsTab: 'Izin',
+    presets: 'Preset',
+    presetReadOnly: 'Hanya lihat',
+    presetFull: 'Akses penuh',
+    presetClear: 'Hapus semua',
+    selectAllFor: 'Pilih semua: {what}',
+    systemRoleNote: 'Peran sistem mempertahankan namanya.',
+    newRoleHint: 'Beri nama peran dan pilih apa yang boleh dilakukan',
+    rolesSummary: 'Lihat {v} · Ubah {e} · Hapus {d}',
+    allUsers: 'Semua pengguna',
+    noEmail: 'Tanpa email',
+    noSiteAccess: 'Tanpa akses site',
+    searchUsers: 'Cari nama, email, peran, atau site',
+    allRoles: 'Semua peran',
+    usersShown: '{n} dari {total} pengguna',
+    clearFilters: 'Hapus filter',
+    deleteUserTitle: 'Hapus pengguna ini?',
+    deleteUserBody: '{name} tidak akan dapat masuk lagi. Tindakan ini tidak dapat dibatalkan.',
+    accountTab: 'Akun',
+    newUserHint: 'Atur akun masuk, peran, dan akses site',
+    activeHelp: 'Pengguna nonaktif tidak dapat masuk.',
+    sitesSelected: '{n} dari {total} site dipilih',
+    sitesKept: '{n} lainnya tetap seperti semula',
+    noAccessWarning: 'Belum ada site dipilih: pengguna ini tidak dapat membuka data apa pun.',
+    activated: 'Aktif',
+    notActivated: 'Tidak aktif',
+    activate: 'Aktifkan',
+    deactivate: 'Nonaktifkan',
+    activationNeedsCompany: 'Aktifkan perusahaan terlebih dahulu.',
+    activationHasSites: 'Nonaktifkan site-nya terlebih dahulu.',
+    managedInDataHub: 'Dikelola di DataHub. Tarik perubahan dari Administrasi, DataHub.',
+    backToAdmin: '← Kembali ke Administrasi',
+    users: 'Pengguna',
+    user: 'Pengguna',
+    addUser: 'Tambah Pengguna',
+    editUser: 'Ubah Pengguna',
+    username: 'Nama pengguna',
+    displayName: 'Nama tampilan',
+    email: 'Email',
+    password: 'Kata sandi',
+    newPasswordOptional: 'Kata sandi baru (opsional)',
+    active: 'Aktif',
+    roles: 'Peran',
+    siteAccess: 'Akses site',
+    search: 'Cari',
+    allStatuses: 'Semua status',
+    activeStatus: 'Aktif',
+    inactiveStatus: 'Nonaktif',
+    noUsers: 'Belum ada pengguna.',
+    noMatch: 'Tidak ada data yang sesuai dengan filter.',
+    userSaved: 'Pengguna disimpan. {n} site ditetapkan.',
+    userDeleted: 'Pengguna dihapus.',
+    deleteUserConfirm: 'Hapus pengguna ini? Mereka tidak akan bisa masuk lagi.',
+    saving: 'Menyimpan…',
+    systemSuffix: '(sistem)',
+    rolesHelp: 'Peran mengatur halaman yang dapat dilihat, diubah, atau dihapus pengguna ini.',
+    sitesHelp: 'Pengguna tanpa site tidak dapat membuka data operasional maupun data master.',
+    searchSite: 'Cari site…',
+    selectVisible: 'Pilih yang tampil',
+    clearVisible: 'Hapus yang tampil',
+    noRoles: 'Tidak ada peran.',
+    noSites: 'Tidak ada site.',
+    accessNotConfigured: 'Akses belum dikonfigurasi',
+    noSiteBody: 'Tidak ada site yang ditetapkan. Hubungi administrator Plant Information Dashboard.',
+    accessDenied: 'Akses ditolak',
+    accessDeniedBody: 'Anda tidak memiliki izin untuk melihat halaman ini.',
+    changePassword: 'Ubah kata sandi',
+    signOut: 'Keluar',
+    currentPassword: 'Kata sandi saat ini',
+    newPassword: 'Kata sandi baru',
+    confirmPassword: 'Konfirmasi kata sandi',
+    passwordUpdated: 'Kata sandi Anda telah diperbarui.',
+    permissionView: 'Lihat',
+    permissionEdit: 'Ubah',
+    permissionDelete: 'Hapus',
+    roleSaved: 'Peran disimpan.',
+    roleDeleted: 'Peran dihapus.',
+    deleteRoleConfirm: 'Hapus peran ini?',
+    addRole: 'Tambah Peran',
+    editRole: 'Ubah Peran',
+    roleName: 'Nama peran',
+    description: 'Deskripsi',
+    usersCount: 'Pengguna',
+    noRolesYet: 'Belum ada peran.',
+    pages: 'Halaman',
+    operationsGroup: 'Operasi',
+    managementGroup: 'Manajemen',
+    stockOverview: 'Ringkasan Stok',
+    mgPrint: 'Cetak',
+    mgCopyLink: 'Salin tautan',
+    mgLinkCopied: 'Tautan disalin',
+    mgAllSites: 'Semua site',
+    mgKpiStock: 'Stok',
+    mgKpiCapacity: 'Kapasitas',
+    mgKpiFill: 'Tingkat isi',
+    mgKpiTanks: 'Tangki melapor',
+    mgKpiFree: 'Ruang kosong',
+    mgCardFreeTitle: 'Ruang kosong per site',
+    mgCardFreeNote: 'Ruang kosong adalah kapasitas dikurangi stok, untuk tangki yang punya pembacaan dan kapasitas.',
+    mgVsYesterday: 'vs kemarin',
+    mgNeedsAttention: 'Perlu perhatian',
+    mgNothingToFlag: 'Tidak ada yang perlu perhatian.',
+    mgAttNearFull: '{count} tangki terisi {pct}% atau lebih',
+    mgAttOver: '{count} tangki melebihi kapasitas, periksa data',
+    mgAttEmpty: '{count} tangki kosong',
+    mgAttNoData: '{count} tangki tanpa data',
+    mgAttStale: '{count} site dengan data lama',
+    mgBySite: 'Per site',
+    mgByCommodity: 'Per komoditas',
+    mgColSite: 'Site',
+    mgColStockCap: 'Stok vs kapasitas',
+    mgColFill: 'Isi',
+    mgColMix: 'Komposisi (t)',
+    mgColChange: 'Perubahan',
+    mgColData: 'Data',
+    mgColClass: 'Komoditas',
+    mgColTank: 'Tangki',
+    mgColProduct: 'Produk',
+    mgColQty: 'Stok (t)',
+    mgColCap: 'Kapasitas (t)',
+    mgColTemp: 'Suhu (°C)',
+    mgColStatus: 'Status',
+    mgColTanks: 'Tangki',
+    mgStOk: 'Normal',
+    mgStNearFull: 'Hampir penuh',
+    mgStOver: 'Melebihi kapasitas',
+    mgStEmpty: 'Kosong',
+    mgStNoData: 'Tanpa data',
+    mgRounds: 'Putaran',
+    mgOldData: 'Data lama',
+    mgAgoMin: '{n}m lalu',
+    mgAgoHour: '{n}j lalu',
+    mgAgoDay: '{n}hr lalu',
+    mgAgoToday: 'hari ini',
+    mgTanksReporting: '{a} dari {b} tangki',
+    mgClassRefined: 'Minyak olahan',
+    mgClassGlycerin: 'Gliserin & fatty matter',
+    mgClassChemical: 'Bahan kimia',
+    mgClassOther: 'Lainnya',
+    mgSplitLabel: 'Komoditas gabungan',
+    mgSplitGrouped: 'Digabung',
+    mgSplitProducts: 'Per produk',
+    mgSplitShow: 'Tampilkan produk',
+    mgSplitHide: 'Sembunyikan produk',
+    mgCardProducts: 'Produk',
+    mgClassCpo: 'CPO',
+    mgClassFame: 'FAME',
+    mgClassPfad: 'PFAD',
+    mgClassPkfad: 'PKFAD',
+    mgClassCpko: 'CPKO',
+    mgShortCpo: 'CPO',
+    mgShortFame: 'FAME',
+    mgShortPfad: 'PFAD',
+    mgShortPkfad: 'PKFAD',
+    mgShortCpko: 'CPKO',
+    mgClassPome: 'POME',
+    mgClassRpome: 'RPOME',
+    mgClassLimbah: 'LIMBAH',
+    mgClassSludge: 'SLUDGE',
+    mgShortPome: 'POME',
+    mgShortRpome: 'RPOME',
+    mgShortLimbah: 'Limbah',
+    mgShortSludge: 'Sludge',
+    mgShortRefined: 'Olahan',
+    mgShortGlycerin: 'Gliserin',
+    mgShortChemical: 'Kimia',
+    mgShortOther: 'Lainnya',
+    mgHistory: 'Riwayat',
+    mgHistoryNone: 'Belum ada riwayat untuk tangki ini.',
+    mgSiteFailed: '{site} tidak dapat dimuat.',
+    mgLoadFailed: 'Ringkasan tidak dapat dimuat.',
+    mgNoSites: 'Tidak ada site dengan modul Tank farm yang tersedia untuk Anda.',
+    mgCapacityNote: 'Kapasitas adalah kapasitas nominal tangki. Tingkat isi hanya menghitung tangki yang punya pembacaan dan kapasitas.',
+    mgNearFullFrom: 'Hampir penuh mulai {pct}%',
+    mgBackTo: 'Kembali ke {where}',
+    mgClose: 'Tutup',
+    mgNoTanks: 'Tidak ada tangki.',
+    mgTipShare: '{pct} dari stok site',
+    mgTipLargest: 'Tangki terbesar',
+    mgTipOpen: 'Buka {cls} di {site}',
+    dsSource: 'Sumber data',
+    dsAtg: 'ATG Tank Vision',
+    dsLogsheet: 'Logsheet',
+    dsAtgHint: 'Dibaca otomatis dari sistem tank gauging.',
+    dsLogsheetHint: 'Diisi operator pada logsheet harian.',
+    mgCardFreeSpace: 'Ruang kosong',
+    mgCardNotCounted: 'Tidak ada pembacaan dari {tanks} tangki, sehingga kapasitas {cap} t tidak masuk tingkat isi.',
+    mgCardSpread: 'Sebaran isi tangki',
+    mgCardFullest: 'Paling mendekati penuh',
+    mgCardOpenSite: 'Buka {site}',
+    mgCardOpenCommodity: 'Buka {cls} di semua site',
+    mgCardStockTitle: 'Stok per site',
+    mgCardCapTitle: 'Kapasitas per site',
+    mgCardFillTitle: 'Tingkat isi per site',
+    mgCardTanksTitle: 'Status tangki',
+    mgCardCounted: 'Masuk tingkat isi',
+    mgCardNoReading: 'Tanpa pembacaan',
+    masterGroup: 'Data master',
+    refineryFractionation: 'Refinery dan fraksinasi',
+    utility: 'Utilitas',
+    utilityOverview: 'Ikhtisar utilitas',
+    utilityBoiler: 'Boiler',
+    utilityCoal: 'Batu bara & bahan bakar',
+    utilityWater: 'Air',
+    utilityEffluent: 'Limbah cair',
+    utilityLoader: 'Loader',
+    utilityPower: 'Listrik',
+    utilityNote: 'Nilai ditampilkan sesuai logsheet utilitas. Rentang yang tercetak di lembar hanya konteks, bukan lulus atau gagal. Meter steam boiler tidak ditambahkan ke steam refineri di laporan produksi.',
+    latestDay: 'Hari terakhir',
+    logged: 'Tercatat',
+    emptySheet: 'Lembar kosong',
+    notSubmitted: 'Tidak dikirim',
+    notLogged: 'Tidak tercatat',
+    outsidePrinted: 'Di luar rentang tercetak',
+    checklistNo: 'Checklist tidak',
+    printedRange: 'tercetak {spec}',
+    periodRange: 'rentang periode ini · {count} hasil',
+    readingCount: '{count} pembacaan',
+    daysLogged: 'Hari tercatat',
+    daysLoggedOf: '{logged} dari {days} hari',
+    formsSubmitted: '{submitted} dari {total} form dikirim',
+    byHour: 'per jam',
+    labBandCaption: 'Area berarsir dari nilai terendah hingga tertinggi harian. Pita abu-abu atau garis putus-putus adalah rentang yang tercetak di lembar.',
+    date: 'Tanggal',
+    shift: 'Shift',
+    boilerDaysLogged: 'Hari boiler tercatat (F/UTI-001)',
+    coalBuckets: 'Batu bara terpakai (bucket)',
+    coalRatio: 'Rasio batu bara terakhir (kg/mt steam)',
+    printedRatio: 'Rasio tercetak (kg/mt steam)',
+    attentionItems: 'Perlu perhatian',
+    sourceBoard: 'Logsheet pada periode ini',
+    coalAndRatio: 'Batu bara dan rasio',
+    coalRatioCaption: 'Bucket batu bara per hari, dengan rasio tercetak terakhir tiap hari pada sumbu sendiri. Hari tanpa lembar dibiarkan kosong.',
+    waterCoverage: 'Cakupan air',
+    roCleaning: 'Pembersihan RO',
+    performedOn: 'Dilakukan',
+    doneBy: 'Oleh',
+    roVerifications: '{count} verifikasi setelah pembersihan',
+    checkYes: 'Ya',
+    checkNo: 'Tidak',
+    reasonOutside: '{value}, tercetak {spec}',
+    reasonNotLogged: 'Log terakhir {date}',
+    reasonEmpty: 'Lembar {date} tidak berisi baris',
+    reasonChecklistNo: 'Dijawab tidak pada {date}',
+    noUtilityRows: 'Tidak ada log utilitas pada periode ini.',
+    noDataDay: 'Lembar hari ini tidak berisi pembacaan.',
+    controlRoom: 'Control Room',
+    localPanel: 'Lokal',
+    boilerNote: 'Taihu 15 TPH. Wuxi 15 TPH belum memiliki kiriman. Flowmeter steam adalah pembacaan meter, bukan steam refineri. Klik angka untuk melihat tag tersebut sepanjang periode.',
+    hourlyLog: 'Log per jam',
+    latestAgainstPrinted: 'Jam terakhir terhadap rentang tercetak',
+    boilerChemicals: 'Chemical boiler',
+    chemicalNote: 'Tercatat pada {count} hari di periode ini. Sisa adalah pembacaan sesaat, bukan saldo stok.',
+    chemical: 'Chemical',
+    lastRemaining: 'Sisa terakhir',
+    lastLog: 'Log terakhir',
+    usedOnLogDays: 'Terpakai pada hari log',
+    daysWithLog: 'Hari dengan log',
+    coalSteamNote: 'Steam pada tab ini adalah meter boiler. Tidak ditambahkan ke steam refineri di laporan produksi. Rasio ditampilkan sesuai cetakan.',
+    steamDistribution: 'Distribusi steam (kg, meter)',
+    steamMeterCaption: 'Distribusi steam per hari dari logsheet batu bara. Hari tanpa lembar dibiarkan kosong.',
+    incomingCoalDays: 'Hari dengan batu bara masuk',
+    incomingCoal: 'Batu bara masuk (kg)',
+    utilityPeriod: '{start} – {end}',
+    form: 'Formulir',
+    shiftLog: 'Log shift',
+    fuelClockLog: 'Log jam bahan bakar',
+    steamMeter: 'Steam (pembacaan meter)',
+    waterNote: 'Setiap hasil hanya dibandingkan dengan rentang yang tercetak pada tagnya sendiri. Klik hasil untuk melihat uji tersebut sepanjang periode.',
+    boilerWaterGroup: 'Air boiler',
+    wtpGroup: 'WTP & WWTP',
+    testsRecorded: 'Uji tercatat',
+    samplePointsLogged: 'Titik sampel tercatat',
+    daysSinceRo: 'Hari sejak pembersihan RO',
+    samplePoint: 'Titik sampel',
+    test: 'Uji',
+    printedSpec: 'Rentang tercetak',
+    labRoster: 'Hasil',
+    wwtpCoverage: 'Cakupan log WWTP',
+    effluentCoverage: '{logged} dari {days} hari pada periode ini memiliki log WWTP.',
+    inletCod: 'COD inlet',
+    outletCod: 'COD outlet',
+    outletTss: 'TSS outlet',
+    inletVsOutlet: 'Inlet dan outlet',
+    inlet: 'Inlet',
+    outlet: 'Outlet',
+    generalLevels: 'Level umum',
+    loaderNote: 'Total ditampilkan sesuai cetakan di lembar. Solar dan oli hanya muncul pada run yang mencatatnya.',
+    hoursRun: 'Jam operasi',
+    runs: 'Run',
+    fuelWritten: 'Solar tercatat (L)',
+    fuelRuns: '{count} run dengan solar',
+    checklistNoItems: 'Item checklist tidak (hari terakhir)',
+    dailyHours: 'Jam per hari',
+    loaderCaption: 'Jam tercetak per hari. Titik hijau menandai hari solar dicatat.',
+    checklist: 'Checklist',
+    checklistAllYes: 'Semua item dijawab ya.',
+    yesItems: '{count} item ya',
+    runRoster: 'Run hour meter',
+    hourStart: 'Hour meter awal',
+    hourEnd: 'Hour meter akhir',
+    printedTotal: 'Total (tercetak)',
+    fuelL: 'Solar (L)',
+    oilL: 'Oli (L)',
+    coverage: 'Cakupan',
+    logsheetCatalog: 'Katalog logsheet',
+    qualityRules: 'Aturan mutu',
+    requestFailed: 'Permintaan tidak dapat diselesaikan.',
+    loadFailed: 'Sebagian data gagal dimuat, sehingga angka di halaman ini mungkin tidak lengkap. Muat ulang halaman untuk mencoba lagi.',
+    usernameRequired: 'Nama pengguna wajib diisi.',
+    passwordRequired: 'Kata sandi wajib diisi untuk pengguna baru.',
+    passwordShort: 'Kata sandi minimal 6 karakter.',
+    usernameTaken: 'Nama pengguna sudah digunakan.',
+    emailTaken: 'Email sudah digunakan.',
+    lastAdmin: 'Minimal satu administrator aktif harus tetap ada.',
+    cannotGrantRole: 'Anda hanya dapat memberi atau mencabut peran yang hak aksesnya Anda miliki sendiri. Hanya Administrator yang dapat memberi peran Administrator.',
+    cannotGrantPermission: 'Anda hanya dapat memberi peran hak akses yang Anda miliki sendiri.',
+    cannotManageUser: 'Pengguna ini memiliki peran dengan hak akses lebih besar dari Anda. Hubungi Administrator.',
+    cannotChangeOwnRoles: 'Anda tidak dapat mengubah peran Anda sendiri. Hubungi Administrator.',
+    selfDeactivate: 'Anda tidak dapat menonaktifkan akun Anda sendiri.',
+    selfDelete: 'Anda tidak dapat menghapus akun Anda sendiri.',
+    currentPasswordRequired: 'Kata sandi saat ini wajib diisi.',
+    newPasswordRequired: 'Kata sandi baru wajib diisi.',
+    samePassword: 'Kata sandi baru harus berbeda dari kata sandi saat ini.',
+    badCurrentPassword: 'Kata sandi saat ini salah.',
+    confirmMismatch: 'Kata sandi baru dan konfirmasi tidak cocok.',
+    roleNameRequired: 'Nama peran wajib diisi.',
+    roleNameTaken: 'Nama peran sudah digunakan.',
+    systemRoleLocked: 'Peran sistem tidak dapat dihapus.',
+    roleInUse: 'Peran ini masih ditetapkan ke pengguna.',
+  },
+}
+
+export const SSO_ERROR_TEXT: Record<Locale, Record<string, string>> = {
+  en: {
+    oidc_disabled: 'Sign-in via Downstream Hub is turned off.',
+    oidc_not_configured: 'Sign-in via Downstream Hub is not configured yet.',
+    legacy_bridge_disabled: 'This Hub sign-in link is turned off.',
+    sso_not_configured: 'Sign-in via Downstream Hub is not configured yet.',
+    missing_token: 'Downstream Hub did not send a sign-in token.',
+    invalid_token: 'The Hub sign-in token is invalid or expired. Open the app from Downstream Hub again.',
+    missing_email_claim: 'The Hub sign-in token did not include an email address.',
+    missing_user_id: 'The Hub sign-in token did not include a user id.',
+    inactive_user: 'This account is inactive. Ask an administrator to turn it back on.',
+    no_linked_sso_user: 'No Plant Information Dashboard account uses this Hub email. Ask an administrator to add you first.',
+    oidc_sub_collision: 'This Hub account is already linked to a different user.',
+    email_not_verified: 'Confirm your email in Downstream Hub, then try again.',
+    invalid_state: 'This sign-in session expired. Start again from the login page.',
+    missing_code: 'Downstream Hub did not finish sign-in. Start again from the login page.',
+    missing_id_token: 'Downstream Hub did not finish sign-in. Start again from the login page.',
+    oidc_sign_in_failed: 'Downstream Hub could not sign you in. Try again, or use your username and password.',
+    sign_on_failed: 'Downstream Hub could not sign you in. Try again, or use your username and password.',
+  },
+  id: {
+    oidc_disabled: 'Masuk via Downstream Hub sedang dimatikan.',
+    oidc_not_configured: 'Masuk via Downstream Hub belum dikonfigurasi.',
+    legacy_bridge_disabled: 'Tautan masuk Hub ini sedang dimatikan.',
+    sso_not_configured: 'Masuk via Downstream Hub belum dikonfigurasi.',
+    missing_token: 'Downstream Hub tidak mengirim token masuk.',
+    invalid_token: 'Token masuk Hub tidak valid atau sudah kedaluwarsa. Buka aplikasi dari Downstream Hub lagi.',
+    missing_email_claim: 'Token masuk Hub tidak berisi alamat email.',
+    missing_user_id: 'Token masuk Hub tidak berisi id pengguna.',
+    inactive_user: 'Akun ini tidak aktif. Minta administrator untuk mengaktifkannya.',
+    no_linked_sso_user: 'Tidak ada akun Dasbor Informasi Pabrik untuk email Hub ini. Minta administrator menambahkan Anda terlebih dahulu.',
+    oidc_sub_collision: 'Akun Hub ini sudah tertaut ke pengguna lain.',
+    email_not_verified: 'Konfirmasi email Anda di Downstream Hub, lalu coba lagi.',
+    invalid_state: 'Sesi masuk ini sudah berakhir. Mulai lagi dari halaman masuk.',
+    missing_code: 'Downstream Hub tidak menyelesaikan masuk. Mulai lagi dari halaman masuk.',
+    missing_id_token: 'Downstream Hub tidak menyelesaikan masuk. Mulai lagi dari halaman masuk.',
+    oidc_sign_in_failed: 'Downstream Hub tidak dapat memasukkan Anda. Coba lagi, atau gunakan nama pengguna dan kata sandi.',
+    sign_on_failed: 'Downstream Hub tidak dapat memasukkan Anda. Coba lagi, atau gunakan nama pengguna dan kata sandi.',
   },
 }

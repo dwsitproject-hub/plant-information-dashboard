@@ -17,7 +17,6 @@ export function MasterMenuPage() {
         <div className="master-card-grid">
           <MasterCard to="/master/companies" badge={t.badgeDatahub} title={t.company} text={t.companyBlurb} open={t.openPage} />
           <MasterCard to="/master/sites" badge={t.badgeDatahub} title={t.site} text={t.siteBlurb} open={t.openPage} />
-          <MasterCard to="/master/plants" badge={t.badgeDatahub} title={t.plants} text={t.plantsBlurb} open={t.openPage} />
           <MasterCard to="/master/commodities" badge={t.badgeDatahub} title={t.commodities} text={t.commoditiesBlurb} open={t.openPage} />
         </div>
       </section>
@@ -28,6 +27,7 @@ export function MasterMenuPage() {
         <div className="master-card-grid">
           <MasterCard to="/master/commodities-calibration" badge={t.badgeThisPlant} title={t.commoditiesCalibration} text={t.commoditiesCalibrationBlurb} open={t.openPage} />
           <MasterCard to="/master/tank-farm" badge={t.badgeThisPlant} title={t.tankFarm} text={t.tankFarmBlurb} open={t.openPage} />
+          <MasterCard to="/master/tank-gauging" badge="ATG" title={t.tankGauging} text={t.tankGaugingBlurb} open={t.openPage} />
         </div>
       </section>
     </div>

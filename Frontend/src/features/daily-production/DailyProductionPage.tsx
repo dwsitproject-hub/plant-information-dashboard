@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  closingStockKg,
+  dayBefore,
+  stockByCode,
   coproductYield,
   lossOf,
   lossYield,
@@ -14,6 +15,8 @@ import {
   type StockCode,
 } from '../../domain/dailyProduction.ts'
 import { useCalibration } from '../../data/CalibrationContext.tsx'
+import { useRepository } from '../../data/OperationsContext.tsx'
+import { useProductionReport } from '../../data/ProductionContext.tsx'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import { DateRangeFilter } from './DateRangeFilter.tsx'
 import { PLANT_PATH, PlantTabs, productionSearch, useProductionRange } from './productionNav.tsx'
@@ -63,10 +66,35 @@ export function DailyProductionPage() {
   const { t, locale } = useLocale()
   const { revision } = useCalibration()
   const { start, end, setRange } = useProductionRange()
+  const { days, dates } = useProductionReport()
   const numberLocale = locale === 'id' ? 'id-ID' : 'en-US'
 
-  const day: ProductionDay = useMemo(() => productionForRange(start, end), [start, end])
-  const closing = useMemo(() => closingStockKg(), [revision])
+  const day: ProductionDay = useMemo(() => productionForRange(start, end, days), [days, start, end])
+  const rangeStart = start <= end ? start : end
+  const rangeEnd = start <= end ? end : start
+  const repository = useRepository()
+  const blank = useMemo(() => stockByCode([]), [])
+  // Opening is the day before the range, closing is its last day. Both come from the active site's
+  // tanks through the repository, so another site never shows Bekasi's bundled soundings.
+  const [stock, setStock] = useState<{ key: string; opening: Record<StockCode, Qty>; closing: Record<StockCode, Qty> } | null>(null)
+  const stockKey = `${dayBefore(rangeStart)}|${rangeEnd}|${revision}`
+  useEffect(() => {
+    let active = true
+    Promise.all([repository.getLiveTanks(dayBefore(rangeStart)), repository.getLiveTanks(rangeEnd)])
+      .then(([before, last]) => {
+        if (active) setStock({ key: stockKey, opening: stockByCode(before), closing: stockByCode(last) })
+      })
+      .catch(() => {
+        // A failed load leaves the stock columns blank rather than showing figures from elsewhere.
+        if (active) setStock({ key: stockKey, opening: blank, closing: blank })
+      })
+    return () => {
+      active = false
+    }
+  }, [repository, rangeStart, rangeEnd, stockKey, blank])
+  const current = stock?.key === stockKey ? stock : null
+  const opening = current?.opening ?? blank
+  const closing = current?.closing ?? blank
   const productionSort = useColumnSort()
   const stockSort = useColumnSort()
   const chemicalSort = useColumnSort()
@@ -125,7 +153,12 @@ export function DailyProductionPage() {
     stockRows,
     stockSort.key,
     stockSort.dir,
-    (row, column) => (column === 'name' ? row.label : column === 'closing' ? closing[row.code] : null),
+    (row, column) => {
+      if (column === 'name') return row.label
+      if (column === 'opening') return opening[row.code]
+      if (column === 'closing') return closing[row.code]
+      return null
+    },
   )
   const chemicalRows = sortRows(
     PLANTS.map((key) => ({ key, plant: day[key] })),
@@ -148,7 +181,7 @@ export function DailyProductionPage() {
     <div className="page page--prod">
       <header className="page-title-row">
         <h1 className="page-title">{t.dailyProductionTitle}</h1>
-        <DateRangeFilter start={start} end={end} onChange={setRange} />
+        <DateRangeFilter start={start} end={end} dataDates={dates} onChange={setRange} monthChoice />
       </header>
       <PlantTabs start={start} end={end} />
 
@@ -210,7 +243,7 @@ export function DailyProductionPage() {
               {stockOrdered.map((row) => (
                 <tr key={row.code}>
                   <td>{row.label}</td>
-                  <td className="num num--empty">-</td>
+                  <Figure value={opening[row.code]} text={qty(opening[row.code], 0)} kind="closing" />
                   <td className="num num--empty">-</td>
                   <td className="num num--empty">-</td>
                   <Figure value={closing[row.code]} text={qty(closing[row.code], 0)} kind="closing" />

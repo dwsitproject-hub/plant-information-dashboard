@@ -1,19 +1,29 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useCalibration } from '../../data/CalibrationContext.tsx'
 import { useRepository } from '../../data/OperationsContext.tsx'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
-import type { LogisticsVehicle, SiteContext, SnapshotMeta, TankLive } from '../../domain/types.ts'
-import { formatDay, formatKg, formatMeasure, inDateRange } from '../../domain/format.ts'
+import type { SiteContext, SnapshotMeta, TankLive } from '../../domain/types.ts'
+import { formatDay, tankLabel } from '../../domain/format.ts'
 import { DateRangeFilter } from '../daily-production/DateRangeFilter.tsx'
-import { usePeriodRange } from '../usePeriodRange.ts'
+import { addDays, usePeriodRange } from '../usePeriodRange.ts'
 import { CommodityFilter } from './CommodityFilter.tsx'
 import { CommodityStock } from './CommodityStock.tsx'
 import { TankCard } from './TankCard.tsx'
 import { TankTable } from './TankTable.tsx'
 import { QuantityHistoryDialog } from './QuantityHistoryDialog.tsx'
 import type { HistoryMetric } from './quantitySeries.ts'
+import { isCritical, isEmptyTank } from './tankAlerts.ts'
+import { MassUnitContext, useMassUnitState } from './massUnit.ts'
+import { KpiDetailDialog, type KpiKind } from './KpiDetailDialog.tsx'
+import { varianceFromLabHistory, type LabVarianceAlert } from '../../domain/qualityVariance.ts'
+import { sourceOfTanks, type DataSource } from '../../domain/dataSource.ts'
+import { SourceBadge } from '../dataSource/SourceBadge.tsx'
 
 type TankView = 'table' | 'grid'
+
+/** Lab results and gate samples look back this many days from the selected day. */
+const LOOKBACK_DAYS = 30
 
 export function LiveOpsPage() {
   const { t, locale } = useLocale()
@@ -22,41 +32,96 @@ export function LiveOpsPage() {
   const [site, setSite] = useState<SiteContext | null>(null)
   const [meta, setMeta] = useState<SnapshotMeta | null>(null)
   const [tanks, setTanks] = useState<TankLive[]>([])
-  const [logistics, setLogistics] = useState<LogisticsVehicle[]>([])
+  const [varianceByTank, setVarianceByTank] = useState<Map<string, LabVarianceAlert[]>>(new Map())
   const [commodity, setCommodity] = useState<string[] | null>(null)
   const [tankView, setTankView] = useState<TankView>('table')
   const [history, setHistory] = useState<{ tankId: string; metric: HistoryMetric; commodity: string } | null>(null)
-  const range = usePeriodRange(meta?.periodLabel ?? null, 30)
+  const [massUnit, setMassUnit] = useMassUnitState()
+  const [kpiDetail, setKpiDetail] = useState<KpiKind | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const range = usePeriodRange(meta?.periodLabel ?? null, 1)
+  const day = range.ready ? range.end : ''
+  const lookbackStart = day ? addDays(day, -(LOOKBACK_DAYS - 1)) : ''
 
   useEffect(() => {
     let active = true
-    Promise.all([
-      repository.getSite(),
-      repository.getSnapshotMeta(),
-      repository.getLiveLogistics(),
-    ]).then(([nextSite, nextMeta, nextLogistics]) => {
-      if (!active) return
-      setSite(nextSite)
-      setMeta(nextMeta)
-      setLogistics(nextLogistics)
-    })
+    Promise.all([repository.getSite(), repository.getSnapshotMeta()])
+      .then(([nextSite, nextMeta]) => {
+        if (!active) return
+        setSite(nextSite)
+        setMeta(nextMeta)
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true)
+      })
     return () => {
       active = false
     }
   }, [repository])
 
-  const farmDay = range.ready ? latestSoundingDay(meta?.soundingDates ?? [], range.start, range.end) : null
+  const farmDay = day ? latestSoundingDay(meta?.soundingDates ?? [], day) : null
 
   useEffect(() => {
-    if (!range.ready) return
+    if (!day) return
     let active = true
-    repository.getLiveTanks(farmDay, { start: range.start, end: range.end }).then((nextTanks) => {
-      if (active) setTanks(nextTanks)
-    })
+    repository
+      .getLiveTanks(farmDay, { start: lookbackStart, end: day })
+      .then((nextTanks) => {
+        if (!active) return
+        setTanks(nextTanks)
+        setLoadFailed(false)
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true)
+      })
     return () => {
       active = false
     }
-  }, [repository, revision, range.ready, range.start, range.end, farmDay])
+  }, [repository, revision, day, lookbackStart, farmDay])
+
+  // The same tanks as of the day before, so quality figures can show what moved since yesterday.
+  const [before, setBefore] = useState<TankLive[]>([])
+  const yesterday = day ? addDays(farmDay ?? day, -1) : ''
+  useEffect(() => {
+    if (!yesterday) return
+    let active = true
+    repository
+      .getLiveTanks(yesterday, { start: addDays(yesterday, -(LOOKBACK_DAYS - 1)), end: yesterday })
+      .then((rows) => {
+        if (active) setBefore(rows)
+      })
+      .catch(() => {
+        // Without yesterday the figures still show; they just carry no change marks.
+        if (active) setBefore([])
+      })
+    return () => {
+      active = false
+    }
+  }, [repository, revision, yesterday])
+  const beforeByTank = useMemo(() => new Map(before.map((tank) => [tank.tankId, tank])), [before])
+
+  useEffect(() => {
+    if (tanks.length === 0) {
+      setVarianceByTank(new Map())
+      return
+    }
+    let active = true
+    Promise.all(
+      tanks.map((tank) =>
+        repository.getLabHistory(tank.tankId).then((history) => [tank.tankId, varianceFromLabHistory(history)] as const),
+      ),
+    )
+      .then((entries) => {
+        if (active) setVarianceByTank(new Map(entries))
+      })
+      .catch(() => {
+        // Lab variance is extra detail on the cards; without it the tanks still show.
+        if (active) setVarianceByTank(new Map())
+      })
+    return () => {
+      active = false
+    }
+  }, [repository, tanks])
 
   const openHistory = (tankId: string, metric: HistoryMetric) => {
     const product = tanks.find((tank) => tank.tankId === tankId)?.productName ?? ''
@@ -64,89 +129,137 @@ export function LiveOpsPage() {
   }
   const families = [...new Set(tanks.map((tank) => tank.oilFamily))].sort()
   const visible = commodity == null ? tanks : tanks.filter((tank) => commodity.includes(tank.oilFamily))
-  const gateVehicles = logistics.filter((item) => !range.ready || inDateRange(item.sampledOn, range.start, range.end))
-  const judged = gateVehicles.filter((item) => item.oilFamily === 'CPO' && item.verdict !== 'spec-pending')
-  const levelValue = mean(visible.map((tank) => tank.soundingLevelM))
   const tempValue = mean(visible.filter((tank) => tank.soundingLevelM != null).map((tank) => tank.temperatureC))
-  const level = levelValue == null ? t.unavailable : `${formatMeasure(levelValue, 2)} m`
-  const temp = tempValue == null ? t.unavailable : `${formatMeasure(tempValue, 1)} °C`
-  const approval = judged.length === 0 ? t.unavailable : `${((judged.filter((item) => item.verdict === 'pass').length / judged.length) * 100).toFixed(1)}%`
-  const quantityValues = visible.map((tank) => tank.quantityKg).filter((value): value is number => value != null)
-  const totalQuantity = quantityValues.length === 0
-    ? t.unavailable
-    : `${formatKg(quantityValues.reduce((sum, value) => sum + value, 0))} kg`
+
+  const stored = visible.filter((tank) => tank.capacityKg != null && tank.capacityKg > 0)
+  const capacityTotal = stored.reduce((sum, tank) => sum + (tank.capacityKg ?? 0), 0)
+  const quantityTotal = stored.reduce((sum, tank) => sum + (tank.quantityKg ?? 0), 0)
+  const utilization = capacityTotal > 0 && stored.some((tank) => tank.quantityKg != null) ? quantityTotal / capacityTotal : null
+  // A site with no lab results has no FFA, M&I or colour to show. Until the backend has said so, assume it does.
+  const hasLabData = meta?.hasLabData !== false
+  const emptyCount = visible.filter(isEmptyTank).length
+  const activeCount = visible.length - emptyCount
+  const critical = visible.filter((tank) => isCritical(tank, tempValue))
+  const varianceTanks = visible.filter((tank) => (varianceByTank.get(tank.tankId)?.length ?? 0) > 0)
+  const kpiTitles: Record<KpiKind, string> = {
+    utilization: t.storageUtilization,
+    activeEmpty: t.activeVsEmpty,
+    alerts: t.criticalAlerts,
+    variance: t.varianceAlerts,
+  }
 
   return (
-    <div className="page page--prod page--ops">
-      <header className="page-title-row">
-        <h1 className="page-title">{t.liveOps}</h1>
-        <span className="site-pill">
-          <span className="site-pill__dot" aria-hidden="true" />
-          {t.siteLabel} {site?.siteName ?? 'Priscolin Bekasi'}
-        </span>
-        <span className="page-meta">
-          {farmDay ? formatDay(farmDay, locale) : t.noSounding}
-        </span>
-        {range.ready && (
-          <DateRangeFilter
-            start={range.start}
-            end={range.end}
-            dataDates={meta?.dataDates ?? []}
-            onChange={range.onChange}
+    <MassUnitContext value={massUnit}>
+      <div className="page page--prod page--ops">
+        <header className="page-title-row">
+          <h1 className="page-title">{t.liveOps}</h1>
+          <span className="site-pill">
+            <span className="site-pill__dot" aria-hidden="true" />
+            {t.siteLabel} {site?.siteName ?? 'Priscolin Bekasi'}
+          </span>
+          {sourceOfTanks(tanks) ? <SourceBadge source={sourceOfTanks(tanks) as DataSource} /> : null}
+          <span className="page-meta">
+            {farmDay ? formatDay(farmDay, locale) : t.noSounding}
+          </span>
+          <div className="view-toggle" role="group" aria-label={t.massUnit}>
+            <button type="button" aria-pressed={massUnit === 'ton'} onClick={() => setMassUnit('ton')}>{t.unitTon}</button>
+            <button type="button" aria-pressed={massUnit === 'kg'} onClick={() => setMassUnit('kg')}>{t.unitKg}</button>
+          </div>
+          {range.ready && (
+            <DateRangeFilter
+              single
+              start={day}
+              end={day}
+              dataDates={meta?.soundingDates ?? []}
+              onChange={range.onChange}
+            />
+          )}
+        </header>
+        {loadFailed ? <p className="page-error" role="alert">{t.loadFailed}</p> : null}
+
+        <div className="live-ops">
+          <div className="live-ops__primary">
+            <section className="prod-kpis" aria-label="Summary">
+              <Kpi
+                label={kpiTitles.utilization}
+                value={utilization == null ? t.unavailable : `${(utilization * 100).toFixed(1)}%`}
+                track={utilization}
+                onOpen={() => setKpiDetail('utilization')}
+              />
+              <Kpi
+                label={kpiTitles.activeEmpty}
+                value={visible.length === 0 ? t.unavailable : `${activeCount} / ${emptyCount}`}
+                sub={t.activeEmptySub}
+                onOpen={() => setKpiDetail('activeEmpty')}
+              />
+              <Kpi
+                label={kpiTitles.alerts}
+                value={visible.length === 0 ? t.unavailable : String(critical.length)}
+                sub={critical.length > 0 ? critical.map((tank) => tankLabel(tank.tankId)).join(', ') : t.criticalAlertsSub}
+                tone={critical.length > 0 ? 'alert' : undefined}
+                onOpen={() => setKpiDetail('alerts')}
+              />
+              <Kpi
+                label={kpiTitles.variance}
+                value={visible.length === 0 ? t.unavailable : String(varianceTanks.length)}
+                sub={varianceTanks.length > 0 ? varianceTanks.map((tank) => tankLabel(tank.tankId)).join(', ') : undefined}
+                tone={varianceTanks.length > 0 ? 'alert' : undefined}
+                onOpen={() => setKpiDetail('variance')}
+              />
+            </section>
+            {!hasLabData && <p className="lab-note">{t.labNotConnected}</p>}
+            <CommodityStock tanks={tanks} before={beforeByTank} day={day} averageTemperature={tempValue} hasLabData={hasLabData} />
+            <section className="prod-panel">
+              <div className="section-head">
+                <h2 className="card__title">{t.tanks}</h2>
+                <div className="section-head__tools">
+                  <div className="view-toggle" role="group" aria-label={t.tanks}>
+                    <button type="button" aria-pressed={tankView === 'table'} onClick={() => setTankView('table')}>{t.tableView}</button>
+                    <button type="button" aria-pressed={tankView === 'grid'} onClick={() => setTankView('grid')}>{t.gridView}</button>
+                  </div>
+                  <CommodityFilter families={families} selected={commodity} onChange={setCommodity} />
+                </div>
+              </div>
+              {tankView === 'table'
+                ? <TankTable tanks={visible} before={beforeByTank} averageTemperature={tempValue} hasLabData={hasLabData} onHistory={openHistory} />
+                : (
+                  <div className="tank-grid tank-grid--vessels">
+                    {visible.map((tank) => (
+                      <TankCard key={tank.tankId} tank={tank} before={beforeByTank.get(tank.tankId)} averageTemperature={tempValue} referenceDay={day} hasLabData={hasLabData} onHistory={openHistory} />
+                    ))}
+                  </div>
+                )}
+            </section>
+          </div>
+        </div>
+        {day && (
+          <QuantityHistoryDialog
+            tankId={history?.tankId ?? null}
+            commodity={history?.commodity ?? ''}
+            metric={history?.metric ?? 'quantity'}
+            start={lookbackStart}
+            end={day}
+            onClose={() => setHistory(null)}
           />
         )}
-      </header>
-
-      <div className="live-ops">
-        <div className="live-ops__primary">
-          <section className="prod-kpis" aria-label="Summary">
-            <Kpi label={t.avgLevel} value={level} />
-            <Kpi label={t.avgTemp} value={temp} />
-            <Kpi label={t.totalQuantity} value={totalQuantity} />
-            <Kpi label={judged.length > 0 ? `${t.approvalRate} · ${t.incomingCpo}` : t.approvalRate} value={approval} tone={judged.length > 0 ? 'yield' : undefined} />
-          </section>
-          <CommodityStock tanks={tanks} start={range.ready ? range.start : ''} end={range.ready ? range.end : ''} />
-          <section className="prod-panel">
-            <div className="section-head">
-              <h2 className="card__title">{t.tanks}</h2>
-              <div className="section-head__tools">
-                <div className="view-toggle" role="group" aria-label={t.tanks}>
-                  <button type="button" aria-pressed={tankView === 'table'} onClick={() => setTankView('table')}>{t.tableView}</button>
-                  <button type="button" aria-pressed={tankView === 'grid'} onClick={() => setTankView('grid')}>{t.gridView}</button>
-                </div>
-                <CommodityFilter families={families} selected={commodity} onChange={setCommodity} />
-              </div>
-            </div>
-            {tankView === 'table'
-              ? <TankTable tanks={visible} averageTemperature={tempValue} onHistory={openHistory} />
-              : (
-                <div className="tank-grid">
-                  {visible.map((tank) => (
-                    <TankCard key={tank.tankId} tank={tank} averageTemperature={tempValue} onHistory={openHistory} />
-                  ))}
-                </div>
-              )}
-          </section>
-        </div>
-      </div>
-      {range.ready && (
-        <QuantityHistoryDialog
-          tankId={history?.tankId ?? null}
-          commodity={history?.commodity ?? ''}
-          metric={history?.metric ?? 'quantity'}
-          start={range.start}
-          end={range.end}
-          onClose={() => setHistory(null)}
+        <KpiDetailDialog
+          kind={kpiDetail}
+          title={kpiDetail ? kpiTitles[kpiDetail] : ''}
+          tanks={visible}
+          averageTemperature={tempValue}
+          day={day}
+          varianceByTank={varianceByTank}
+          onClose={() => setKpiDetail(null)}
         />
-      )}
-    </div>
+      </div>
+    </MassUnitContext>
   )
 }
 
-function latestSoundingDay(dates: string[], start: string, end: string): string | null {
+function latestSoundingDay(dates: string[], day: string): string | null {
   let latest: string | null = null
   for (const date of dates) {
-    if (date >= start && date <= end && (latest == null || date > latest)) latest = date
+    if (date <= day && (latest == null || date > latest)) latest = date
   }
   return latest
 }
@@ -157,11 +270,35 @@ function mean(values: Array<number | null>): number | null {
   return nums.reduce((sum, value) => sum + value, 0) / nums.length
 }
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'yield' }) {
+function Kpi({
+  label,
+  value,
+  tone,
+  sub,
+  track,
+  onOpen,
+}: {
+  label: string
+  value: string
+  tone?: 'yield' | 'alert'
+  sub?: string
+  track?: number | null
+  onOpen: () => void
+}) {
+  const { t } = useLocale()
+  const className = ['prod-kpi', 'prod-kpi--button', tone ? `prod-kpi--${tone}` : ''].filter(Boolean).join(' ')
+  const percent = track == null ? null : Math.min(100, Math.max(0, track * 100))
   return (
-    <article className={tone === 'yield' ? 'prod-kpi prod-kpi--yield' : 'prod-kpi'}>
+    <button type="button" className={className} title={t.kpiDetailHint} onClick={onOpen}>
+      <ChevronRight className="prod-kpi__go" size={16} aria-hidden="true" />
       <strong>{value}</strong>
       <span>{label}</span>
-    </article>
+      {sub && <small className="prod-kpi__sub">{sub}</small>}
+      {percent != null && (
+        <span className="prod-kpi__track" aria-hidden="true">
+          <span className="prod-kpi__fill" style={{ width: `${percent}%` }} />
+        </span>
+      )}
+    </button>
   )
 }

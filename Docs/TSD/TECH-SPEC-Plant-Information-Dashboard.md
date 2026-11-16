@@ -4,7 +4,7 @@
 **Date:** 2026-10-20
 **Status:** Aligned with PID-FSD-001. Behaviour is defined there. This document is the implementation baseline. `Docs/DATABASE-DESIGN.md` records these decisions before migration `001`. It does not reopen them.
 **Audience:** Engineering
-**Companion:** `Docs/FSD-Plant-Information-Dashboard.md` (PID-FSD-001)
+**Companion:** `Docs/FSD/FSD-Plant-Information-Dashboard.md` (PID-FSD-001). User and role screens: `Docs/TSD/TSD-Admin-Users-and-Roles.md`.
 **Reference system:** Jetty Planning System (local), for environment layout, Docker, and Alicloud only. This product does not share that database, those ports, or that API.
 
 ---
@@ -148,13 +148,15 @@ Dev may skip nginx and run Vite on the host against `pid-api`. Testing and Produ
 
 Ports are chosen so this stack can sit on the same machine as Jetty Planning System without taking its ports (JPS uses 3000, 3001/3080, and loopback 5436).
 
-| Service | Container | Host port |
+| Service | Container | Host port (product default) |
 | --- | --- | --- |
 | Web | `pid-web` | **3090** → container 80 |
 | API | `pid-api` | **3010** → container 3010 |
 | Postgres | `pid-db` | **127.0.0.1:5437** → container 5432 |
 
-Postgres is bound to loopback only. Security groups do not open 5437 or 5432 to the internet. On Testing and Production the API port 3010 accepts traffic only from the app server private IP.
+On the shared Alicloud SIT pair (`172.28.92.56` / `172.28.92.57`) those host ports are already taken (`msd-fe` `:3090`, `project_management_backend_staging` `:3010`). Staging therefore publishes **`3091`** and **`3011`**. The process inside each PID container is unchanged. See [STAGING-3-SERVER-DEPLOY-RUNBOOK.md](../Guide/STAGING-3-SERVER-DEPLOY-RUNBOOK.md).
+
+Postgres is bound to loopback only. Security groups do not open 5437 or 5432 to the internet. On Testing and Production the published API port accepts traffic only from the app server private IP.
 
 ---
 
@@ -205,7 +207,7 @@ Two ECS instances in one VPC, same pattern as Jetty Planning System:
 
 Install path: `/opt/plant-information-dashboard`.
 
-Users open `http://<testing-app-host>:3090`. nginx proxies `/api/` to the API private IP on port 3010. `VITE_API_URL` is baked at image build as `/api/v1`. `VITE_DATA_SOURCE` is `api`.
+SIT (shared hosts, internal only): users open `http://172.28.92.56:3091`. nginx proxies `/api/` to `172.28.92.57:3011`. API data is ApsaraDB, not a `pid-db` container (`docker-compose.backend-api-only.yml`). `VITE_API_URL` is baked at image build as `/api/v1`. `VITE_DATA_SOURCE` is `api`. Dedicated hosts can still use the product-default ports 3090 / 3010.
 
 `CORS_ORIGIN` lists the Testing app origin only.
 
@@ -518,7 +520,7 @@ supporting_materials (
   unique (site_id, code)
 )
 
-tanks (id, plant_id → plants, code, capacity, capacity_unit,
+tanks (id, plant_id → plants, code,
        unique (plant_id, code))
 ```
 
@@ -625,16 +627,11 @@ Every fact row includes `site_id`, `plant_id` where the form is plant-scoped, an
 soundings (
   id, site_id, plant_id, tank_id → tanks, submission_id,
   recorded_on date, round_index,
-  product_name, level_m, temperature_c, operational_status,
+  product_name, commodity_id null, level_m, temperature_c, operational_status,
   unique (tank_id, recorded_on, round_index)
 )
 
-lab_results (
-  id, site_id, plant_id, tank_id → tanks, submission_id,
-  analysis_date, snapshot_on, revision,
-  product_name, temperature_c, parameters jsonb, remark,
-  unique (tank_id, snapshot_on, revision)
-)
+The sounding, storage-certificate, and refinery-quality projections are specified in `Docs/DATABASE-DESIGN.md` under “Three logsheet projections”. `storage_certificates` is the F/QCO-001 header. Its tests are `certificate_parameters`, not `lab_results`. F/QCO-002 is `refinery_quality_days` and its children. `lab_results` remains in migration 001 and is not written for these forms.
 
 production_measures (
   id, site_id, plant_id, process_unit_id → process_units, submission_id,
@@ -659,12 +656,13 @@ checklist_results (
 
 Gate samples, vessel tickets, truck samples, and movements follow the same rule: foreign keys to site, plant, and submission. A day total for a process unit is the sum of its shift rows. A duplicated flowmeter span that repeats the same start and end is counted once.
 
-Mass (`quantity`, empty space, loadable stock, fill ratio) is computed at read time from the tank profile and the density table. Level alone is not a mass. Sounding mass is shown to two decimal places of kilograms. Yield is shown as a percentage to one decimal place. A quantity that cannot be computed is null, never zero.
+Mass (`quantity`, empty space, loadable stock, fill ratio) is computed at read time from the tank profile and the density table. Capacity and bottom stock share `capacity_unit` and are converted to kilograms first: `kg` is unchanged, and a tonne is 1,000 kg. A unit the converter does not know leaves those figures null. Level alone is not a mass. Sounding mass is shown to two decimal places of kilograms. Yield is shown as a percentage to one decimal place. A quantity that cannot be computed is null, never zero.
 
 Calibration hangs off `tanks.id`, not off a tank code:
 
 ```text
-tank_profiles (tank_id primary key → tanks, capacity_kg, bottom_stock_kg, …, origin)
+tank_profiles (tank_id primary key → tanks, capacity, capacity_unit default 'kg',
+               bottom_stock, …, origin)
 tank_volume_points (tank_id, height_mm, volume_litre, primary key (tank_id, height_mm))
 tank_ring_bands (id, tank_id, low_mm, high_mm, offset_mm)
 tank_ring_volumes (tank_id, ring_index, volume_litre, primary key (tank_id, ring_index))
@@ -836,11 +834,11 @@ Phase order:
 
 ### 11.2 nginx
 
-`Frontend/nginx.alicloud.conf` proxies `/api/` to the Testing or Production API private address. The browser talks only to port 3090.
+`Frontend/nginx.alicloud-app.conf` proxies `/api/` to the Testing or Production API private address. The browser talks only to the App host port (`3091` on shared SIT; `3090` on a dedicated host).
 
 ```text
 location /api/ {
-  proxy_pass http://<api-private-ip>:3010;
+  proxy_pass http://<api-private-ip>:3011;   # SIT host port; container still listens on 3010
 }
 location / {
   try_files $uri $uri/ /index.html;
@@ -861,8 +859,8 @@ The private IP is edited on the app host per environment. It is not hard-coded i
 ## 12. Security
 
 - Postgres is not reachable from the internet.
-- API port 3010 on Alicloud accepts the app server only.
-- App port 3090 is the only user port. Restrict it to the office range until auth ships, then open it to plant users.
+- The published API port on Alicloud accepts the app server only (`3011` on shared SIT; `3010` on a dedicated host).
+- The App host port is the only user port (`3091` on shared SIT; `3090` on a dedicated host). Restrict it to the office / VPC range.
 - SSH 22 stays on the admin IP.
 - `JWT_SECRET` and `POSTGRES_PASSWORD` differ across the three env files.
 - Logsheet passwords sit only on the API host.

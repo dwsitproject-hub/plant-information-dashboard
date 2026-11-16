@@ -27,6 +27,26 @@ export interface StorageRow {
   remark: string | null
   snapshotOn: string | null
   revision: number
+  /** Set by the API: the commodity this result was judged as, and the verdict against its limits. */
+  commodityId?: string | null
+  verdict?: 'pass' | 'quarantine' | 'spec-pending'
+  breaches?: SpecBreach[]
+}
+
+/** One limit a storage result broke. `field` is the StorageRow field, such as ffa or odor. */
+export interface SpecBreach {
+  field: string
+  parameterCode: string
+  bound: 'max' | 'min'
+  limit: number | null
+  value: number | string
+  severity: 'reject' | 'watch'
+}
+
+/** Rejecting limits outrank watch limits for the same figure. */
+export function breachFor(row: StorageRow | null, field: string): SpecBreach | null {
+  const hits = (row?.breaches ?? []).filter((breach) => breach.field === field)
+  return hits.find((breach) => breach.severity === 'reject') ?? hits[0] ?? null
 }
 
 export interface PalkaSample {
@@ -98,6 +118,7 @@ export interface TruckSheet {
 }
 
 export interface MovementRow {
+  movementDate?: string | null
   vehicle: string
   commodity: string
   timeIn: string | null
@@ -141,11 +162,12 @@ export function inRange(iso: string | null, start: string, end: string): boolean
   return iso >= from && iso <= to
 }
 
-export function qcDates(): string[] {
+export function qcDates(file: QcFile = QC): string[] {
   const dates = new Set<string>()
-  for (const row of QC.storage) if (row.snapshotOn) dates.add(row.snapshotOn)
-  for (const row of QC.trucks.rows) if (row.sampledOn) dates.add(row.sampledOn)
-  for (const row of QC.vessels) if (row.arrival) dates.add(row.arrival)
+  for (const row of file.storage) if (row.snapshotOn) dates.add(row.snapshotOn)
+  for (const row of file.trucks.rows) if (row.sampledOn) dates.add(row.sampledOn)
+  for (const row of file.vessels) if (row.arrival) dates.add(row.arrival)
+  for (const row of file.movements.rows) if (row.movementDate) dates.add(row.movementDate)
   return [...dates].sort()
 }
 
@@ -161,8 +183,8 @@ export function retestDue(row: StorageRow): boolean {
   return age != null && age > RETEST_AFTER_DAYS
 }
 
-export function storageInRange(start: string, end: string): StorageRow[] {
-  return QC.storage.filter((row) => inRange(row.snapshotOn, start, end))
+export function storageInRange(start: string, end: string, file: QcFile = QC): StorageRow[] {
+  return file.storage.filter((row) => inRange(row.snapshotOn, start, end))
 }
 
 export function latestStorage(rows: StorageRow[]): StorageRow[] {
@@ -201,6 +223,18 @@ export function historyForTank(rows: StorageRow[], tankId: string): StorageRow[]
       if (date !== 0) return date
       return right.revision - left.revision
     })
+}
+
+/**
+ * Every certificate for one tank and one product, newest first, across the
+ * whole file rather than the page's date-range filter. Used to find the
+ * "previous result" for a variance check: the comparison should not
+ * flicker on and off as someone changes the viewed date range, and a
+ * product change on the same tank (CPO swapped for PFAD) is not a quality
+ * drift, so only certificates for the same `oil` text are compared.
+ */
+export function qualityHistoryForTank(tankId: string, oil: string, file: QcFile = QC): StorageRow[] {
+  return historyForTank(file.storage.filter((row) => row.oil === oil), tankId)
 }
 
 export function overMax(value: number | null, max: number | null): boolean {
@@ -252,6 +286,39 @@ export function commodityFamily(raw: string): string {
     .replace(/\s+/g, ' ')
     .replace(/\bTOOLING\b/g, 'TOLLING')
     .replace(/\bTOLING\b/g, 'TOLLING')
+}
+
+export type NumericStorageField = {
+  [K in keyof StorageRow]-?: StorageRow[K] extends number | null ? K : never
+}[keyof StorageRow]
+
+export interface ProductRange {
+  low: number
+  high: number
+  count: number
+}
+
+/** Spread of one parameter for one product across every tank and snapshot given. */
+export function productRange(rows: StorageRow[], oil: string, field: NumericStorageField): ProductRange | null {
+  const values = rows
+    .filter((row) => row.oil === oil)
+    .map((row) => row[field])
+    .filter((value): value is number => typeof value === 'number')
+  if (values.length === 0) return null
+  return { low: Math.min(...values), high: Math.max(...values), count: values.length }
+}
+
+/** Quantity over capacity. A ratio above 105% means the two figures are in different units, so it is withheld. */
+export function tankFill(row: StorageRow | null): number | null {
+  if (!row || row.quantity == null || row.capacity == null || row.capacity <= 0) return null
+  const ratio = row.quantity / row.capacity
+  if (ratio < 0 || ratio > 1.05) return null
+  return Math.min(ratio, 1)
+}
+
+/** Row key for one truck sample. Sample numbers repeat once in the sheet, so the police number is part of it. */
+export function truckKey(row: TruckRow): string {
+  return `${row.sampleNo}-${row.policeNo}`
 }
 
 export function contractText(ffaMax: number | null, moistureMax: number | null, dobiMin: number | null): string {

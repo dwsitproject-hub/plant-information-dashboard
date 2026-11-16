@@ -1,6 +1,5 @@
-import logsheets from '../data/logsheets.json'
 import { commodityStock } from './commodityStock.ts'
-import { presentTank, type RawSounding } from './present.ts'
+import type { TankLive } from './types.ts'
 
 export type Qty = number | null
 
@@ -155,10 +154,10 @@ function blankDay(id: string): ProductionDay {
 }
 
 /** Inclusive sum of every logged day from start through end. Yield is recomputed by the caller. */
-export function productionForRange(start: string, end: string): ProductionDay {
+export function productionForRange(start: string, end: string, source: readonly ProductionDay[] = PRODUCTION_DAYS): ProductionDay {
   const from = start <= end ? start : end
   const to = start <= end ? end : start
-  const days = PRODUCTION_DAYS.filter((day) => day.id >= from && day.id <= to)
+  const days = source.filter((day) => day.id >= from && day.id <= to)
   const total = blankDay(`${from}:${to}`)
   for (const key of PLANT_KEYS) {
     const next = key === 'fract400' || key === 'fract500' ? fractionation({}) : empty()
@@ -206,24 +205,29 @@ export function lossYield(plant: PlantDay): Qty {
 
 export type StockCode = 'CPO' | 'RBDPO' | 'PFAD' | 'OLEIN' | 'RBDPS'
 
-/** Latest sounding per tank, converted with the same stockOf path Live Ops uses. */
-export function closingStockKg(): Record<StockCode, number | null> {
-  const rows = (logsheets as { soundings: RawSounding[] }).soundings
-  const byTank = new Map<string, RawSounding>()
-  for (const row of rows) {
-    const current = byTank.get(row.tankId)
-    if (!current || row.roundIndex >= current.roundIndex) byTank.set(row.tankId, row)
-  }
-  const stock = commodityStock([...byTank.values()].map((row) => presentTank(row, undefined, new Date())))
-  const result: Record<StockCode, number | null> = {
-    CPO: null,
-    RBDPO: null,
-    PFAD: null,
-    OLEIN: null,
-    RBDPS: null,
-  }
-  for (const row of stock) {
+function blankStock(): Record<StockCode, number | null> {
+  return { CPO: null, RBDPO: null, PFAD: null, OLEIN: null, RBDPS: null }
+}
+
+/**
+ * Stock per commodity for one day's tanks, as the repository returns them (the API in api mode,
+ * the bundled sheets in local mode). A day with no tank quantity stays blank.
+ */
+export function stockByCode(tanks: TankLive[]): Record<StockCode, number | null> {
+  const result = blankStock()
+  if (!tanks.some((tank) => tank.quantityKg != null)) return result
+  for (const row of commodityStock(tanks)) {
     if (row.code in result) result[row.code as StockCode] = row.quantityKg
   }
   return result
+}
+
+/** Calendar day before an ISO date. */
+export function dayBefore(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  const date = new Date(year, (month || 1) - 1, day || 1)
+  date.setDate(date.getDate() - 1)
+  const nextMonth = String(date.getMonth() + 1).padStart(2, '0')
+  const nextDay = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${nextMonth}-${nextDay}`
 }

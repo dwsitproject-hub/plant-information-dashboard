@@ -4,6 +4,8 @@
  * rather than the raw e-form columns.
  */
 
+import type { SpecHit, SpecLimit } from './qualityView.ts'
+
 export type OilFamily =
   | 'CPO'
   | 'RPO'
@@ -21,7 +23,9 @@ export type MassAvailability = 'known' | 'unavailable'
 
 export interface SiteContext {
   companyName: string
+  companyCode?: string | null
   siteName: string
+  siteCode?: string | null
   timezone: string
 }
 
@@ -38,6 +42,10 @@ export interface TankQuality {
   retestRequired: boolean
   parameters: LabParameter[]
   storageVerdict: StorageVerdict
+  /** From the API: the product's limits (Master > Commodities) and the ones this result breaks. */
+  commodityId?: string | null
+  limits?: SpecLimit[]
+  breaches?: SpecHit[]
 }
 
 export interface TankLive {
@@ -64,6 +72,19 @@ export interface TankLive {
   /** Quantity divided by capacity. Null when either figure is unknown. */
   fillRatio: number | null
   quality: TankQuality | null
+  /**
+   * Only for a tank read by a gauge system. live is the reading just taken, round is a saved
+   * daily round. A tank filled from logsheets leaves it out.
+   */
+  readingKind?: 'live' | 'round' | null
+  /** When the gauge reading was taken. */
+  readingAt?: string | null
+  /** The commodity card this gauged tank counts under. It follows the product the gauge assigns. */
+  stockGroup?: string | null
+  /** Max Tank Capacity the gauge reports, in litres. */
+  capacityLitre?: number | null
+  /** What the gauge says the tank is doing, such as In Operation or In Maintenance. */
+  tankState?: string | null
 }
 
 export interface LogisticsVehicle {
@@ -92,6 +113,18 @@ export interface SoundingPoint {
   temperatureC: number | null
   /** Sounding method, such as ISI LK or EMPTY. */
   operationalStatus: string
+  /** Total mass in kilograms when a gauge system reported it. Stock then uses it directly. */
+  massKg?: number | null
+  /** Tank capacity in kilograms, when known. Used with the gauge mass for free space and level. */
+  capacityKg?: number | null
+  /**
+   * Stock worked out by the API from this site's calibration. Present in api mode; when it is,
+   * the browser uses it instead of its own bundled calibration tables.
+   */
+  quantityKg?: number | null
+  emptySpaceKg?: number | null
+  loadableKg?: number | null
+  fillRatio?: number | null
   storageVerdict: StorageVerdict
 }
 
@@ -134,4 +167,8 @@ export interface SnapshotMeta {
   /** Calendar days that carry a sounding, lab, or gate sample. */
   dataDates: string[]
   roundCount: number
+  /** When a gauge system was last read for this site. Null for a site filled from logsheets. */
+  liveAsOf?: string | null
+  /** Whether any lab result exists for the site. When it does not, screens hide the lab area. */
+  hasLabData?: boolean
 }

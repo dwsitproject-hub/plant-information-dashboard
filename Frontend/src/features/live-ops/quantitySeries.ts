@@ -1,5 +1,5 @@
 import { parameter } from '../../domain/format.ts'
-import { stockOf } from '../../domain/tankStock.ts'
+import { stockFromPoint } from '../../domain/tankStock.ts'
 import type { LabHistoryPoint, SoundingPoint } from '../../domain/types.ts'
 
 export type HistoryKind = 'measured' | 'gap'
@@ -13,6 +13,10 @@ export type HistoryMetric =
   | 'temperature'
   | 'ffa'
   | 'moisture'
+  | 'colorR'
+  | 'colorY'
+  /** Any other lab parameter by its short code, such as lab:IV or lab:DOBI. */
+  | `lab:${string}`
 
 export interface HistoryDay {
   day: string
@@ -21,7 +25,16 @@ export interface HistoryDay {
 }
 
 export function isLabMetric(metric: HistoryMetric): boolean {
-  return metric === 'ffa' || metric === 'moisture'
+  return metric === 'ffa' || metric === 'moisture' || metric === 'colorR' || metric === 'colorY' || metric.startsWith('lab:')
+}
+
+/** Canonical lab parameter code behind each lab metric. */
+export function labCodeFor(metric: HistoryMetric): string {
+  if (metric === 'moisture') return 'MI'
+  if (metric === 'colorR') return 'COLOR_R'
+  if (metric === 'colorY') return 'COLOR_Y'
+  if (metric.startsWith('lab:')) return metric.slice(4)
+  return 'FFA'
 }
 
 function nextDay(iso: string): string {
@@ -46,7 +59,7 @@ function daysFrom(start: string, end: string): string[] {
 function soundingValue(tankId: string, point: SoundingPoint, metric: HistoryMetric): number | null {
   if (metric === 'level') return point.soundingLevelM
   if (metric === 'temperature') return point.temperatureC
-  const stock = stockOf(tankId, point.soundingLevelM, point.temperatureC, point.operationalStatus)
+  const stock = stockFromPoint(tankId, point)
   if (metric === 'quantity') return stock.quantityKg
   if (metric === 'emptySpace') return stock.emptySpaceKg
   if (metric === 'loadable') return stock.loadableKg
@@ -100,6 +113,8 @@ export interface CommodityDayReading {
   emptySpaceKg: number | null
   loadableKg: number | null
   levelRatio: number | null
+  temperatureC: number | null
+  operationalStatus: string
 }
 
 /** Total quantity of the tanks in one commodity. A day with no sounding stays empty. */
@@ -122,7 +137,7 @@ export function commodityQuantitySeries(
     for (const history of byTank) {
       const point = history.byDay.get(day)
       if (!point) continue
-      const stock = stockOf(history.tankId, point.soundingLevelM, point.temperatureC, point.operationalStatus)
+      const stock = stockFromPoint(history.tankId, point)
       if (stock.quantityKg == null) continue
       measured = true
       total += stock.quantityKg
@@ -136,12 +151,14 @@ export function commodityQuantitySeries(
 export function commodityDayReading(tankId: string, points: SoundingPoint[], day: string): CommodityDayReading | null {
   const point = points.find((row) => row.recordedOn === day)
   if (!point) return null
-  const stock = stockOf(tankId, point.soundingLevelM, point.temperatureC, point.operationalStatus)
+  const stock = stockFromPoint(tankId, point)
   return {
     soundingLevelM: point.soundingLevelM,
     quantityKg: stock.quantityKg,
     emptySpaceKg: stock.emptySpaceKg,
     loadableKg: stock.loadableKg,
     levelRatio: stock.levelRatio,
+    temperatureC: point.temperatureC,
+    operationalStatus: point.operationalStatus,
   }
 }

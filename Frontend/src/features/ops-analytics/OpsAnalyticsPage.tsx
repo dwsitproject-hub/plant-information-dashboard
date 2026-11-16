@@ -19,6 +19,7 @@ export function OpsAnalyticsPage() {
   const [movements, setMovements] = useState<MovementTotal[]>([])
   const [meta, setMeta] = useState<SnapshotMeta | null>(null)
   const range = usePeriodRange(meta?.periodLabel ?? null)
+  const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -26,12 +27,16 @@ export function OpsAnalyticsPage() {
       repository.getLiveTanks(),
       repository.getSnapshotMeta(),
       repository.getMovementSummary(),
-    ]).then(([tanks, nextMeta, nextMovements]) => {
-      if (!active) return
-      setOptions(tanks.map((tank) => tank.tankId))
-      setMeta(nextMeta)
-      setMovements(nextMovements)
-    })
+    ])
+      .then(([tanks, nextMeta, nextMovements]) => {
+        if (!active) return
+        setOptions(tanks.map((tank) => tank.tankId))
+        setMeta(nextMeta)
+        setMovements(nextMovements)
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true)
+      })
     return () => {
       active = false
     }
@@ -42,11 +47,18 @@ export function OpsAnalyticsPage() {
     Promise.all([
       repository.getSoundingHistory(tankId),
       repository.getLabHistory(tankId),
-    ]).then(([nextHistory, nextLabs]) => {
-      if (!active) return
-      setHistory(nextHistory)
-      setLabs(nextLabs)
-    })
+    ])
+      .then(([nextHistory, nextLabs]) => {
+        if (!active) return
+        setHistory(nextHistory)
+        setLabs(nextLabs)
+      })
+      .catch(() => {
+        if (!active) return
+        setHistory([])
+        setLabs([])
+        setLoadFailed(true)
+      })
     return () => {
       active = false
     }
@@ -78,6 +90,7 @@ export function OpsAnalyticsPage() {
           </select>
         </label>
       </header>
+      {loadFailed ? <p className="page-error" role="alert">{t.loadFailed}</p> : null}
 
       <section className="prod-kpis" aria-label="Summary">
         <Kpi label={`${t.avgLevel} · ${tankLabel(tankId)}`} value={level} />
