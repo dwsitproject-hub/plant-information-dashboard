@@ -1,6 +1,16 @@
 import { Router } from 'express'
 import { pool, query } from '../db.js'
-import { PAGE_KEYS, SITE_MODULES, hashPassword, requireAny, requireAuth, requirePermission } from '../access.js'
+import {
+  PAGE_KEYS,
+  SITE_MODULES,
+  canGrantRole,
+  hashPassword,
+  normalizePermissionList,
+  permissionsWithin,
+  requireAny,
+  requireAuth,
+  requirePermission,
+} from '../access.js'
 
 const router = Router()
 
@@ -29,6 +39,70 @@ async function isLastActiveAdmin(userId) {
   )
   const ids = result.rows.map((row) => Number(row.id))
   return ids.length === 1 && ids[0] === Number(userId)
+}
+
+/** Roles by id, each with its rights keyed like the session's permissions. */
+async function loadRoleGrants(db, roleIds) {
+  if (roleIds.length === 0) return new Map()
+  const result = await db.query(
+    `SELECT r.id, r.name, r.is_system_role, p.resource_key, rp.can_view, rp.can_edit, rp.can_delete
+     FROM roles r
+     LEFT JOIN role_permissions rp ON rp.role_id = r.id
+     LEFT JOIN permissions p ON p.id = rp.permission_id
+     WHERE r.id = ANY($1::bigint[])`,
+    [roleIds],
+  )
+  const roles = new Map()
+  for (const row of result.rows) {
+    const id = Number(row.id)
+    if (!roles.has(id)) {
+      roles.set(id, {
+        id,
+        isAdministratorRole: row.name === 'Administrator' && row.is_system_role === true,
+        permissions: {},
+      })
+    }
+    if (row.resource_key) {
+      const flags = roles.get(id).permissions[row.resource_key] ?? { view: false, edit: false, delete: false }
+      roles.get(id).permissions[row.resource_key] = {
+        view: flags.view || row.can_view === true,
+        edit: flags.edit || row.can_edit === true,
+        delete: flags.delete || row.can_delete === true,
+      }
+    }
+  }
+  return roles
+}
+
+async function currentRoleIds(db, userId) {
+  const result = await db.query('SELECT role_id FROM user_roles WHERE user_id = $1', [userId])
+  return result.rows.map((row) => Number(row.role_id))
+}
+
+/**
+ * Checks a role change for the signed-in user. Returns an error code, or null when allowed.
+ * - Every role being added or removed must be one the actor could grant (canGrantRole).
+ * - A user who is not an Administrator cannot change their own roles.
+ * - A user who is not an Administrator cannot manage someone holding a role they could not grant
+ *   (for example, reset an Administrator's password).
+ */
+async function checkRoleChange(db, actor, targetId, nextRoleIds) {
+  const before = targetId ? await currentRoleIds(db, targetId) : []
+  const grants = await loadRoleGrants(db, [...new Set([...before, ...nextRoleIds])])
+  if (actor.isAdministrator === true) return null
+  if (before.some((id) => !canGrantRole(actor, grants.get(id)))) return 'cannot_manage_user'
+  const added = nextRoleIds.filter((id) => !before.includes(id))
+  const removed = before.filter((id) => !nextRoleIds.includes(id))
+  if (targetId && targetId === actor.id && (added.length || removed.length)) return 'cannot_change_own_roles'
+  if ([...added, ...removed].some((id) => !canGrantRole(actor, grants.get(id)))) return 'cannot_grant_role'
+  return null
+}
+
+/** Would the Administrator role leave the last active Administrator? */
+async function dropsLastAdmin(db, userId, nextRoleIds) {
+  if (!(await isLastActiveAdmin(userId))) return false
+  const grants = await loadRoleGrants(db, nextRoleIds)
+  return ![...grants.values()].some((role) => role.isAdministratorRole)
 }
 
 async function replaceRoles(client, userId, roleIds) {
@@ -231,6 +305,10 @@ router.post('/roles', requirePermission('admin-roles', 'edit'), async (req, res,
   try {
     const name = clean(req.body?.name)
     if (!name) return res.status(400).json({ error: 'role_name_required' })
+    const requested = normalizePermissionList(req.body?.permissions)
+    if (req.sessionUser.isAdministrator !== true && !permissionsWithin(requested, req.sessionUser.permissions)) {
+      return res.status(403).json({ error: 'cannot_grant_permission' })
+    }
     await client.query('BEGIN')
     const created = await client.query(
       `INSERT INTO roles (name, description, is_system_role) VALUES ($1, $2, FALSE) RETURNING id`,
@@ -257,6 +335,16 @@ router.put('/roles/:id', requirePermission('admin-roles', 'edit'), async (req, r
     if (!name) return res.status(400).json({ error: 'role_name_required' })
     const current = await client.query('SELECT is_system_role, name FROM roles WHERE id = $1', [id])
     if (!current.rows[0]) return res.status(404).json({ error: 'not_found' })
+    if (req.sessionUser.isAdministrator !== true) {
+      // Only an Administrator changes a system role, or a role holding rights the editor does not have.
+      if (current.rows[0].is_system_role) return res.status(403).json({ error: 'system_role' })
+      const before = (await loadRoleGrants(client, [id])).get(id)
+      const requested = normalizePermissionList(req.body?.permissions)
+      if (!permissionsWithin(before?.permissions, req.sessionUser.permissions)
+        || !permissionsWithin(requested, req.sessionUser.permissions)) {
+        return res.status(403).json({ error: 'cannot_grant_permission' })
+      }
+    }
     const nextName = current.rows[0].is_system_role ? current.rows[0].name : name
     await client.query('BEGIN')
     await client.query(
@@ -340,6 +428,11 @@ router.post('/users', requirePermission('admin-users', 'edit'), async (req, res,
       await client.query('ROLLBACK')
       return res.status(400).json({ error: 'not_found' })
     }
+    const denied = await checkRoleChange(client, req.sessionUser, null, roleIds)
+    if (denied) {
+      await client.query('ROLLBACK')
+      return res.status(403).json({ error: denied })
+    }
     const created = await client.query(
       `INSERT INTO users (username, display_name, email, password_hash, is_active)
        VALUES ($1, $2, $3, $4, $5)
@@ -387,6 +480,15 @@ router.put('/users/:id', requirePermission('admin-users', 'edit'), async (req, r
       await client.query('ROLLBACK')
       return res.status(400).json({ error: 'not_found' })
     }
+    const denied = await checkRoleChange(client, req.sessionUser, id, roleIds)
+    if (denied) {
+      await client.query('ROLLBACK')
+      return res.status(403).json({ error: denied })
+    }
+    if (await dropsLastAdmin(client, id, roleIds)) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({ error: 'last_admin' })
+    }
     await client.query(
       `UPDATE users
        SET display_name = $1, email = $2, is_active = $3, updated_at = NOW()
@@ -423,6 +525,8 @@ router.delete('/users/:id', requirePermission('admin-users', 'delete'), async (r
       [id],
     )
     if (!current.rows[0]) return res.status(404).json({ error: 'not_found' })
+    const denied = await checkRoleChange(client, req.sessionUser, id, await currentRoleIds(client, id))
+    if (denied) return res.status(403).json({ error: denied })
     if (current.rows[0].is_active && await isLastActiveAdmin(id)) {
       return res.status(409).json({ error: 'last_admin' })
     }

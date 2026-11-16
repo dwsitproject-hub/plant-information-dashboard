@@ -175,6 +175,47 @@ export function requireAny(checks) {
   }
 }
 
+const ACTIONS = ['view', 'edit', 'delete']
+
+/**
+ * Normalise a list of { resourceKey, view, edit, delete } the way saveRolePermissions stores it:
+ * edit or delete implies view. Entries with no flag are dropped.
+ */
+export function normalizePermissionList(list) {
+  const out = {}
+  for (const entry of Array.isArray(list) ? list : []) {
+    const key = typeof entry?.resourceKey === 'string' ? entry.resourceKey : null
+    if (!key) continue
+    const edit = entry.edit === true
+    const canDelete = entry.delete === true
+    const view = entry.view === true || edit || canDelete
+    if (!view) continue
+    out[key] = { view, edit, delete: canDelete }
+  }
+  return out
+}
+
+/** True when every right in `requested` (key -> { view, edit, delete }) is also in `held`. */
+export function permissionsWithin(requested, held) {
+  for (const [key, flags] of Object.entries(requested ?? {})) {
+    for (const action of ACTIONS) {
+      if (flags?.[action] && !held?.[key]?.[action]) return false
+    }
+  }
+  return true
+}
+
+/**
+ * A role may be given to someone only by a user who already holds every right in it.
+ * The system Administrator role is given and taken only by an Administrator.
+ * `role` is { isAdministratorRole, permissions } with permissions keyed like the session's.
+ */
+export function canGrantRole(actor, role) {
+  if (actor?.isAdministrator === true) return true
+  if (!role || role.isAdministratorRole) return false
+  return permissionsWithin(role.permissions, actor?.permissions)
+}
+
 export async function verifyPassword(usernameOrEmail, password) {
   const result = await query(
     `SELECT id, password_hash, is_active, deleted_at

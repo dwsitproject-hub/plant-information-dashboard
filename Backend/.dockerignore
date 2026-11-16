@@ -1,2 +1,9 @@
 node_modules
 npm-debug.log
+
+# Secrets and data never go into the image. The container gets its env from compose.
+.env
+.env.*
+backups
+*.dump
+*.sql.gz

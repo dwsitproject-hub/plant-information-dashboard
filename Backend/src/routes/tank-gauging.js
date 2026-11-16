@@ -27,10 +27,16 @@ async function siteAllowed(req, siteId) {
   return req.sessionUser.sites.some((s) => s.id === siteId) ? site.rows[0] : null
 }
 
+// Express 4 does not catch a rejected promise from middleware. Pass every error to next(),
+// or one database failure becomes an unhandled rejection and stops the API process.
 async function withSite(req, res, next) {
-  const site = await siteAllowed(req, req.params.siteId)
-  if (!site) return res.status(404).json({ error: 'not_found' })
-  req.site = site
+  try {
+    const site = await siteAllowed(req, req.params.siteId)
+    if (!site) return res.status(404).json({ error: 'not_found' })
+    req.site = site
+  } catch (error) {
+    return next(error)
+  }
   next()
 }
 
@@ -100,10 +106,14 @@ router.post('/sites/:siteId/sources', edit, withSite, async (req, res, next) => 
 })
 
 async function ownSource(req, res, next) {
-  const row = await getSource(pool, parseInt(req.params.id, 10))
-  if (!row) return res.status(404).json({ error: 'not_found' })
-  if (!(await siteAllowed(req, row.site_id))) return res.status(404).json({ error: 'not_found' })
-  req.sourceRow = row
+  try {
+    const row = await getSource(pool, parseInt(req.params.id, 10))
+    if (!row) return res.status(404).json({ error: 'not_found' })
+    if (!(await siteAllowed(req, row.site_id))) return res.status(404).json({ error: 'not_found' })
+    req.sourceRow = row
+  } catch (error) {
+    return next(error)
+  }
   next()
 }
 

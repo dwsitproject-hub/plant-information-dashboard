@@ -438,6 +438,7 @@ export interface Messages {
   legend: string
   loading: string
   loginInvalid: string
+  loginThrottled: string
   signingIn: string
   administration: string
   adminMenuTitle: string
@@ -795,6 +796,10 @@ export interface Messages {
   usernameTaken: string
   emailTaken: string
   lastAdmin: string
+  cannotGrantRole: string
+  cannotGrantPermission: string
+  cannotManageUser: string
+  cannotChangeOwnRoles: string
   selfDeactivate: string
   selfDelete: string
   currentPasswordRequired: string
@@ -1247,6 +1252,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     legend: 'Legend',
     loading: 'Loading…',
     loginInvalid: 'Invalid username or password.',
+    loginThrottled: 'Too many failed sign-in attempts. Wait 15 minutes and try again.',
     signingIn: 'Signing in…',
     administration: 'Administration',
     adminMenuTitle: 'Administration',
@@ -1604,6 +1610,10 @@ export const MESSAGES: Record<Locale, Messages> = {
     usernameTaken: 'Username is already in use.',
     emailTaken: 'Email is already in use.',
     lastAdmin: 'At least one active administrator must remain.',
+    cannotGrantRole: 'You can only give or remove roles whose rights you hold yourself. Only an Administrator can give the Administrator role.',
+    cannotGrantPermission: 'You can only give a role rights that you hold yourself.',
+    cannotManageUser: 'This user has a role with more rights than yours. Ask an Administrator.',
+    cannotChangeOwnRoles: 'You cannot change your own roles. Ask an Administrator.',
     selfDeactivate: 'You cannot deactivate your own account.',
     selfDelete: 'You cannot delete your own account.',
     currentPasswordRequired: 'Current password is required.',
@@ -2054,6 +2064,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     legend: 'Keterangan',
     loading: 'Memuat…',
     loginInvalid: 'Nama pengguna atau kata sandi salah.',
+    loginThrottled: 'Terlalu banyak percobaan masuk yang gagal. Tunggu 15 menit lalu coba lagi.',
     signingIn: 'Masuk…',
     administration: 'Administrasi',
     adminMenuTitle: 'Administrasi',
@@ -2411,6 +2422,10 @@ export const MESSAGES: Record<Locale, Messages> = {
     usernameTaken: 'Nama pengguna sudah digunakan.',
     emailTaken: 'Email sudah digunakan.',
     lastAdmin: 'Minimal satu administrator aktif harus tetap ada.',
+    cannotGrantRole: 'Anda hanya dapat memberi atau mencabut peran yang hak aksesnya Anda miliki sendiri. Hanya Administrator yang dapat memberi peran Administrator.',
+    cannotGrantPermission: 'Anda hanya dapat memberi peran hak akses yang Anda miliki sendiri.',
+    cannotManageUser: 'Pengguna ini memiliki peran dengan hak akses lebih besar dari Anda. Hubungi Administrator.',
+    cannotChangeOwnRoles: 'Anda tidak dapat mengubah peran Anda sendiri. Hubungi Administrator.',
     selfDeactivate: 'Anda tidak dapat menonaktifkan akun Anda sendiri.',
     selfDelete: 'Anda tidak dapat menghapus akun Anda sendiri.',
     currentPasswordRequired: 'Kata sandi saat ini wajib diisi.',
