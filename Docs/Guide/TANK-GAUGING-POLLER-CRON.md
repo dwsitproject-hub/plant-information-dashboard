@@ -54,25 +54,25 @@ Use **Test connection** on each row. It reads the tank list and shows how many u
 
 ## Schedule it
 
-On the backend host (`172.28.92.57`), as the user that runs Docker:
+On the backend host (`172.28.92.57`), as root. The jobs go in their own file under `/etc/cron.d/`, not in root's crontab: that host is shared with other products, and a rewrite of root's crontab by another team would drop PID's lines.
 
 ```bash
-sudo touch /var/log/pid-tank-gauging-poll.log /var/log/pid-tank-gauging-purge.log
-sudo chown "$USER" /var/log/pid-tank-gauging-poll.log /var/log/pid-tank-gauging-purge.log
-crontab -e
+touch /var/log/pid-tank-gauging-poll.log /var/log/pid-tank-gauging-purge.log
+cat > /etc/cron.d/pid-tank-gauging <<'CRON'
+# Plant Information Dashboard: tank gauging. The server clock is UTC.
+SHELL=/bin/bash
+# Poll every gauge source every 15 minutes. Live Ops stays fresh, and a reading always falls within the
+# 30-minute tolerance of each site's round times, so the daily rounds get written.
+*/15 * * * * root cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/run-tank-gauging-poll.js >> /var/log/pid-tank-gauging-poll.log 2>&1
+# Sample purge: every day at 02:20 UTC
+20 2 * * * root cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/purge-tank-gauging-samples.js >> /var/log/pid-tank-gauging-purge.log 2>&1
+CRON
+chmod 644 /etc/cron.d/pid-tank-gauging
 ```
 
-Add:
+Change how often it runs by editing the first field, for example `*/30` for every 30 minutes (still inside the round tolerance). Polling less often than the tolerance is risky: a poll must land within 30 minutes of each round time, or that day's round is not written.
 
-```cron
-# Tank gauging poll: every 15 minutes
-*/15 * * * * cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/run-tank-gauging-poll.js >> /var/log/pid-tank-gauging-poll.log 2>&1
-
-# Sample purge: every day at 02:20
-20 2 * * * cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/purge-tank-gauging-samples.js >> /var/log/pid-tank-gauging-purge.log 2>&1
-```
-
-Change how often it runs by editing the first field, for example `*/10` for every 10 minutes. The round times are not in cron. They are set on the Tank gauging page under **Daily rounds**.
+**Times are UTC.** The round times (06:30 and 14:30 by default) are in each site's own timezone and are set on the Tank gauging page under **Daily rounds**, not in cron. If you schedule polls at fixed times instead of an interval, convert them: 06:30 in Bontang (WITA, UTC+8) is 22:30 UTC; 06:30 in Tanjung Pura (WIB, UTC+7) is 23:30 UTC.
 
 Only one poll runs at a time. If a run is still going when the next starts, the new one exits quietly.
 
