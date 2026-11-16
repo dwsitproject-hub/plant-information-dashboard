@@ -5,17 +5,23 @@ import { exchangeAuthorizationCode, getDiscoveryDocument, validateIdToken } from
 import { getOidcConfig, oidcConfigError } from '../sso/oidc-config.js'
 import {
   clearOidcFlowCookie,
+  createFlowValues,
   createPkcePair,
-  createSignedState,
+  nonceMatches,
   readOidcFlowCookie,
-  readSignedState,
   setOidcFlowCookie,
+  verifierForCallback,
 } from '../sso/oidc-flow.js'
+import { HubTokenReplayGuard } from '../sso/replay-guard.js'
 import { appPublicOrigin, redirectToSsoError } from '../sso/public-origin.js'
 import { resolveHubUser } from '../sso/resolve-user.js'
 
 const router = Router()
 const urlencoded = express.urlencoded({ extended: false })
+const hubTokens = new HubTokenReplayGuard()
+
+/** The Hub's tokens live 60 seconds by default. Anything issued longer ago than this is refused. */
+const HUB_TOKEN_MAX_AGE_SECONDS = 300
 
 router.get('/sso/status', (_req, res) => {
   const config = getOidcConfig()
@@ -30,21 +36,29 @@ router.get('/oidc/start', async (req, res) => {
   if (!config.enabled) return redirectToSsoError(res, 'oidc_disabled')
   if (oidcConfigError(config)) return redirectToSsoError(res, 'oidc_not_configured')
 
+  // Inside an iframe the flow cookie may be dropped as third-party. Restart at the top level first,
+  // so the cookie is set in the same browsing context that will receive the callback.
+  const accept = req.get('Accept') || ''
+  const secFetchDest = (req.get('Sec-Fetch-Dest') || '').toLowerCase()
+  if (accept.includes('text/html') && secFetchDest === 'iframe') {
+    return sendBreakout(res, absoluteRequestUrl(req))
+  }
+
   try {
     const discovery = await getDiscoveryDocument(config.discoveryUrl)
     if (!discovery?.authorization_endpoint) return redirectToSsoError(res, 'oidc_sign_in_failed')
     const { verifier, challenge, method } = createPkcePair()
-    const state = createSignedState(verifier)
-    setOidcFlowCookie(res, { state, verifier })
+    const { state, nonce } = createFlowValues()
+    setOidcFlowCookie(res, { state, verifier, nonce })
     const authUrl = new URL(discovery.authorization_endpoint)
     authUrl.searchParams.set('response_type', 'code')
     authUrl.searchParams.set('client_id', config.clientId)
     authUrl.searchParams.set('redirect_uri', config.redirectUri)
     authUrl.searchParams.set('scope', config.scopes)
     authUrl.searchParams.set('state', state)
+    authUrl.searchParams.set('nonce', nonce)
     authUrl.searchParams.set('code_challenge', challenge)
     authUrl.searchParams.set('code_challenge_method', method)
-    const accept = req.get('Accept') || ''
     if (accept.includes('text/html')) return sendBreakout(res, authUrl.toString())
     return res.redirect(302, authUrl.toString())
   } catch (error) {
@@ -67,12 +81,8 @@ router.get('/oidc/callback', async (req, res) => {
   try {
     const code = typeof req.query?.code === 'string' ? req.query.code : ''
     const state = typeof req.query?.state === 'string' ? req.query.state : ''
-    const signedState = readSignedState(state)
     const flow = readOidcFlowCookie(req)
-    let codeVerifier = signedState?.verifier || ''
-    if (flow?.state && flow.state === state && typeof flow.verifier === 'string') {
-      codeVerifier = flow.verifier
-    }
+    const codeVerifier = verifierForCallback(flow, state)
     if (!codeVerifier) return fail(res, 'invalid_state')
     if (!code) return fail(res, 'missing_code')
 
@@ -93,6 +103,7 @@ router.get('/oidc/callback', async (req, res) => {
       audience: config.clientId,
       jwksUri: discovery.jwks_uri,
     })
+    if (!nonceMatches(flow, claims)) return fail(res, 'invalid_state')
     const resolved = await resolveHubUser({
       hubUserId: claims.sub,
       email: typeof claims.email === 'string' ? claims.email : '',
@@ -120,7 +131,15 @@ router.post('/hub', urlencoded, async (req, res) => {
   if (!token || typeof token !== 'string') return redirectToSsoError(res, 'missing_token')
 
   try {
-    const payload = jwt.verify(token, secret, { algorithms: ['HS256'], clockTolerance: 0 })
+    const payload = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+      clockTolerance: 0,
+      maxAge: HUB_TOKEN_MAX_AGE_SECONDS,
+    })
+    // The contract requires exp; jsonwebtoken only enforces it when present.
+    if (typeof payload?.exp !== 'number') return redirectToSsoError(res, 'invalid_token')
+    // A Hub token signs in once. A second POST of the same token is refused until it expires.
+    if (!hubTokens.claim(token, payload.exp)) return redirectToSsoError(res, 'invalid_token')
     const resolved = await resolveHubUser({
       hubUserId: payload.user_id,
       email: payload.email,

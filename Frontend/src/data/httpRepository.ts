@@ -1,3 +1,4 @@
+import { notifySessionExpired } from './api.ts'
 import type { OperationsRepository } from './repository.ts'
 import type {
   AnalyticsSummary,
@@ -23,6 +24,7 @@ export class HttpOperationsRepository implements OperationsRepository {
   private async get<T>(path: string): Promise<T> {
     // The data routes need the session cookie.
     const response = await fetch(`${this.baseUrl}${path}`, { credentials: 'include' })
+    if (response.status === 401) notifySessionExpired()
     if (!response.ok) {
       throw new Error(`API ${response.status} for ${path}`)
     }

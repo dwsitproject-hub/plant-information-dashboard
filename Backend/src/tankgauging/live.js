@@ -18,7 +18,8 @@ export async function loadGaugedTanks(db, siteId) {
             l.product_name, l.level_mm, l.temperature_c, l.total_mass, l.observed_density_kg_m3,
             l.total_observed_volume, l.status_text, l.raw_payload, l.fetched_at, l.recorded_at,
             i.max_capacity_litre, i.tank_state, i.tank_height_mm,
-            d.density AS ref_density_kg_m3
+            d.density AS ref_density_kg_m3,
+            EXISTS (SELECT 1 FROM tank_gauging_tank_map m WHERE m.tank_id = t.id) AS linked
      FROM tanks t
      JOIN plants p ON p.id = t.plant_id
      LEFT JOIN tank_gauging_latest l ON l.tank_id = t.id
@@ -65,13 +66,31 @@ export function newestReading(rows) {
   return times.length ? new Date(Math.max(...times)) : null
 }
 
+/** Minutes after which a gauge reading no longer counts as live. */
+export function staleAfterMinutes(env = process.env) {
+  const n = Number(env.TANK_GAUGING_STALE_MINUTES)
+  return Number.isFinite(n) && n > 0 ? n : 120
+}
+
+/**
+ * A reading is stale when it was fetched long ago, for example because the poller stopped.
+ * The gauge's own timestamp is not used: it may be the time a value last changed, which is old for
+ * a tank that is simply standing still, and plant gauge clocks are not always set.
+ */
+export function isStale(row, now = new Date(), minutes = staleAfterMinutes()) {
+  const fetched = row.fetched_at ? new Date(row.fetched_at).getTime() : NaN
+  if (!Number.isFinite(fetched)) return true
+  return now.getTime() - fetched > minutes * 60_000
+}
+
 /**
  * A sounding in the shape Live Ops already reads, made from the latest reading.
- * A reading with nothing trustworthy in it shows as NO DATA with blank figures.
+ * A reading with nothing trustworthy in it shows as NO DATA with blank figures. So does a tank no longer
+ * linked to a gauge, and a reading older than the stale limit, so neither keeps counting in stock.
  */
-export function liveSounding(row, recordedOn) {
+export function liveSounding(row, recordedOn, now = new Date()) {
   const values = roundValues(row)
-  const usable = hasEvidence(values)
+  const usable = hasEvidence(values) && row.linked !== false && !isStale(row, now)
   return {
     roundIndex: 0,
     recordedOn,

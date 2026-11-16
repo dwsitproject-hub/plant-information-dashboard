@@ -150,7 +150,9 @@ unset PGPASSWORD
 
 Expected counts after restore (from local dev baseline): see [Backend/backups/staging-local-dump-baseline.txt](../../Backend/backups/staging-local-dump-baseline.txt) (`soundings=2488`, `schema_migrations=7`, `users=1`).
 
-If the dump has no `admin` user, run **`npm run seed:admin`** after the API container is up (step 3).
+If the dump has no `admin` user, run **`npm run seed:admin`** after the API container is up (step 3). It needs `SEED_ADMIN_PASSWORD` (at least 12 characters); there is no default password outside `APP_ENV=dev`.
+
+The dev dump also carries the dev users and their password hashes. After restoring it, reset or remove those accounts before anyone else can reach staging.
 
 ---
 
@@ -176,8 +178,13 @@ bash Backend/scripts/deploy-staging-api.sh deploy
 Optional admin bootstrap:
 
 ```bash
-docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api npm run seed:admin
+# Type the password at the prompt so it stays out of shell history and git.
+read -rs SEED_ADMIN_PASSWORD && export SEED_ADMIN_PASSWORD
+docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T -e SEED_ADMIN_PASSWORD pid-api npm run seed:admin
+unset SEED_ADMIN_PASSWORD
 ```
+
+An existing `admin` keeps its password. Add `-- --reset-password` to the `npm run seed:admin` command to overwrite it.
 
 Health (host port **3011**):
 
@@ -205,7 +212,7 @@ export DEPLOY_BRANCH=sit
 bash Backend/scripts/deploy-staging-frontend.sh deploy
 ```
 
-Open **`http://172.28.92.56:3091`**. Log in (dev dump: same password as local; or `admin` / `admin123` after `seed:admin`). Change that password after first login.
+Open **`http://172.28.92.56:3091`**. Log in (dev dump: same password as local; or `admin` with the `SEED_ADMIN_PASSWORD` you set for `seed:admin`).
 
 ---
 

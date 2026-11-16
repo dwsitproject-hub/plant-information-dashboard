@@ -37,6 +37,8 @@ const siteId = arg('siteId') ?? undefined
 const once = process.argv.includes('--once')
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+// Keep the loop alive when an idle connection drops; the pool replaces it.
+pool.on('error', (error) => console.error('pg.pool.idle_client_error', error?.message ?? error))
 let stopping = false
 let timer = null
 

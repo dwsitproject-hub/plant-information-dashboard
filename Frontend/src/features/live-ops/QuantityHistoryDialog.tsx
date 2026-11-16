@@ -8,6 +8,19 @@ import { useLocale } from '../../i18n/LocaleContext.tsx'
 import { useMass, type MassFormat } from './massUnit.ts'
 import { historySeries, isLabMetric, labCodeFor, labHistorySeries, type HistoryDay, type HistoryMetric } from './quantitySeries.ts'
 
+/**
+ * Bottom stock is quantity minus loadable. In api mode both come from the server, which used this
+ * site's own calibration. Without them (local mode) the bundled profile is the only source.
+ */
+function bottomStockOf(tankId: string | null, points: SoundingPoint[]): number | null {
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const point = points[index]
+    if (point.quantityKg != null && point.loadableKg != null) return point.quantityKg - point.loadableKg
+  }
+  if (points.some((point) => point.quantityKg !== undefined)) return null
+  return profileOf(tankId ?? '')?.bottomStockKg ?? null
+}
+
 export function QuantityHistoryDialog({
   tankId,
   commodity,
@@ -29,6 +42,7 @@ export function QuantityHistoryDialog({
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [soundings, setSoundings] = useState<{ tankId: string; points: SoundingPoint[] } | null>(null)
   const [labs, setLabs] = useState<{ tankId: string; points: LabHistoryPoint[] } | null>(null)
+  const [failedFor, setFailedFor] = useState<string | null>(null)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -40,14 +54,21 @@ export function QuantityHistoryDialog({
   useEffect(() => {
     if (!tankId) return
     let active = true
+    const fail = () => {
+      if (active) setFailedFor(tankId)
+    }
     if (isLabMetric(metric)) {
       repository.getLabHistory(tankId).then((next) => {
-        if (active) setLabs({ tankId, points: next })
-      })
+        if (!active) return
+        setLabs({ tankId, points: next })
+        setFailedFor(null)
+      }).catch(fail)
     } else {
       repository.getSoundingHistory(tankId).then((next) => {
-        if (active) setSoundings({ tankId, points: next })
-      })
+        if (!active) return
+        setSoundings({ tankId, points: next })
+        setFailedFor(null)
+      }).catch(fail)
     }
     return () => {
       active = false
@@ -61,7 +82,7 @@ export function QuantityHistoryDialog({
       : historySeries(tankId, soundings?.tankId === tankId ? soundings.points : [], start, end, metric)
   const hasValue = series.some((point) => point.value != null)
   const stats = seriesStats(series)
-  const bottomStock = metric === 'loadable' ? profileOf(tankId ?? '')?.bottomStockKg ?? null : null
+  const bottomStock = metric === 'loadable' ? bottomStockOf(tankId, soundings?.tankId === tankId ? soundings.points : []) : null
   const title = metricTitle(metric, t)
 
   return (
@@ -90,9 +111,11 @@ export function QuantityHistoryDialog({
               </div>
             )}
           </dl>
-          {hasValue
-            ? <QuantityChart series={series} metric={metric} title={title} />
-            : <p className="empty">{t.unavailable}</p>}
+          {failedFor === tankId
+            ? <p className="page-error" role="alert">{t.loadFailed}</p>
+            : hasValue
+              ? <QuantityChart series={series} metric={metric} title={title} />
+              : <p className="empty">{t.unavailable}</p>}
           <ul className="qty-legend">
             <li><span className="qty-dot qty-dot--measured" aria-hidden="true" />{isLabMetric(metric) ? t.analysisDay : t.soundingDay}</li>
           </ul>

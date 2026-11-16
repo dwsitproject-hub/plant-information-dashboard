@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { query } from '../db.js'
 import { clearSession, hashPassword, loadSession, requireAuth, signSession, verifyPassword } from '../access.js'
+import { loginThrottle } from '../loginThrottle.js'
 
 const router = Router()
 
@@ -9,8 +10,13 @@ router.post('/login', async (req, res, next) => {
     const username = String(req.body?.username ?? '').trim()
     const password = String(req.body?.password ?? '')
     if (!username || !password) return res.status(400).json({ error: 'invalid_credentials' })
+    if (!loginThrottle.allowed(username)) return res.status(429).json({ error: 'too_many_attempts' })
     const userId = await verifyPassword(username, password)
-    if (!userId) return res.status(401).json({ error: 'invalid_credentials' })
+    if (!userId) {
+      loginThrottle.fail(username)
+      return res.status(401).json({ error: 'invalid_credentials' })
+    }
+    loginThrottle.succeed(username)
     signSession(res, userId)
     res.json(await loadSession(userId))
   } catch (error) {
@@ -41,8 +47,13 @@ router.put('/password', requireAuth, async (req, res, next) => {
       [req.sessionUser.id],
     )
     if (!row.rows[0]) return res.status(401).json({ error: 'unauthenticated' })
+    if (!loginThrottle.allowed(req.sessionUser.username)) return res.status(429).json({ error: 'too_many_attempts' })
     const userId = await verifyPassword(req.sessionUser.username, currentPassword)
-    if (!userId) return res.status(401).json({ error: 'bad_current_password' })
+    if (!userId) {
+      loginThrottle.fail(req.sessionUser.username)
+      return res.status(401).json({ error: 'bad_current_password' })
+    }
+    loginThrottle.succeed(req.sessionUser.username)
 
     await query(
       `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,

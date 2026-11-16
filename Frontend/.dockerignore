@@ -1,0 +1,7 @@
+node_modules
+dist
+npm-debug.log
+
+# Local env files hold logsheet and staging credentials. The build reads only the ARGs in the Dockerfile.
+.env
+.env.*

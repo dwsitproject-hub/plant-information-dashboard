@@ -1,6 +1,5 @@
+import { lazy, Suspense, type ComponentType } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import { ProductionLayout } from './data/ProductionContext.tsx'
-import { QcLayout } from './data/QcContext.tsx'
 import { ActiveSiteProvider } from './data/ActiveSiteContext.tsx'
 import { AuthProvider } from './data/AuthContext.tsx'
 import { CalibrationProvider } from './data/CalibrationContext.tsx'
@@ -9,45 +8,54 @@ import { MasterProvider } from './data/MasterContext.tsx'
 import { OperationsProvider } from './data/OperationsContext.tsx'
 import { LocaleProvider } from './i18n/LocaleContext.tsx'
 import { AppShell } from './layout/AppShell.tsx'
-import { AdminMenuPage } from './features/admin/AdminMenuPage.tsx'
-import { RolesPage } from './features/admin/RolesPage.tsx'
-import { UsersPage } from './features/admin/UsersPage.tsx'
-import { DataHubPage } from './features/admin/DataHubPage.tsx'
-import { SiteModulesPage } from './features/admin/SiteModulesPage.tsx'
 import { PageGate, RequireAuth, SiteRequired } from './features/auth/guards.tsx'
 import { LoginPage } from './features/login/LoginPage.tsx'
 import { SsoErrorPage } from './features/login/SsoErrorPage.tsx'
-import { LiveOpsPage } from './features/live-ops/LiveOpsPage.tsx'
-import { CommoditiesPage, TankFarmPage } from './features/master/masterPages.tsx'
-import { CompaniesPage, SitesPage } from './features/master/OrgPages.tsx'
-import { TankGaugingPage } from './features/master/TankGaugingPage.tsx'
-import { MasterMenuPage } from './features/master/MasterMenuPage.tsx'
-import { CommoditiesCalibrationPage } from './features/master/CommoditiesCalibrationPage.tsx'
-import { TankCalibrationPage } from './features/master/TankCalibrationPage.tsx'
-import { OpsAnalyticsPage } from './features/ops-analytics/OpsAnalyticsPage.tsx'
-import { DailyProductionPage } from './features/daily-production/DailyProductionPage.tsx'
-import { MovementPage } from './features/qc/MovementPage.tsx'
-import { RefineryQualityPage } from './features/qc/RefineryQualityPage.tsx'
-import { QcOverviewPage } from './features/qc/QcOverviewPage.tsx'
-import { StoragePage } from './features/qc/StoragePage.tsx'
-import { TruckPage } from './features/qc/TruckPage.tsx'
-import { VesselPage } from './features/qc/VesselPage.tsx'
-import { BoilerPage } from './features/utility/BoilerPage.tsx'
-import { CoalPage } from './features/utility/CoalPage.tsx'
-import { EffluentPage } from './features/utility/EffluentPage.tsx'
-import { LoaderPage } from './features/utility/LoaderPage.tsx'
-import { UtilityOverviewPage } from './features/utility/UtilityOverviewPage.tsx'
-import { UtilityLayout } from './features/utility/utilityShell.tsx'
-import { WaterPage } from './features/utility/WaterPage.tsx'
-import { StockOverviewPage } from './features/management/StockOverviewPage.tsx'
-import {
-  Fractionation400Page,
-  Fractionation500Page,
-  Refinery150Page,
-  Refinery500Page,
-  SeparatorPage,
-  SupportingMaterialsPage,
-} from './features/daily-production/PlantSectionPage.tsx'
+
+// Each screen loads when first opened, so the first page does not download every other screen
+// and the sample data some of them bundle.
+function page<T extends Record<string, unknown>>(load: () => Promise<T>, name: keyof T) {
+  return lazy(() => load().then((module) => ({ default: module[name] as ComponentType })))
+}
+
+const ProductionLayout = page(() => import('./data/ProductionContext.tsx'), 'ProductionLayout')
+const QcLayout = page(() => import('./data/QcContext.tsx'), 'QcLayout')
+const AdminMenuPage = page(() => import('./features/admin/AdminMenuPage.tsx'), 'AdminMenuPage')
+const RolesPage = page(() => import('./features/admin/RolesPage.tsx'), 'RolesPage')
+const UsersPage = page(() => import('./features/admin/UsersPage.tsx'), 'UsersPage')
+const DataHubPage = page(() => import('./features/admin/DataHubPage.tsx'), 'DataHubPage')
+const SiteModulesPage = page(() => import('./features/admin/SiteModulesPage.tsx'), 'SiteModulesPage')
+const LiveOpsPage = page(() => import('./features/live-ops/LiveOpsPage.tsx'), 'LiveOpsPage')
+const CommoditiesPage = page(() => import('./features/master/masterPages.tsx'), 'CommoditiesPage')
+const TankFarmPage = page(() => import('./features/master/masterPages.tsx'), 'TankFarmPage')
+const CompaniesPage = page(() => import('./features/master/OrgPages.tsx'), 'CompaniesPage')
+const SitesPage = page(() => import('./features/master/OrgPages.tsx'), 'SitesPage')
+const TankGaugingPage = page(() => import('./features/master/TankGaugingPage.tsx'), 'TankGaugingPage')
+const MasterMenuPage = page(() => import('./features/master/MasterMenuPage.tsx'), 'MasterMenuPage')
+const CommoditiesCalibrationPage = page(() => import('./features/master/CommoditiesCalibrationPage.tsx'), 'CommoditiesCalibrationPage')
+const TankCalibrationPage = page(() => import('./features/master/TankCalibrationPage.tsx'), 'TankCalibrationPage')
+const OpsAnalyticsPage = page(() => import('./features/ops-analytics/OpsAnalyticsPage.tsx'), 'OpsAnalyticsPage')
+const DailyProductionPage = page(() => import('./features/daily-production/DailyProductionPage.tsx'), 'DailyProductionPage')
+const MovementPage = page(() => import('./features/qc/MovementPage.tsx'), 'MovementPage')
+const RefineryQualityPage = page(() => import('./features/qc/RefineryQualityPage.tsx'), 'RefineryQualityPage')
+const QcOverviewPage = page(() => import('./features/qc/QcOverviewPage.tsx'), 'QcOverviewPage')
+const StoragePage = page(() => import('./features/qc/StoragePage.tsx'), 'StoragePage')
+const TruckPage = page(() => import('./features/qc/TruckPage.tsx'), 'TruckPage')
+const VesselPage = page(() => import('./features/qc/VesselPage.tsx'), 'VesselPage')
+const BoilerPage = page(() => import('./features/utility/BoilerPage.tsx'), 'BoilerPage')
+const CoalPage = page(() => import('./features/utility/CoalPage.tsx'), 'CoalPage')
+const EffluentPage = page(() => import('./features/utility/EffluentPage.tsx'), 'EffluentPage')
+const LoaderPage = page(() => import('./features/utility/LoaderPage.tsx'), 'LoaderPage')
+const UtilityOverviewPage = page(() => import('./features/utility/UtilityOverviewPage.tsx'), 'UtilityOverviewPage')
+const UtilityLayout = page(() => import('./features/utility/utilityShell.tsx'), 'UtilityLayout')
+const WaterPage = page(() => import('./features/utility/WaterPage.tsx'), 'WaterPage')
+const StockOverviewPage = page(() => import('./features/management/StockOverviewPage.tsx'), 'StockOverviewPage')
+const Fractionation400Page = page(() => import('./features/daily-production/PlantSectionPage.tsx'), 'Fractionation400Page')
+const Fractionation500Page = page(() => import('./features/daily-production/PlantSectionPage.tsx'), 'Fractionation500Page')
+const Refinery150Page = page(() => import('./features/daily-production/PlantSectionPage.tsx'), 'Refinery150Page')
+const Refinery500Page = page(() => import('./features/daily-production/PlantSectionPage.tsx'), 'Refinery500Page')
+const SeparatorPage = page(() => import('./features/daily-production/PlantSectionPage.tsx'), 'SeparatorPage')
+const SupportingMaterialsPage = page(() => import('./features/daily-production/PlantSectionPage.tsx'), 'SupportingMaterialsPage')
 
 const repository = createRepository()
 
@@ -60,6 +68,7 @@ export default function App() {
           <CalibrationProvider>
             <MasterProvider>
               <BrowserRouter>
+                <Suspense fallback={<p className="page-note">…</p>}>
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/sso-error" element={<SsoErrorPage />} />
@@ -141,6 +150,7 @@ export default function App() {
                     </Route>
                   </Route>
                 </Routes>
+                </Suspense>
               </BrowserRouter>
             </MasterProvider>
           </CalibrationProvider>

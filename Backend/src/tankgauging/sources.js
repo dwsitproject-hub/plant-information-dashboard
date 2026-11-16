@@ -129,6 +129,17 @@ export async function updateSource(db, id, input, userId) {
       userId ?? null,
     ],
   )
+  // Tanks are linked to a host by its address. When the address changes, move the links with it,
+  // or the next poll creates a second copy of every tank and the old ones keep counting in stock.
+  const oldBase = trimBaseUrl(row.base_url)
+  const newBase = trimBaseUrl(baseUrl)
+  if (oldBase !== newBase) {
+    await db.query(
+      `UPDATE tank_gauging_tank_map SET source_base_url = $3, updated_at = NOW()
+       WHERE site_id = $1 AND source_base_url = $2`,
+      [row.site_id, oldBase, newBase],
+    )
+  }
   return toAdminDto(r.rows[0])
 }
 

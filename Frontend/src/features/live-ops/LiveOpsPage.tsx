@@ -38,17 +38,22 @@ export function LiveOpsPage() {
   const [history, setHistory] = useState<{ tankId: string; metric: HistoryMetric; commodity: string } | null>(null)
   const [massUnit, setMassUnit] = useMassUnitState()
   const [kpiDetail, setKpiDetail] = useState<KpiKind | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const range = usePeriodRange(meta?.periodLabel ?? null, 1)
   const day = range.ready ? range.end : ''
   const lookbackStart = day ? addDays(day, -(LOOKBACK_DAYS - 1)) : ''
 
   useEffect(() => {
     let active = true
-    Promise.all([repository.getSite(), repository.getSnapshotMeta()]).then(([nextSite, nextMeta]) => {
-      if (!active) return
-      setSite(nextSite)
-      setMeta(nextMeta)
-    })
+    Promise.all([repository.getSite(), repository.getSnapshotMeta()])
+      .then(([nextSite, nextMeta]) => {
+        if (!active) return
+        setSite(nextSite)
+        setMeta(nextMeta)
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true)
+      })
     return () => {
       active = false
     }
@@ -59,9 +64,16 @@ export function LiveOpsPage() {
   useEffect(() => {
     if (!day) return
     let active = true
-    repository.getLiveTanks(farmDay, { start: lookbackStart, end: day }).then((nextTanks) => {
-      if (active) setTanks(nextTanks)
-    })
+    repository
+      .getLiveTanks(farmDay, { start: lookbackStart, end: day })
+      .then((nextTanks) => {
+        if (!active) return
+        setTanks(nextTanks)
+        setLoadFailed(false)
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true)
+      })
     return () => {
       active = false
     }
@@ -77,9 +89,14 @@ export function LiveOpsPage() {
       tanks.map((tank) =>
         repository.getLabHistory(tank.tankId).then((history) => [tank.tankId, varianceFromLabHistory(history)] as const),
       ),
-    ).then((entries) => {
-      if (active) setVarianceByTank(new Map(entries))
-    })
+    )
+      .then((entries) => {
+        if (active) setVarianceByTank(new Map(entries))
+      })
+      .catch(() => {
+        // Lab variance is extra detail on the cards; without it the tanks still show.
+        if (active) setVarianceByTank(new Map())
+      })
     return () => {
       active = false
     }
@@ -137,6 +154,7 @@ export function LiveOpsPage() {
             />
           )}
         </header>
+        {loadFailed ? <p className="page-error" role="alert">{t.loadFailed}</p> : null}
 
         <div className="live-ops">
           <div className="live-ops__primary">

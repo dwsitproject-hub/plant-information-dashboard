@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api } from './api.ts'
+import { api, SESSION_EXPIRED_EVENT } from './api.ts'
 
 export interface SessionSite {
   id: string
@@ -61,6 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Any API call that finds the session gone signs the person out here; the route guard then shows
+  // the sign-in page.
+  useEffect(() => {
+    const expire = () => setUser(null)
+    window.addEventListener(SESSION_EXPIRED_EVENT, expire)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expire)
+  }, [])
+
   const refresh = useCallback(async () => {
     const next = await api<SessionUser>('/api/v1/auth/me')
     setUser(next)
@@ -75,8 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
-    await api('/api/v1/auth/logout', { method: 'POST' })
-    setUser(null)
+    try {
+      await api('/api/v1/auth/logout', { method: 'POST' })
+    } finally {
+      // Sign out on this screen even when the request fails; the cookie expires on its own.
+      setUser(null)
+    }
   }, [])
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 import pg from 'pg'
 import { SITE_ID, PLANT_ID } from '../src/scope.js'
+import { requireSiteReplaceConfirmed } from './guard.js'
 
 dotenv.config()
 
@@ -11,6 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = path.resolve(here, '../../Frontend/src/data')
 const siteId = SITE_ID
 const plantId = PLANT_ID
+requireSiteReplaceConfirmed('load-dashboard-files', siteId)
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 
 const CERT_TESTS = [
@@ -108,7 +110,8 @@ try {
 
   await client.query('DELETE FROM certificate_parameters WHERE certificate_id IN (SELECT id FROM storage_certificates WHERE site_id = $1)', [siteId])
   await client.query('DELETE FROM storage_certificates WHERE site_id = $1', [siteId])
-  await client.query('DELETE FROM soundings WHERE site_id = $1', [siteId])
+  // Gauge rounds (source 'atg') cannot be rebuilt from these files once their samples are purged.
+  await client.query(`DELETE FROM soundings WHERE site_id = $1 AND source = 'logsheet'`, [siteId])
   await client.query('DELETE FROM lab_results WHERE site_id = $1', [siteId])
   await client.query('DELETE FROM refinery_quality_days WHERE site_id = $1', [siteId])
 

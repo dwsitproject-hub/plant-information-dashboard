@@ -438,6 +438,7 @@ export interface Messages {
   legend: string
   loading: string
   loginInvalid: string
+  loginThrottled: string
   signingIn: string
   administration: string
   adminMenuTitle: string
@@ -789,12 +790,17 @@ export interface Messages {
   logsheetCatalog: string
   qualityRules: string
   requestFailed: string
+  loadFailed: string
   usernameRequired: string
   passwordRequired: string
   passwordShort: string
   usernameTaken: string
   emailTaken: string
   lastAdmin: string
+  cannotGrantRole: string
+  cannotGrantPermission: string
+  cannotManageUser: string
+  cannotChangeOwnRoles: string
   selfDeactivate: string
   selfDelete: string
   currentPasswordRequired: string
@@ -1247,6 +1253,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     legend: 'Legend',
     loading: 'Loading…',
     loginInvalid: 'Invalid username or password.',
+    loginThrottled: 'Too many failed sign-in attempts. Wait 15 minutes and try again.',
     signingIn: 'Signing in…',
     administration: 'Administration',
     adminMenuTitle: 'Administration',
@@ -1598,12 +1605,17 @@ export const MESSAGES: Record<Locale, Messages> = {
     logsheetCatalog: 'Logsheet catalog',
     qualityRules: 'Quality rules',
     requestFailed: 'The request could not be completed.',
+    loadFailed: 'Some data could not be loaded, so figures on this page may be missing. Refresh the page to try again.',
     usernameRequired: 'Username is required.',
     passwordRequired: 'Password is required for a new user.',
     passwordShort: 'Password must be at least 6 characters.',
     usernameTaken: 'Username is already in use.',
     emailTaken: 'Email is already in use.',
     lastAdmin: 'At least one active administrator must remain.',
+    cannotGrantRole: 'You can only give or remove roles whose rights you hold yourself. Only an Administrator can give the Administrator role.',
+    cannotGrantPermission: 'You can only give a role rights that you hold yourself.',
+    cannotManageUser: 'This user has a role with more rights than yours. Ask an Administrator.',
+    cannotChangeOwnRoles: 'You cannot change your own roles. Ask an Administrator.',
     selfDeactivate: 'You cannot deactivate your own account.',
     selfDelete: 'You cannot delete your own account.',
     currentPasswordRequired: 'Current password is required.',
@@ -2054,6 +2066,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     legend: 'Keterangan',
     loading: 'Memuat…',
     loginInvalid: 'Nama pengguna atau kata sandi salah.',
+    loginThrottled: 'Terlalu banyak percobaan masuk yang gagal. Tunggu 15 menit lalu coba lagi.',
     signingIn: 'Masuk…',
     administration: 'Administrasi',
     adminMenuTitle: 'Administrasi',
@@ -2405,12 +2418,17 @@ export const MESSAGES: Record<Locale, Messages> = {
     logsheetCatalog: 'Katalog logsheet',
     qualityRules: 'Aturan mutu',
     requestFailed: 'Permintaan tidak dapat diselesaikan.',
+    loadFailed: 'Sebagian data gagal dimuat, sehingga angka di halaman ini mungkin tidak lengkap. Muat ulang halaman untuk mencoba lagi.',
     usernameRequired: 'Nama pengguna wajib diisi.',
     passwordRequired: 'Kata sandi wajib diisi untuk pengguna baru.',
     passwordShort: 'Kata sandi minimal 6 karakter.',
     usernameTaken: 'Nama pengguna sudah digunakan.',
     emailTaken: 'Email sudah digunakan.',
     lastAdmin: 'Minimal satu administrator aktif harus tetap ada.',
+    cannotGrantRole: 'Anda hanya dapat memberi atau mencabut peran yang hak aksesnya Anda miliki sendiri. Hanya Administrator yang dapat memberi peran Administrator.',
+    cannotGrantPermission: 'Anda hanya dapat memberi peran hak akses yang Anda miliki sendiri.',
+    cannotManageUser: 'Pengguna ini memiliki peran dengan hak akses lebih besar dari Anda. Hubungi Administrator.',
+    cannotChangeOwnRoles: 'Anda tidak dapat mengubah peran Anda sendiri. Hubungi Administrator.',
     selfDeactivate: 'Anda tidak dapat menonaktifkan akun Anda sendiri.',
     selfDelete: 'Anda tidak dapat menghapus akun Anda sendiri.',
     currentPasswordRequired: 'Kata sandi saat ini wajib diisi.',

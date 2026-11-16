@@ -77,9 +77,16 @@ CREATE TABLE production_remarks (
   UNIQUE (day_id, row_index)
 );
 
-INSERT INTO process_units (plant_id, code, name, yield_rule) VALUES
-  ('priscolin-proj-bekasi', 'fractionation400', 'Fractionation 400', 'same-day'),
-  ('priscolin-proj-bekasi', 'fractionation500', 'Fractionation 500', 'same-day')
+-- Bekasi rows only where that plant already exists. On an empty database no plant exists yet;
+-- seed-from-mockup creates these units for the plant it loads.
+INSERT INTO process_units (plant_id, code, name, yield_rule)
+SELECT p.id, u.code, u.name, 'same-day'
+FROM plants p
+CROSS JOIN (VALUES
+  ('fractionation400', 'Fractionation 400'),
+  ('fractionation500', 'Fractionation 500')
+) AS u (code, name)
+WHERE p.id = 'priscolin-proj-bekasi'
 ON CONFLICT (plant_id, code) DO NOTHING;
 
 COMMIT;

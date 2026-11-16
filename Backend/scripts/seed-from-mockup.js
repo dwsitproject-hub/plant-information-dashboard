@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'
 import pg from 'pg'
 import { SITE_ID, PLANT_ID } from '../src/scope.js'
+import { requireSiteReplaceConfirmed } from './guard.js'
 
 dotenv.config()
 
@@ -12,6 +13,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const dataDir = process.env.SEED_DATA_DIR || path.resolve(here, '../../Frontend/src/data')
 const siteId = SITE_ID
 const plantId = PLANT_ID
+requireSiteReplaceConfirmed('seed-from-mockup', siteId)
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 
 const FORMS = [
@@ -151,6 +153,19 @@ try {
       [plantId, code, name],
     )
   }
+  for (const [code, name, kind] of [
+    ['taihu-15tph', 'Taihu 15 TPH', 'boiler'],
+    ['wuxi-15tph', 'Wuxi 15 TPH', 'boiler'],
+    ['wheel-loader', 'Wheel loader', 'loader'],
+    ['wwtp', 'WWTP', 'effluent'],
+  ]) {
+    await client.query(
+      `INSERT INTO utility_assets (site_id, plant_id, code, name, kind)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (site_id, code) DO NOTHING`,
+      [siteId, plantId, code, name, kind],
+    )
+  }
   const aliases = [
     ['CPO', 'cpo'],
     ['cpo', 'cpo'],
@@ -221,15 +236,18 @@ try {
     return result.rows[0].id
   }
 
-  await client.query(`
-    TRUNCATE TABLE
-      vessel_palka_samples, truck_samples, certificate_parameters, storage_certificates, gate_movements,
-      logistics_events, analytics_movements, lab_results, soundings,
-      tank_ring_bands, tank_ring_volumes, tank_volume_points
-    RESTART IDENTITY CASCADE
-  `)
-  await client.query('DELETE FROM vessel_tickets')
-  await client.query('DELETE FROM truck_batches')
+  // Replace this site's logsheet data only. Other sites, and rounds read from a gauge, are kept.
+  const siteTanks = `SELECT t.id FROM tanks t JOIN plants p ON p.id = t.plant_id WHERE p.site_id = $1 AND t.source = 'logsheet'`
+  await client.query('DELETE FROM vessel_palka_samples WHERE ticket_id IN (SELECT id FROM vessel_tickets WHERE site_id = $1)', [siteId])
+  await client.query('DELETE FROM truck_samples WHERE batch_id IN (SELECT id FROM truck_batches WHERE site_id = $1)', [siteId])
+  await client.query('DELETE FROM certificate_parameters WHERE certificate_id IN (SELECT id FROM storage_certificates WHERE site_id = $1)', [siteId])
+  for (const table of ['storage_certificates', 'gate_movements', 'logistics_events', 'analytics_movements', 'lab_results', 'vessel_tickets', 'truck_batches']) {
+    await client.query(`DELETE FROM ${table} WHERE site_id = $1`, [siteId])
+  }
+  await client.query(`DELETE FROM soundings WHERE site_id = $1 AND source = 'logsheet'`, [siteId])
+  for (const table of ['tank_ring_bands', 'tank_ring_volumes', 'tank_volume_points']) {
+    await client.query(`DELETE FROM ${table} WHERE tank_id IN (${siteTanks})`, [siteId])
+  }
 
   const soundingSubmission = await submission('F/TNF-003', 'seed:logsheets')
   const labSubmission = await submission('F/QCO-001', 'seed:labs')

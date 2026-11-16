@@ -377,6 +377,16 @@ main {
   font-size: var(--font-size-sm);
 }
 
+/* A load that failed. Shown instead of empty figures, so a broken feed is not read as "no stock". */
+.page-error {
+  margin: var(--spacing-2) 0 var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-left: 3px solid var(--color-destructive);
+  background: var(--color-bg-lighter);
+  color: var(--color-brand-red-deep);
+  font-size: var(--font-size-sm);
+}
+
 .site-pill,
 .filter-chip {
   display: inline-flex;

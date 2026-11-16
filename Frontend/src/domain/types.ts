@@ -111,6 +111,14 @@ export interface SoundingPoint {
   massKg?: number | null
   /** Tank capacity in kilograms, when known. Used with the gauge mass for free space and level. */
   capacityKg?: number | null
+  /**
+   * Stock worked out by the API from this site's calibration. Present in api mode; when it is,
+   * the browser uses it instead of its own bundled calibration tables.
+   */
+  quantityKg?: number | null
+  emptySpaceKg?: number | null
+  loadableKg?: number | null
+  fillRatio?: number | null
   storageVerdict: StorageVerdict
 }
 

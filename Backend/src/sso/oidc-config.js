@@ -12,7 +12,8 @@ export function getOidcConfig() {
   const discoveryUrl = trim(process.env.OIDC_DISCOVERY_URL) || (issuer ? `${issuer}/api/sso/.well-known/openid-configuration` : '')
   return {
     enabled: asBool(process.env.SSO_OIDC_ENABLED, false),
-    legacyBridgeEnabled: asBool(process.env.SSO_LEGACY_BRIDGE_ENABLED, true),
+    // Off unless an environment turns it on. The bridge accepts a shared-secret token by POST.
+    legacyBridgeEnabled: asBool(process.env.SSO_LEGACY_BRIDGE_ENABLED, false),
     issuer,
     discoveryUrl,
     clientId: trim(process.env.OIDC_CLIENT_ID),

@@ -37,6 +37,7 @@ export function CommodityTrendDialog({
   const repository = useRepository()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [histories, setHistories] = useState<Array<{ tankId: string; points: SoundingPoint[] }>>([])
+  const [loadFailed, setLoadFailed] = useState(false)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [range, setRange] = useState(() => defaultRange(day))
   const { start, end } = range
@@ -71,9 +72,15 @@ export function CommodityTrendDialog({
     if (!code) return
     const ids = sourceKey ? sourceKey.split(',') : []
     let active = true
-    Promise.all(ids.map(async (tankId) => ({ tankId, points: await repository.getSoundingHistory(tankId) }))).then((rows) => {
-      if (active) setHistories(rows)
-    })
+    Promise.all(ids.map(async (tankId) => ({ tankId, points: await repository.getSoundingHistory(tankId) })))
+      .then((rows) => {
+        if (!active) return
+        setHistories(rows)
+        setLoadFailed(false)
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true)
+      })
     return () => {
       active = false
     }
@@ -112,6 +119,7 @@ export function CommodityTrendDialog({
               <DateRangeFilter start={start} end={end} dataDates={soundingDays} onChange={changeRange} />
             )}
           </div>
+          {loadFailed ? <p className="page-error" role="alert">{t.loadFailed}</p> : null}
           <dl className="qty-stats">
             <div>
               <dt>{t.rangeAverage}</dt>

@@ -64,9 +64,10 @@ router.get('/portfolio/sites/:siteId/tanks/:tankId/history', async (req, res, ne
       points.map((point) => ({
         recordedOn: point.recordedOn,
         roundIndex: point.roundIndex,
-        quantityKg: point.massKg,
+        // Worked out on the server for gauge and manual points alike, so logsheet tanks have a history too.
+        quantityKg: point.quantityKg,
         capacityKg: point.capacityKg,
-        fillRatio: point.massKg != null && point.capacityKg ? point.massKg / point.capacityKg : null,
+        fillRatio: point.fillRatio,
         levelM: point.soundingLevelM,
         temperatureC: point.temperatureC,
       })),

@@ -184,8 +184,29 @@ export function stockFromProfile(
  */
 export function stockFromPoint(
   tankId: string,
-  point: { soundingLevelM: number | null; temperatureC: number | null; operationalStatus: string; massKg?: number | null; capacityKg?: number | null },
+  point: {
+    soundingLevelM: number | null
+    temperatureC: number | null
+    operationalStatus: string
+    massKg?: number | null
+    capacityKg?: number | null
+    quantityKg?: number | null
+    emptySpaceKg?: number | null
+    loadableKg?: number | null
+    fillRatio?: number | null
+  },
 ): TankStock {
+  // The API sends stock it worked out from the site's own calibration. Use it as given: the bundled
+  // tables below are Bekasi's, keyed by tank code, and would give another site's T01 Bekasi's numbers.
+  if (point.quantityKg !== undefined) {
+    return {
+      capacityKg: point.capacityKg ?? null,
+      quantityKg: point.quantityKg,
+      emptySpaceKg: point.emptySpaceKg ?? null,
+      loadableKg: point.loadableKg ?? null,
+      levelRatio: point.fillRatio ?? null,
+    }
+  }
   if (point.massKg != null) {
     const capacity = point.capacityKg != null && point.capacityKg > 0 ? point.capacityKg : null
     return {

@@ -21,9 +21,14 @@ export function Topbar({ onToggleMenu }: { onToggleMenu: () => void }) {
 
   useEffect(() => {
     let current = true
-    repository.getSite().then((next) => {
-      if (current) setLoaded({ id: siteId, context: next })
-    })
+    repository
+      .getSite()
+      .then((next) => {
+        if (current) setLoaded({ id: siteId, context: next })
+      })
+      .catch(() => {
+        // The bar keeps the site name the session already has.
+      })
     return () => {
       current = false
     }
@@ -98,7 +103,8 @@ export function Topbar({ onToggleMenu }: { onToggleMenu: () => void }) {
           name={user?.displayName || user?.username || ''}
           username={user?.username || ''}
           onSignOut={async () => {
-            await logout()
+            // logout() clears the session on this screen even when the request fails.
+            await logout().catch(() => {})
             navigate('/login')
           }}
           onChangePassword={changePassword}

@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  closingStockKg,
   dayBefore,
-  openingStockKg,
+  stockByCode,
   coproductYield,
   lossOf,
   lossYield,
@@ -16,6 +15,7 @@ import {
   type StockCode,
 } from '../../domain/dailyProduction.ts'
 import { useCalibration } from '../../data/CalibrationContext.tsx'
+import { useRepository } from '../../data/OperationsContext.tsx'
 import { useProductionReport } from '../../data/ProductionContext.tsx'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import { DateRangeFilter } from './DateRangeFilter.tsx'
@@ -71,8 +71,30 @@ export function DailyProductionPage() {
 
   const day: ProductionDay = useMemo(() => productionForRange(start, end, days), [days, start, end])
   const rangeStart = start <= end ? start : end
-  const closing = useMemo(() => closingStockKg(), [revision])
-  const opening = useMemo(() => openingStockKg(dayBefore(rangeStart)), [rangeStart, revision])
+  const rangeEnd = start <= end ? end : start
+  const repository = useRepository()
+  const blank = useMemo(() => stockByCode([]), [])
+  // Opening is the day before the range, closing is its last day. Both come from the active site's
+  // tanks through the repository, so another site never shows Bekasi's bundled soundings.
+  const [stock, setStock] = useState<{ key: string; opening: Record<StockCode, Qty>; closing: Record<StockCode, Qty> } | null>(null)
+  const stockKey = `${dayBefore(rangeStart)}|${rangeEnd}|${revision}`
+  useEffect(() => {
+    let active = true
+    Promise.all([repository.getLiveTanks(dayBefore(rangeStart)), repository.getLiveTanks(rangeEnd)])
+      .then(([before, last]) => {
+        if (active) setStock({ key: stockKey, opening: stockByCode(before), closing: stockByCode(last) })
+      })
+      .catch(() => {
+        // A failed load leaves the stock columns blank rather than showing figures from elsewhere.
+        if (active) setStock({ key: stockKey, opening: blank, closing: blank })
+      })
+    return () => {
+      active = false
+    }
+  }, [repository, rangeStart, rangeEnd, stockKey, blank])
+  const current = stock?.key === stockKey ? stock : null
+  const opening = current?.opening ?? blank
+  const closing = current?.closing ?? blank
   const productionSort = useColumnSort()
   const stockSort = useColumnSort()
   const chemicalSort = useColumnSort()
