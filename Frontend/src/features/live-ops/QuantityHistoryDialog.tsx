@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useRepository } from '../../data/OperationsContext.tsx'
 import { formatDay, formatMeasure, tankLabel } from '../../domain/format.ts'
+import { displayOf } from '../../domain/qualityView.ts'
 import { profileOf } from '../../domain/tankStock.ts'
 import type { LabHistoryPoint, SoundingPoint } from '../../domain/types.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
@@ -154,6 +155,7 @@ function metricTitle(
   if (metric === 'ffa') return 'FFA'
   if (metric === 'moisture') return 'M&I'
   if (metric === 'colorR') return t.colourRLov
+  if (metric.startsWith('lab:')) return displayOf(metric.slice(4)).label
   return t.colourYLov
 }
 
@@ -257,6 +259,7 @@ function formatAxis(metric: HistoryMetric, value: number, mass: MassFormat): str
   if (metric === 'temperature') return formatMeasure(value, 0)
   if (metric === 'level') return formatMeasure(value, 1)
   if (metric === 'colorR' || metric === 'colorY') return formatMeasure(value, 1)
+  if (metric.startsWith('lab:')) return formatMeasure(value, Math.min(2, displayOf(metric.slice(4)).digits))
   return formatMeasure(value, 2)
 }
 
@@ -266,5 +269,9 @@ function formatTip(metric: HistoryMetric, value: number, mass: MassFormat): stri
   if (metric === 'levelTank') return `${value.toFixed(1)}%`
   if (metric === 'temperature') return `${formatMeasure(value, 1)} °C`
   if (metric === 'colorR' || metric === 'colorY') return formatMeasure(value, 1)
+  if (metric.startsWith('lab:')) {
+    const display = displayOf(metric.slice(4))
+    return `${formatMeasure(value, display.digits)}${display.unit ? ` ${display.unit}` : ''}`
+  }
   return `${formatMeasure(value)}%`
 }

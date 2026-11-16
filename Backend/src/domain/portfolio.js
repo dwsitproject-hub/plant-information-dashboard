@@ -42,8 +42,26 @@ export function sourceOf(tank) {
   return tank.readingKind === 'live' || tank.readingKind === 'round' ? 'atg' : 'logsheet'
 }
 
-export function slimTank(tank, nearFull = NEAR_FULL) {
+/**
+ * The lab result a management card needs: parameter values, the product's limits and which it breaks.
+ * `before` is the same tank as of the day before, so a card can show a change since yesterday.
+ */
+export function slimQuality(quality, before = null) {
+  if (!quality) return null
+  const values = (list) => (list ?? []).map((item) => ({ code: item.code, value: item.value }))
   return {
+    analysisDate: quality.analysisDate ?? null,
+    verdict: quality.storageVerdict ?? 'spec-pending',
+    parameters: values(quality.parameters),
+    limits: quality.limits ?? [],
+    breaches: (quality.breaches ?? []).map((item) => ({ code: item.code, bound: item.bound, limit: item.limit, value: item.value, severity: item.severity })),
+    before: before ? values(before.parameters) : null,
+  }
+}
+
+export function slimTank(tank, nearFull = NEAR_FULL, previous = null) {
+  return {
+    quality: slimQuality(tank.quality, previous?.quality ?? null),
     tankId: tank.tankId,
     source: sourceOf(tank),
     productName: tank.productName ?? '',
@@ -106,7 +124,8 @@ export function summariseSite(site, tanks, context) {
   const nearFull = context.nearFull ?? NEAR_FULL
   const now = context.now ?? new Date()
   const used = tanks.filter(isInUse)
-  const slim = used.map((tank) => slimTank(tank, nearFull))
+  const before = new Map((context.previous ?? []).map((tank) => [tank.tankId, tank]))
+  const slim = used.map((tank) => slimTank(tank, nearFull, before.get(tank.tankId) ?? null))
 
   const total = emptyTotals()
   const byClass = new Map(COMMODITY_CLASSES.map((code) => [code, emptyTotals()]))

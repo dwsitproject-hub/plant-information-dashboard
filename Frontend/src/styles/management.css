@@ -759,3 +759,32 @@ div.mg-row--sub { cursor: default; }
 .mg-stamp__age { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px; color: var(--mg-muted); font-size: var(--font-size-sm); font-variant-numeric: tabular-nums; }
 .mg-stamp__age.is-live { background: var(--mg-ok-bg); color: var(--mg-ok); }
 .mg-stamp__age.is-stale { background: var(--mg-warn-bg); color: var(--mg-warn); }
+
+/* Hover card: quality of each product in the class */
+.mg-tip__quality {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mg-tip__quality li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mg-tip__qname {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.mg-tip__qname .badge {
+  font-size: 10px;
+  padding: 0 6px;
+}

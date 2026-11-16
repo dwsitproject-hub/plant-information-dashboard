@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { commodityClassOf } from './commodityClass.js'
-import { isInUse, sameTankDelta, sourceOf, summarisePortfolio, summariseSite, tankStatus } from './portfolio.js'
+import { isInUse, sameTankDelta, slimQuality, sourceOf, summarisePortfolio, summariseSite, tankStatus } from './portfolio.js'
 
 test('products from every site land in the same few classes', () => {
   const expected = {
@@ -127,4 +127,25 @@ test('a site says whether its figures come from a gauge system or from logsheets
   assert.equal(gauged.tanks[0].source, 'atg')
   const sheet = summariseSite(site, [tank('T1', 1, 10)], { day: '2026-11-09', live: false, now: NOW })
   assert.equal(sheet.source, 'logsheet')
+})
+
+test('a management tank carries its lab result, limits, breaches and yesterday', () => {
+  const quality = {
+    analysisDate: '2026-11-16',
+    storageVerdict: 'quarantine',
+    parameters: [{ code: 'FFA', label: 'FFA', value: 0.19, unit: '%' }, { code: 'IV', label: 'IV', value: 52.3, unit: '' }],
+    limits: [{ code: 'FFA', bound: 'max', limit: 0.1, severity: 'reject' }],
+    breaches: [{ field: 'ffa', code: 'FFA', parameterCode: 'lab.ffa', bound: 'max', limit: 0.1, value: 0.19, severity: 'reject' }],
+  }
+  const before = { parameters: [{ code: 'FFA', label: 'FFA', value: 0.07, unit: '%' }] }
+  const slim = slimQuality(quality, before)
+  assert.equal(slim.verdict, 'quarantine')
+  assert.deepEqual(slim.parameters, [{ code: 'FFA', value: 0.19 }, { code: 'IV', value: 52.3 }])
+  assert.deepEqual(slim.limits, quality.limits)
+  assert.deepEqual(slim.breaches, [{ code: 'FFA', bound: 'max', limit: 0.1, value: 0.19, severity: 'reject' }])
+  assert.deepEqual(slim.before, [{ code: 'FFA', value: 0.07 }])
+  assert.equal(slimQuality(null), null)
+
+  const s = summariseSite(site, [tank('T03', 500, 1000, { quality })], { day: '2026-11-16', live: false, now: NOW, previous: [tank('T03', 480, 1000, { quality: before })] })
+  assert.deepEqual(s.tanks[0].quality.before, [{ code: 'FFA', value: 0.07 }])
 })

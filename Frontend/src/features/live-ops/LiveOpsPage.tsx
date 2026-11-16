@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useCalibration } from '../../data/CalibrationContext.tsx'
 import { useRepository } from '../../data/OperationsContext.tsx'
@@ -78,6 +78,27 @@ export function LiveOpsPage() {
       active = false
     }
   }, [repository, revision, day, lookbackStart, farmDay])
+
+  // The same tanks as of the day before, so quality figures can show what moved since yesterday.
+  const [before, setBefore] = useState<TankLive[]>([])
+  const yesterday = day ? addDays(farmDay ?? day, -1) : ''
+  useEffect(() => {
+    if (!yesterday) return
+    let active = true
+    repository
+      .getLiveTanks(yesterday, { start: addDays(yesterday, -(LOOKBACK_DAYS - 1)), end: yesterday })
+      .then((rows) => {
+        if (active) setBefore(rows)
+      })
+      .catch(() => {
+        // Without yesterday the figures still show; they just carry no change marks.
+        if (active) setBefore([])
+      })
+    return () => {
+      active = false
+    }
+  }, [repository, revision, yesterday])
+  const beforeByTank = useMemo(() => new Map(before.map((tank) => [tank.tankId, tank])), [before])
 
   useEffect(() => {
     if (tanks.length === 0) {
@@ -187,7 +208,7 @@ export function LiveOpsPage() {
               />
             </section>
             {!hasLabData && <p className="lab-note">{t.labNotConnected}</p>}
-            <CommodityStock tanks={tanks} day={day} averageTemperature={tempValue} hasLabData={hasLabData} />
+            <CommodityStock tanks={tanks} before={beforeByTank} day={day} averageTemperature={tempValue} hasLabData={hasLabData} />
             <section className="prod-panel">
               <div className="section-head">
                 <h2 className="card__title">{t.tanks}</h2>
@@ -200,11 +221,11 @@ export function LiveOpsPage() {
                 </div>
               </div>
               {tankView === 'table'
-                ? <TankTable tanks={visible} averageTemperature={tempValue} varianceByTank={varianceByTank} hasLabData={hasLabData} onHistory={openHistory} />
+                ? <TankTable tanks={visible} before={beforeByTank} averageTemperature={tempValue} hasLabData={hasLabData} onHistory={openHistory} />
                 : (
                   <div className="tank-grid tank-grid--vessels">
                     {visible.map((tank) => (
-                      <TankCard key={tank.tankId} tank={tank} averageTemperature={tempValue} variance={varianceByTank.get(tank.tankId)} referenceDay={day} hasLabData={hasLabData} onHistory={openHistory} />
+                      <TankCard key={tank.tankId} tank={tank} before={beforeByTank.get(tank.tankId)} averageTemperature={tempValue} referenceDay={day} hasLabData={hasLabData} onHistory={openHistory} />
                     ))}
                   </div>
                 )}

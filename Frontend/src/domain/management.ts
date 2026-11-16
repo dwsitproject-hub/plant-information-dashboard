@@ -1,6 +1,7 @@
 /** What the management Stock Overview reads from /api/v1/portfolio/stock. */
 
 import type { DataSource } from './dataSource.ts'
+import type { CodeValue, SpecHit, SpecLimit } from './qualityView.ts'
 
 export type TankStatus = 'ok' | 'near-full' | 'over' | 'empty' | 'no-data'
 
@@ -21,6 +22,17 @@ export interface PortfolioTank {
   temperatureC: number | null
   status: TankStatus
   readingAt: string | null
+  /** The tank's lab result: values, its product's limits, the limits broken, and yesterday's values. */
+  quality?: PortfolioQuality | null
+}
+
+export interface PortfolioQuality {
+  analysisDate: string | null
+  verdict: 'pass' | 'quarantine' | 'spec-pending'
+  parameters: CodeValue[]
+  limits: SpecLimit[]
+  breaches: SpecHit[]
+  before: CodeValue[] | null
 }
 
 export interface ClassTotals {

@@ -20,8 +20,10 @@ import {
   type PortfolioTank,
   type TankStatus,
 } from '../../domain/management.ts'
+import { odourFailures, qualityFor, sampleOf } from '../../domain/qualityView.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import { SourceBadge } from '../dataSource/SourceBadge.tsx'
+import { QualityChips, QualityFlags } from '../live-ops/QualityChips.tsx'
 import { useCardActions } from './HoverCard.tsx'
 import { Change, ClassDot, DataBadge, StatusChip, fill, useClassLabel } from './parts.tsx'
 
@@ -230,6 +232,7 @@ export function ClassAtSiteCard({ site, code, product, hide }: { site: Portfolio
         ]}
       />
       <StatusSplit counts={counts} />
+      <ProductQuality tanks={tanks} code={code} />
       {products.length > 1 ? (
         <>
           <Title>{t.mgCardProducts}</Title>
@@ -258,6 +261,48 @@ export function ClassAtSiteCard({ site, code, product, hide }: { site: Portfolio
       >
         {fill(t.mgTipOpen, { cls: title, site: site.name })}
       </Foot>
+    </>
+  )
+}
+
+/* ------------------------------------------------------------------ quality of each product */
+
+/**
+ * The average lab result of each product in a class, over its tanks holding stock. Each product keeps its
+ * own row: CPO and olein have different parameters and limits, so they are never averaged together.
+ */
+function ProductQuality({ tanks, code }: { tanks: PortfolioTank[]; code: CommodityClass }) {
+  const { t } = useLocale()
+  const groups = new Map<string, PortfolioTank[]>()
+  for (const tank of tanks) {
+    if (!tank.quality || tank.quality.parameters.length === 0) continue
+    if (tank.quantityKg == null || tank.quantityKg <= 0) continue
+    const product = productOf(tank)
+    groups.set(product, [...(groups.get(product) ?? []), tank])
+  }
+  if (groups.size === 0) return null
+  const rows = [...groups.entries()]
+    .map(([product, members]) => {
+      const samples = members.map((tank) => sampleOf(tank.tankId, tank.quality ?? null, tank.quality?.before ?? null))
+      return { product, samples, views: qualityFor(samples) }
+    })
+    .sort((a, b) => b.samples.length - a.samples.length || a.product.localeCompare(b.product))
+  return (
+    <>
+      <Title>{t.qualityByProduct}</Title>
+      <ul className="mg-tip__quality" title={t.qualityHint}>
+        {rows.slice(0, MAX_ROWS).map((row) => (
+          <li key={row.product}>
+            <span className="mg-tip__qname">
+              <i className="mg-dot" style={{ background: tintOf(row.product, code).background }} aria-hidden="true" />
+              <strong>{row.product}</strong>
+              <span className="mg-muted">{fill(t.qualityAverageOf, { n: row.samples.length })}</span>
+              <QualityFlags views={row.views} odourFailed={odourFailures(row.samples)} tanks={row.samples.length} />
+            </span>
+            <QualityChips views={row.views} tanks={row.samples.length} />
+          </li>
+        ))}
+      </ul>
     </>
   )
 }

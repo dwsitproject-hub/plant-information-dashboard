@@ -4,6 +4,8 @@
  * rather than the raw e-form columns.
  */
 
+import type { SpecHit, SpecLimit } from './qualityView.ts'
+
 export type OilFamily =
   | 'CPO'
   | 'RPO'
@@ -40,6 +42,10 @@ export interface TankQuality {
   retestRequired: boolean
   parameters: LabParameter[]
   storageVerdict: StorageVerdict
+  /** From the API: the product's limits (Master > Commodities) and the ones this result breaks. */
+  commodityId?: string | null
+  limits?: SpecLimit[]
+  breaches?: SpecHit[]
 }
 
 export interface TankLive {

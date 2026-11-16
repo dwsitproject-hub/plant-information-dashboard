@@ -2,8 +2,11 @@ import type { ReactNode } from 'react'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import type { TankLive } from '../../domain/types.ts'
 import { sourceOfTanks } from '../../domain/dataSource.ts'
-import { formatDay, formatMeasure, levelPercent, parameter, tankLabel } from '../../domain/format.ts'
-import { findVariance, type LabVarianceAlert } from '../../domain/qualityVariance.ts'
+import { formatDay, formatMeasure, levelPercent, tankLabel } from '../../domain/format.ts'
+import { qualityFor } from '../../domain/qualityView.ts'
+import { ChangeArrow } from './QualityChips.tsx'
+import { useQualityTitle } from './qualityTitle.ts'
+import { labMetric, tankSample } from './tankQuality.ts'
 import { SourceBadge } from '../dataSource/SourceBadge.tsx'
 import { useMass } from './massUnit.ts'
 import type { HistoryMetric } from './quantitySeries.ts'
@@ -17,15 +20,17 @@ import { TankVessel } from './TankVessel.tsx'
  */
 export function TankCard({
   tank,
+  before,
   averageTemperature,
-  variance,
   referenceDay,
   hasLabData = true,
   onHistory,
 }: {
   tank: TankLive
   averageTemperature: number | null
-  variance?: LabVarianceAlert[]
+  /** The same tank as of yesterday, for the change since yesterday. */
+  before?: TankLive
+  
   /** The day the screen is showing. A reading from another day says so in the header. */
   referenceDay?: string | null
   /** False for a site with no lab results: the lab row is left out. */
@@ -41,7 +46,6 @@ export function TankCard({
   const hot = isTempAnomaly(tank.temperatureC, averageTemperature)
   const critical = isCritical(tank, averageTemperature)
   const stale = tank.quality?.ageDays != null && tank.quality.ageDays > 7
-  const varianceCount = variance?.length ?? 0
   const gauge = sourceOfTanks([tank]) === 'atg'
   const status = tank.operationalStatus && tank.operationalStatus !== '—' && tank.operationalStatus !== 'EMPTY' ? tank.operationalStatus : ''
   const otherDay = tank.recordedOn && referenceDay && tank.recordedOn !== referenceDay ? formatDay(tank.recordedOn, locale) : ''
@@ -54,27 +58,30 @@ export function TankCard({
   const capacityLine = tank.capacityKg == null ? t.capacityNotSet : t.capacityOf.replace('{cap}', wholeText(tank.capacityKg))
   const emptySpaceKg = tank.emptySpaceKg
 
-  // Four fixed slots, so the lab values line up from card to card. A slot with no value stays, as a dash.
-  const slots = [
-    { key: 'ffa', metric: 'ffa' as HistoryMetric, code: 'FFA', short: 'FFA', full: 'FFA', digits: 3, unit: '%' },
-    { key: 'mi', metric: 'moisture' as HistoryMetric, code: 'MI', short: 'M&I', full: 'M&I', digits: 3, unit: '%' },
-    { key: 'r', metric: 'colorR' as HistoryMetric, code: 'COLOR_R', short: 'R', full: t.colourRLov, digits: 1, unit: '' },
-    { key: 'y', metric: 'colorY' as HistoryMetric, code: 'COLOR_Y', short: 'Y', full: t.colourYLov, digits: 1, unit: '' },
-  ].map((slot) => ({ ...slot, value: parameter(tank.quality?.parameters, slot.code), alert: findVariance(variance, slot.code) }))
+  // The product's parameters (Master > Commodities), coloured by its limits, with the change since yesterday.
+  const qualityTitle = useQualityTitle()
+  const slots = qualityFor([tankSample(tank, before)]).map((view) => ({
+    view,
+    key: view.code,
+    metric: labMetric(view.code) as HistoryMetric,
+    value: view.value,
+  }))
   const hasLabValue = slots.some((slot) => slot.value != null)
+  const varianceCount = slots.filter((slot) => slot.view.change).length
+  const outOfSpec = slots.some((slot) => slot.view.status === 'reject')
   const analysed = tank.quality?.analysisDate ? formatDay(tank.quality.analysisDate, locale) : ''
   const analysedShort = analysed.replace(/\s\d{4}$/, '')
   const labOld = stale || tank.quality?.retestRequired === true
   const ageTitle = stale && tank.quality?.analysisDate
     ? t.qualityAge.replace('{age}', String(tank.quality.ageDays)).replace('{day}', formatDay(tank.quality.analysisDate, locale))
     : undefined
-  const showLabRow = hasLabData && (hasLabValue || tank.quality?.retestRequired || quarantined || varianceCount > 0)
+  const showLabRow = hasLabData && (hasLabValue || tank.quality?.retestRequired || quarantined || outOfSpec)
 
   return (
     <article className={[
       'tank-card',
       empty ? 'tank-card--empty' : '',
-      quarantined ? 'tank-card--quarantine' : '',
+      quarantined || outOfSpec ? 'tank-card--quarantine' : '',
       critical && !empty ? 'tank-card--critical' : '',
     ].filter(Boolean).join(' ')}>
       <header className="tank-card__head">
@@ -129,14 +136,14 @@ export function TankCard({
             <span className="tank-lab__badges">
               {tank.quality?.retestRequired && <span className="badge badge--warning">{t.retest}</span>}
               {quarantined && <span className="badge badge--danger">QUARANTINE</span>}
-              {varianceCount > 0 && <span className="badge badge--variance">{t.varianceAlert} {varianceCount}</span>}
+              {varianceCount > 0 && <span className="badge badge--variance" title={t.qualityChangedFlag}>{t.qualityChangedFlag}</span>}
             </span>
           </div>
           <div className="tank-lab__grid">
             {slots.map((slot) => slot.value == null
               ? (
                 <span key={slot.key} className="tank-lab__cell tank-lab__cell--missing">
-                  <small>{slot.short}</small>
+                  <small>{slot.view.label}</small>
                   <b>–</b>
                 </span>
               )
@@ -144,15 +151,19 @@ export function TankCard({
                 <button
                   key={slot.key}
                   type="button"
-                  className="tank-lab__cell"
-                  title={[slot.full, analysed, ageTitle].filter(Boolean).join(' · ')}
+                  className={[
+                    'tank-lab__cell',
+                    slot.view.status ? `tank-lab__cell--${slot.view.status}` : '',
+                    slot.view.change ? 'tank-lab__cell--changed' : '',
+                  ].filter(Boolean).join(' ')}
+                  title={[qualityTitle(slot.view, 1), analysed, ageTitle].filter(Boolean).join('\n')}
                   onClick={() => onHistory(tank.tankId, slot.metric)}
                 >
-                  <small>{slot.short}</small>
+                  <small>{slot.view.label}</small>
                   <b>
-                    {formatMeasure(slot.value, slot.digits)}
-                    {slot.unit && <u>{slot.unit}</u>}
-                    <VarianceMark alert={slot.alert} />
+                    {formatMeasure(slot.value, slot.view.digits)}
+                    {slot.view.unit === '%' && <u>%</u>}
+                    {slot.view.change ? <ChangeArrow pctChange={slot.view.change.pctChange} /> : null}
                   </b>
                 </button>
               ))}
@@ -169,18 +180,6 @@ function Pill({ children, title, alert = false, onClick }: { children: ReactNode
     <button type="button" className={alert ? 'drum__pill drum__pill--alert' : 'drum__pill'} title={title} onClick={onClick}>
       {children}
     </button>
-  )
-}
-
-function VarianceMark({ alert }: { alert?: LabVarianceAlert }) {
-  if (!alert) return null
-  return (
-    <span
-      className={alert.pctChange >= 0 ? 'num-variance-arrow num-variance-arrow--up' : 'num-variance-arrow num-variance-arrow--down'}
-      aria-hidden="true"
-    >
-      {alert.pctChange >= 0 ? '▲' : '▼'}
-    </span>
   )
 }
 

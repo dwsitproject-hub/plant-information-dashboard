@@ -1,22 +1,45 @@
 import { useState } from 'react'
 import { ChevronRight, Thermometer } from 'lucide-react'
 import type { CommodityStockRow, StockGroup } from '../../domain/commodityStock.ts'
-import { commodityStock } from '../../domain/commodityStock.ts'
+import { commoditySources, commodityStock } from '../../domain/commodityStock.ts'
 import type { TankLive } from '../../domain/types.ts'
 import { formatMeasure } from '../../domain/format.ts'
+import { hasChange, hasOutOfSpec, odourFailures, qualityFor, type QualitySample } from '../../domain/qualityView.ts'
 import { useMass } from './massUnit.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
-import { CommodityTrendDialog } from './CommodityTrendDialog.tsx'
+import { CommodityTrendDialog, type TrendTank } from './CommodityTrendDialog.tsx'
 import { LiveBadge } from './LiveBadge.tsx'
+import { QualityChips, QualityFlags } from './QualityChips.tsx'
 import { fillTone } from './tankAlerts.ts'
+import { tankSample } from './tankQuality.ts'
 
-export function CommodityStock({ tanks, day, averageTemperature, hasLabData = true }: { tanks: TankLive[]; day: string; averageTemperature: number | null; hasLabData?: boolean }) {
+export function CommodityStock({
+  tanks,
+  before,
+  day,
+  averageTemperature,
+  hasLabData = true,
+}: {
+  tanks: TankLive[]
+  /** The same tanks as of yesterday, by tank id, for the change since yesterday. */
+  before: Map<string, TankLive>
+  day: string
+  averageTemperature: number | null
+  hasLabData?: boolean
+}) {
   const { t } = useLocale()
   const rows = commodityStock(tanks)
   const [openCode, setOpenCode] = useState<StockGroup | null>(null)
   // Only a gauge reading taken for today is live. The newest of them says how fresh the screen is.
   const readings = tanks.filter((tank) => tank.readingKind === 'live' && tank.readingAt).map((tank) => tank.readingAt as string).sort()
   const liveAt = readings.at(-1) ?? null
+  const sourcesOf = (code: StockGroup): TrendTank[] => commoditySources(tanks, code).map((tank) => ({
+    tankId: tank.tankId,
+    quantityKg: tank.quantityKg,
+    operationalStatus: tank.operationalStatus,
+    productName: tank.productName,
+    sample: tankSample(tank, before.get(tank.tankId)),
+  }))
 
   return (
     <section className="commodity-stock" aria-label={t.commodityStock}>
@@ -25,15 +48,22 @@ export function CommodityStock({ tanks, day, averageTemperature, hasLabData = tr
         <LiveBadge readingAt={liveAt} />
       </h2>
       <ul className="commodity-grid">
-        {rows.map((row) => (
-          <li key={row.code}>
-            <CommodityCard row={row} hasLabData={hasLabData} onOpen={() => setOpenCode(row.code)} />
-          </li>
-        ))}
+        {rows.map((row) => {
+          // Quality is averaged over the tanks that hold stock, the same tanks as temperature.
+          const samples = commoditySources(tanks, row.code)
+            .filter((tank) => tank.quantityKg != null && tank.quantityKg > 0)
+            .map((tank) => tankSample(tank, before.get(tank.tankId)))
+          return (
+            <li key={row.code}>
+              <CommodityCard row={row} samples={samples} hasLabData={hasLabData} onOpen={() => setOpenCode(row.code)} />
+            </li>
+          )
+        })}
       </ul>
       <CommodityTrendDialog
         code={openCode}
-        tanks={tanks}
+        title={openCode ?? ''}
+        sources={openCode ? sourcesOf(openCode) : []}
         day={day}
         averageTemperature={averageTemperature}
         hasLabData={hasLabData}
@@ -43,27 +73,31 @@ export function CommodityStock({ tanks, day, averageTemperature, hasLabData = tr
   )
 }
 
-function CommodityCard({ row, hasLabData, onOpen }: { row: CommodityStockRow; hasLabData: boolean; onOpen: () => void }) {
+function CommodityCard({ row, samples, hasLabData, onOpen }: { row: CommodityStockRow; samples: QualitySample[]; hasLabData: boolean; onOpen: () => void }) {
   const { t } = useLocale()
   const mass = useMass()
   const percent = row.utilization == null ? null : row.utilization * 100
   const width = percent == null ? 0 : Math.min(100, Math.max(0, percent))
   const tone = fillTone(row.utilization)
   const blank = t.unavailable
-  // The card shows the average. The range behind it is one hover away, so a single off-colour tank is not hidden.
-  const range = (stat: { min: number; max: number } | null) => (stat == null ? blank : stat.min === stat.max ? formatMeasure(stat.min, 1) : `${formatMeasure(stat.min, 1)}–${formatMeasure(stat.max, 1)}`)
-  const colourCount = Math.max(row.colourR?.count ?? 0, row.colourY?.count ?? 0)
-  const colourTitle = colourCount > 1
-    ? t.colourRangeHint.replace('{r}', range(row.colourR)).replace('{y}', range(row.colourY))
-    : colourCount === 1 ? t.colourOneTank : undefined
   const quantity = row.capacityKg == null
     ? blank
     : `${mass.compact(row.quantityKg)} / ${mass.compact(row.capacityKg)} ${mass.symbol}`
+  const quality = hasLabData ? qualityFor(samples) : []
+  const odour = odourFailures(samples)
+  const withResult = samples.filter((sample) => sample.parameters.length > 0).length
+  const out = hasOutOfSpec(quality) || odour > 0
+  const changed = hasChange(quality)
 
   return (
     <button
       type="button"
-      className={`commodity-card commodity-card--${tone}`}
+      className={[
+        'commodity-card',
+        `commodity-card--${tone}`,
+        out ? 'commodity-card--quality-out' : '',
+        changed ? 'commodity-card--quality-change' : '',
+      ].filter(Boolean).join(' ')}
       aria-label={`${row.code}. ${t.stockSources}`}
       disabled={row.tankCount === 0}
       onClick={onOpen}
@@ -87,21 +121,13 @@ function CommodityCard({ row, hasLabData, onOpen }: { row: CommodityStockRow; ha
           <Thermometer size={13} aria-hidden="true" />
           {row.avgTemperatureC == null ? blank : `${formatMeasure(row.avgTemperatureC, 1)} °C`}
         </span>
-        {hasLabData && (
-          <>
-            <span className="commodity-card__fact" title={t.avgQuality}>
-              FFA {row.avgFfa == null ? blank : `${formatMeasure(row.avgFfa, 2)}%`}
-              {' · '}
-              M&I {row.avgMi == null ? blank : `${formatMeasure(row.avgMi, 2)}%`}
-            </span>
-            <span className="commodity-card__fact" title={colourTitle}>
-              R {row.colourR == null ? blank : formatMeasure(row.colourR.average, 1)}
-              {' · '}
-              Y {row.colourY == null ? blank : formatMeasure(row.colourY.average, 1)}
-            </span>
-          </>
-        )}
+        <QualityFlags views={quality} odourFailed={odour} tanks={withResult} />
       </span>
+      {hasLabData && withResult > 0 ? (
+        <span className="commodity-card__quality" title={t.qualityHint}>
+          <QualityChips views={quality} tanks={withResult} />
+        </span>
+      ) : null}
     </button>
   )
 }
