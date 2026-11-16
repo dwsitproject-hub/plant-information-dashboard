@@ -93,11 +93,14 @@ export function Num({
   watch = false,
   variance = null,
   className,
+  limitTitle,
 }: {
   value: number | null
   code: ParamCode
   breach?: boolean
   watch?: boolean
+  /** Says which limit the figure broke, for example "FFA 0.19, limit ≤ 0.1". */
+  limitTitle?: string
   /** Set when this result moved 15%+ from the tank's last recorded result. Shown alongside, not instead of, breach/watch. */
   variance?: VarianceAlert | null
   className?: string
@@ -110,7 +113,7 @@ export function Num({
   else if (breach) names.push('num--neg')
   else if (watch) names.push('num--watch')
   if (variance) names.push('num--variance')
-  const title = value == null ? t.notRecorded : breach ? t.overMax : watch ? t.watch : undefined
+  const title = value == null ? t.notRecorded : (breach || watch) && limitTitle ? limitTitle : breach ? t.overMax : watch ? t.watch : undefined
   const varianceTitle = variance
     ? t.varianceTooltip
       .replace('{pct}', formatVariancePct(variance.pctChange))

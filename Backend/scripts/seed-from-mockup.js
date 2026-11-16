@@ -6,6 +6,7 @@ import dotenv from 'dotenv'
 import pg from 'pg'
 import { SITE_ID, PLANT_ID } from '../src/scope.js'
 import { requireSiteReplaceConfirmed } from './guard.js'
+import { seedDefaultStorageSpecs } from '../src/qualityRules.js'
 
 dotenv.config()
 
@@ -210,6 +211,9 @@ try {
      ON CONFLICT DO NOTHING`,
     [siteId],
   )
+
+  // Storage limits per commodity for this site, where it has none yet. QC edits them on Master > Commodities.
+  await seedDefaultStorageSpecs(client, siteId)
 
   const definitions = new Map()
   for (const [formCode, name, externalId, mapperKey, schedule] of FORMS) {

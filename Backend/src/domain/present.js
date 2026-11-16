@@ -40,14 +40,19 @@ function daysSince(analysisDate, asOfIso) {
   return Math.round((today - analysed) / 86_400_000)
 }
 
-export function assessStorage(oilFamily, parameters, analysisDate, timeZone) {
+/**
+ * `judged` is the result of evaluateStorage against the commodity's limits for the site
+ * (Master > Commodities). Without it, or without limits, the verdict stays spec-pending.
+ */
+export function assessStorage(oilFamily, parameters, analysisDate, timeZone, judged = null) {
   const ageDays = analysisDate ? daysSince(analysisDate, todayIso(timeZone)) : null
   return {
     analysisDate,
     ageDays,
     retestRequired: ageDays != null && ageDays > RETEST_AFTER_DAYS,
     parameters,
-    storageVerdict: 'spec-pending',
+    storageVerdict: judged?.verdict ?? 'spec-pending',
+    breaches: judged?.breaches ?? [],
   }
 }
 
@@ -82,7 +87,7 @@ export function presentTank(sounding, lab, stock, timeZone) {
     massAvailability: stock.quantityKg == null ? 'unavailable' : 'known',
     fillRatio: stock.levelRatio,
     quality: lab
-      ? assessStorage(oilFamily, lab.parameters, lab.analysisDate, timeZone)
+      ? assessStorage(oilFamily, lab.parameters, lab.analysisDate, timeZone, lab.judged)
       : null,
   }
 }
