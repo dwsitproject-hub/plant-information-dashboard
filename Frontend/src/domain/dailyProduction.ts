@@ -1,6 +1,5 @@
-import logsheets from '../data/logsheets.json'
 import { commodityStock } from './commodityStock.ts'
-import { presentTank, type RawSounding } from './present.ts'
+import type { TankLive } from './types.ts'
 
 export type Qty = number | null
 
@@ -206,29 +205,21 @@ export function lossYield(plant: PlantDay): Qty {
 
 export type StockCode = 'CPO' | 'RBDPO' | 'PFAD' | 'OLEIN' | 'RBDPS'
 
-const SOUNDINGS = (logsheets as { soundings: RawSounding[] }).soundings
-
 function blankStock(): Record<StockCode, number | null> {
   return { CPO: null, RBDPO: null, PFAD: null, OLEIN: null, RBDPS: null }
 }
 
-function stockKg(rows: RawSounding[]): Record<StockCode, number | null> {
-  const stock = commodityStock(rows.map((row) => presentTank(row, undefined, new Date())))
+/**
+ * Stock per commodity for one day's tanks, as the repository returns them (the API in api mode,
+ * the bundled sheets in local mode). A day with no tank quantity stays blank.
+ */
+export function stockByCode(tanks: TankLive[]): Record<StockCode, number | null> {
   const result = blankStock()
-  for (const row of stock) {
+  if (!tanks.some((tank) => tank.quantityKg != null)) return result
+  for (const row of commodityStock(tanks)) {
     if (row.code in result) result[row.code as StockCode] = row.quantityKg
   }
   return result
-}
-
-/** Last round of each tank, using the same kilogram path as closing. */
-function latestRound(rows: RawSounding[]): RawSounding[] {
-  const byTank = new Map<string, RawSounding>()
-  for (const row of rows) {
-    const current = byTank.get(row.tankId)
-    if (!current || row.roundIndex >= current.roundIndex) byTank.set(row.tankId, row)
-  }
-  return [...byTank.values()]
 }
 
 /** Calendar day before an ISO date. */
@@ -239,19 +230,4 @@ export function dayBefore(iso: string): string {
   const nextMonth = String(date.getMonth() + 1).padStart(2, '0')
   const nextDay = String(date.getDate()).padStart(2, '0')
   return `${date.getFullYear()}-${nextMonth}-${nextDay}`
-}
-
-/** Latest sounding per tank, converted with the same stockOf path Live Ops uses. */
-export function closingStockKg(): Record<StockCode, number | null> {
-  return stockKg(latestRound(SOUNDINGS))
-}
-
-/**
- * Opening for a report range: the latest round on this date, in kilograms.
- * A date with no sounding stays blank.
- */
-export function openingStockKg(on: string): Record<StockCode, number | null> {
-  const rows = SOUNDINGS.filter((row) => row.recordedOn === on)
-  if (rows.length === 0) return blankStock()
-  return stockKg(latestRound(rows))
 }

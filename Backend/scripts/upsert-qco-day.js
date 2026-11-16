@@ -121,6 +121,7 @@ async function upsertDay(client, body) {
   let parameters = 0
   let history = 0
   let skippedTanks = 0
+  const imported = []
   for (const tank of body.tanks ?? []) {
     const code = String(tank.tankId ?? '').replace(/\./g, '').replace(/\s+/g, '').trim()
     if (!code) continue
@@ -173,8 +174,27 @@ async function upsertDay(client, body) {
       parameters += 1
     }
     certificates += 1
+    imported.push(tankId)
   }
-  return { snapshotOn, certificates, parameters, history, skippedTanks }
+
+  // A day's export is the whole day. A tank that was on an earlier import of this day and revision
+  // but not on this one is dropped, so a re-import replaces the day instead of only adding to it.
+  // An import with no matched tank removes nothing, so a broken file cannot empty a day.
+  let removed = 0
+  if (imported.length > 0) {
+    const stale = await client.query(
+      `SELECT id FROM storage_certificates
+       WHERE site_id = $1 AND snapshot_on = $2 AND revision = $3 AND NOT (tank_id = ANY($4::text[]))`,
+      [siteId, snapshotOn, revision, imported],
+    )
+    const ids = stale.rows.map((row) => row.id)
+    if (ids.length > 0) {
+      await client.query('DELETE FROM certificate_parameters WHERE certificate_id = ANY($1::bigint[])', [ids])
+      await client.query('DELETE FROM storage_certificates WHERE id = ANY($1::bigint[])', [ids])
+      removed = ids.length
+    }
+  }
+  return { snapshotOn, certificates, parameters, history, skippedTanks, removed }
 }
 
 async function recordRun(client, report) {

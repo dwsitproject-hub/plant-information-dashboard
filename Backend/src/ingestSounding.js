@@ -79,12 +79,18 @@ export async function ingestSoundingDays(input) {
 
     let soundings = 0
     const unknownTanks = []
+    const duplicateRows = []
     for (const day of days) {
+      // Replace this sheet's rows for the day. Rounds read from a gauge (source 'atg') are not
+      // part of the sheet and stay.
       await client.query(
-        'DELETE FROM soundings WHERE site_id = $1 AND recorded_on = $2',
+        `DELETE FROM soundings WHERE site_id = $1 AND recorded_on = $2 AND source = 'logsheet'`,
         [siteId, day.recordedOn],
       )
+      const seen = new Set()
       for (const row of day.rows ?? []) {
+        if (seen.has(row.tankCode)) duplicateRows.push({ day: day.recordedOn, tankCode: row.tankCode })
+        seen.add(row.tankCode)
         const submissionId = await upsertSubmission(client, definition, day.recordedOn, row)
         const tankId = tanks.get(row.tankCode)
         if (!tankId) {
@@ -95,7 +101,15 @@ export async function ingestSoundingDays(input) {
           `INSERT INTO soundings (
              site_id, plant_id, tank_id, submission_id, recorded_on, round_index,
              product_name, commodity_id, level_m, temperature_c, operational_status
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           ON CONFLICT (tank_id, recorded_on, round_index) DO UPDATE
+             SET submission_id = EXCLUDED.submission_id,
+                 product_name = EXCLUDED.product_name,
+                 commodity_id = EXCLUDED.commodity_id,
+                 level_m = EXCLUDED.level_m,
+                 temperature_c = EXCLUDED.temperature_c,
+                 operational_status = EXCLUDED.operational_status
+             WHERE soundings.source = 'logsheet'`,
           [
             siteId,
             plantId,
@@ -114,11 +128,13 @@ export async function ingestSoundingDays(input) {
       }
     }
 
+    // A tank written twice on one sheet keeps its last row instead of failing the whole range.
     const detail = {
       downloaded: input.downloaded ?? days.length,
       skipped: input.skipped ?? 0,
       soundings,
       unknownTanks,
+      duplicateRows,
     }
     await client.query(
       `INSERT INTO ingest_runs (definition_id, range_from, range_to, status, detail, finished_at)

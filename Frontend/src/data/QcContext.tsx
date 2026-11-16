@@ -1,16 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 import { QC, type QcFile } from '../domain/qc.ts'
+import { apiBase, notifySessionExpired } from './api.ts'
 import { useActiveSite } from './ActiveSiteContext.tsx'
 
 const QcFileContext = createContext<QcFile>(QC)
 
 export function useQcFile(): QcFile {
   return useContext(QcFileContext)
-}
-
-function apiBase(): string {
-  return (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:3010/api/v1').replace(/\/$/, '')
 }
 
 export function QcLayout({ children }: { children?: ReactNode }) {
@@ -25,6 +22,7 @@ export function QcLayout({ children }: { children?: ReactNode }) {
     let cancelled = false
     const load = async (path: string) => {
       const response = await fetch(`${base}${path}`, { credentials: 'include' })
+      if (response.status === 401) notifySessionExpired()
       if (!response.ok) throw new Error(`API ${response.status} for ${path}`)
       return response.json()
     }

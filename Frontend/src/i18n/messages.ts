@@ -790,6 +790,7 @@ export interface Messages {
   logsheetCatalog: string
   qualityRules: string
   requestFailed: string
+  loadFailed: string
   usernameRequired: string
   passwordRequired: string
   passwordShort: string
@@ -1604,6 +1605,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     logsheetCatalog: 'Logsheet catalog',
     qualityRules: 'Quality rules',
     requestFailed: 'The request could not be completed.',
+    loadFailed: 'Some data could not be loaded, so figures on this page may be missing. Refresh the page to try again.',
     usernameRequired: 'Username is required.',
     passwordRequired: 'Password is required for a new user.',
     passwordShort: 'Password must be at least 6 characters.',
@@ -2416,6 +2418,7 @@ export const MESSAGES: Record<Locale, Messages> = {
     logsheetCatalog: 'Katalog logsheet',
     qualityRules: 'Aturan mutu',
     requestFailed: 'Permintaan tidak dapat diselesaikan.',
+    loadFailed: 'Sebagian data gagal dimuat, sehingga angka di halaman ini mungkin tidak lengkap. Muat ulang halaman untuk mencoba lagi.',
     usernameRequired: 'Nama pengguna wajib diisi.',
     passwordRequired: 'Kata sandi wajib diisi untuk pengguna baru.',
     passwordShort: 'Kata sandi minimal 6 karakter.',

@@ -142,9 +142,15 @@ export async function ingestOilMovementDays(input) {
     }
 
     let visits = 0
+    // The sync skips days with no tickets, so a day that arrives with no rows usually means the sheet
+    // was not read. Leave that day as it is and carry on with the rest of the range.
+    const emptyDays = []
     for (const day of days) {
       const rows = day.rows ?? []
-      if (rows.length === 0) throw new Error(`No visits for ${day.movementDate}`)
+      if (rows.length === 0) {
+        emptyDays.push(day.movementDate)
+        continue
+      }
       const submissionId = await upsertSubmission(client, definition, day.movementDate, rows)
       await client.query(
         'DELETE FROM oil_movement_days WHERE site_id = $1 AND movement_date = $2',
@@ -190,6 +196,7 @@ export async function ingestOilMovementDays(input) {
       downloaded: input.downloaded ?? days.length,
       skipped: input.skipped ?? 0,
       visits,
+      emptyDays,
     }
     await client.query(
       `INSERT INTO ingest_runs (definition_id, range_from, range_to, status, detail, finished_at)

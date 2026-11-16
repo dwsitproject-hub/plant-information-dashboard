@@ -18,6 +18,10 @@ The latest reading is never purged, and the daily rounds live in `soundings`, so
 
 The units are slow, about one to two seconds a call, and the poller reads them one after another. Do not poll faster than every five minutes.
 
+Live Ops shows today's tanks from the latest reading. A reading fetched more than **120 minutes** ago shows as NO DATA and stops counting in stock, so a stopped poller is visible instead of freezing the totals. Change the limit with `TANK_GAUGING_STALE_MINUTES` on the API. A tank that no longer appears on its gauge (or whose gauge was removed) also shows as NO DATA; its history stays.
+
+Changing a gauge system's address in Master > Tank gauging moves its tanks to the new address. It does not create new tanks.
+
 ## Before you start
 
 1. Migration `011_tank_gauging.sql` is applied. The deploy script runs it. You can also run `npm run migrate` in `Backend`.

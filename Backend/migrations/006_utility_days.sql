@@ -95,11 +95,18 @@ CREATE TABLE utility_job_checks (
   result TEXT CHECK (result IN ('yes', 'no'))
 );
 
-INSERT INTO utility_assets (site_id, plant_id, code, name, kind) VALUES
-  ('bekasi', 'priscolin-proj-bekasi', 'taihu-15tph', 'Taihu 15 TPH', 'boiler'),
-  ('bekasi', 'priscolin-proj-bekasi', 'wuxi-15tph', 'Wuxi 15 TPH', 'boiler'),
-  ('bekasi', 'priscolin-proj-bekasi', 'wheel-loader', 'Wheel loader', 'loader'),
-  ('bekasi', 'priscolin-proj-bekasi', 'wwtp', 'WWTP', 'effluent')
+-- Bekasi rows only where that plant already exists. On an empty database no plant exists yet;
+-- seed-from-mockup creates these assets for the plant it loads.
+INSERT INTO utility_assets (site_id, plant_id, code, name, kind)
+SELECT p.site_id, p.id, a.code, a.name, a.kind
+FROM plants p
+CROSS JOIN (VALUES
+  ('taihu-15tph', 'Taihu 15 TPH', 'boiler'),
+  ('wuxi-15tph', 'Wuxi 15 TPH', 'boiler'),
+  ('wheel-loader', 'Wheel loader', 'loader'),
+  ('wwtp', 'WWTP', 'effluent')
+) AS a (code, name, kind)
+WHERE p.id = 'priscolin-proj-bekasi'
 ON CONFLICT (site_id, code) DO NOTHING;
 
 COMMIT;

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { query } from '../db.js'
 import { requireAny, requireAuth, requireSiteAccess, requireSiteModule } from '../access.js'
-import { loadCatalog } from '../catalog.js'
+import { loadCatalog, tankIdsByCode } from '../catalog.js'
 import { labParameters } from '../domain/lab.js'
 import { massToKg, stockFromGauge, stockFromProfile } from '../domain/stock.js'
 import { assessStorage, oilFamilyOf, presentLogistics, presentTank } from '../domain/present.js'
@@ -11,6 +11,17 @@ import { localDate } from '../tankgauging/rounds.js'
 const router = Router()
 
 const NO_STOCK = { capacityKg: null, quantityKg: null, emptySpaceKg: null, loadableKg: null, levelRatio: null }
+
+/** The stock figures one history point carries, named as the screens read them. */
+function stockFields(stock) {
+  return {
+    capacityKg: stock.capacityKg ?? null,
+    quantityKg: stock.quantityKg ?? null,
+    emptySpaceKg: stock.emptySpaceKg ?? null,
+    loadableKg: stock.loadableKg ?? null,
+    fillRatio: stock.levelRatio ?? null,
+  }
+}
 
 function num(value) {
   if (value == null || value === '') return null
@@ -233,6 +244,7 @@ export async function loadSiteTanks(site, asked = null) {
   if (live) for (const row of gauged) thatDay.set(row.code, liveSounding(row, day))
 
   const catalog = await loadCatalog()
+  const idOf = await tankIdsByCode(site.id)
   const gaugeProfiles = await loadGaugeProfiles(gauged.map((row) => row.id))
   const tanks = [...known].map((tankId) => {
     const sounding = thatDay.get(tankId) ?? {
@@ -265,7 +277,7 @@ export async function loadSiteTanks(site, asked = null) {
         stock = { ...NO_STOCK, capacityKg }
       }
     } else {
-      const profile = catalog.profiles.get(tankId)
+      const profile = catalog.profiles.get(idOf.get(tankId))
       if (profile) stock = stockFromProfile(profile, catalog.tables, sounding.soundingLevelM, sounding.temperatureC, sounding.operationalStatus)
     }
     const present = presentTank(sounding, lab, stock, site.timezone)
@@ -342,8 +354,8 @@ router.get('/sites/:siteId/live/logistics', async (req, res, next) => {
 /** One tank's readings over time, with the capacity at each point. Also used by the management overview. */
 export async function loadTankHistory(siteId, tankId) {
   const result = await query(
-    `SELECT s.recorded_on, s.round_index, s.level_m, s.temperature_c, s.operational_status, s.mass_kg,
-            s.density_kg_m3, s.volume_litre, p.capacity, p.capacity_unit, i.max_capacity_litre
+    `SELECT t.id AS tank_pk, s.recorded_on, s.round_index, s.level_m, s.temperature_c, s.operational_status, s.mass_kg,
+            s.density_kg_m3, s.volume_litre, p.capacity, p.capacity_unit, p.bottom_stock, i.max_capacity_litre
      FROM soundings s JOIN tanks t ON t.id = s.tank_id
      LEFT JOIN tank_profiles p ON p.tank_id = t.id
      LEFT JOIN tank_gauging_info i ON i.tank_id = t.id
@@ -351,21 +363,35 @@ export async function loadTankHistory(siteId, tankId) {
      ORDER BY s.recorded_on, s.round_index`,
     [siteId, tankId],
   )
-  const points = result.rows.map((row) => ({
-    roundIndex: row.round_index,
-    recordedOn: row.recorded_on,
-    soundingLevelM: num(row.level_m),
-    temperatureC: num(row.temperature_c),
-    operationalStatus: row.operational_status ?? '',
-    massKg: num(row.mass_kg),
-    capacityKg: row.mass_kg == null
-      ? null
-      : stockFromGauge(num(row.mass_kg), { capacityKg: massToKg(num(row.capacity), row.capacity_unit) }, {
-          capacityLitre: num(row.max_capacity_litre),
-          densityKgM3: num(row.density_kg_m3),
-        }).capacityKg,
-    storageVerdict: 'spec-pending',
-  }))
+  // The server works out the stock of every point, gauge or manual, from this site's own calibration.
+  // The browser no longer needs calibration tables, and one tank code at two sites cannot mix.
+  const catalog = await loadCatalog()
+  const stockOfRow = (row) => {
+    const massKg = num(row.mass_kg)
+    if (massKg != null) {
+      return stockFromGauge(
+        massKg,
+        { capacityKg: massToKg(num(row.capacity), row.capacity_unit), bottomStockKg: massToKg(num(row.bottom_stock), row.capacity_unit) },
+        { capacityLitre: num(row.max_capacity_litre), volumeLitre: num(row.volume_litre), densityKgM3: num(row.density_kg_m3) },
+      )
+    }
+    const profile = catalog.profiles.get(row.tank_pk)
+    if (!profile) return NO_STOCK
+    return stockFromProfile(profile, catalog.tables, num(row.level_m), num(row.temperature_c), row.operational_status ?? '')
+  }
+  const points = result.rows.map((row) => {
+    const stock = stockOfRow(row)
+    return {
+      roundIndex: row.round_index,
+      recordedOn: row.recorded_on,
+      soundingLevelM: num(row.level_m),
+      temperatureC: num(row.temperature_c),
+      operationalStatus: row.operational_status ?? '',
+      massKg: num(row.mass_kg),
+      ...stockFields(stock),
+      storageVerdict: 'spec-pending',
+    }
+  })
 
   // A gauged tank also has a reading for today, which is newer than any round.
   const site = await siteOf(siteId)
@@ -374,6 +400,14 @@ export async function loadTankHistory(siteId, tankId) {
     const today = localDate(new Date(), site.timezone)
     const sounding = liveSounding(gauged, today)
     const profile = (await loadGaugeProfiles([gauged.id])).get(gauged.id)
+    const gauge = {
+      capacityLitre: num(gauged.max_capacity_litre),
+      volumeLitre: sounding.volumeLitre,
+      densityKgM3: sounding.densityKgM3 ?? num(gauged.ref_density_kg_m3),
+    }
+    const stock = sounding.massKg != null
+      ? stockFromGauge(sounding.massKg, profile, gauge)
+      : { ...NO_STOCK, capacityKg: stockFromGauge(0, profile, gauge).capacityKg }
     points.push({
       roundIndex: 0,
       recordedOn: today,
@@ -381,10 +415,7 @@ export async function loadTankHistory(siteId, tankId) {
       temperatureC: sounding.temperatureC,
       operationalStatus: sounding.operationalStatus,
       massKg: sounding.massKg,
-      capacityKg: stockFromGauge(sounding.massKg ?? 0, profile, {
-        capacityLitre: num(gauged.max_capacity_litre),
-        densityKgM3: sounding.densityKgM3 ?? num(gauged.ref_density_kg_m3),
-      }).capacityKg,
+      ...stockFields(stock),
       storageVerdict: 'spec-pending',
     })
   }
