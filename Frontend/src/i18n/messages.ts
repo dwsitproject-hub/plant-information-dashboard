@@ -390,6 +390,16 @@ export interface Messages {
   overMax: string
   watch: string
   noSpec: string
+  qualityAverageOf: string
+  qualityLimit: string
+  qualityOutTanks: string
+  qualityWatchTanks: string
+  qualityAverageOut: string
+  qualityChange: string
+  qualityChangedFlag: string
+  qualityOdourFailed: string
+  qualityByProduct: string
+  qualityHint: string
   specsTitle: string
   specsBlurb: string
   specsSite: string
@@ -1240,6 +1250,16 @@ export const MESSAGES: Record<Locale, Messages> = {
     overMax: 'Over max',
     watch: 'Watch',
     noSpec: 'No spec',
+    qualityAverageOf: 'Average of {n} tanks',
+    qualityLimit: 'Limit {range}',
+    qualityOutTanks: '{n} of {total} tanks out of spec',
+    qualityWatchTanks: '{n} of {total} tanks on watch',
+    qualityAverageOut: 'The average is outside the limit',
+    qualityChange: '{pct} since yesterday (was {previous})',
+    qualityChangedFlag: 'Changed since yesterday',
+    qualityOdourFailed: 'Odour failed in {n} tanks',
+    qualityByProduct: 'Quality by product',
+    qualityHint: 'Average lab result of the tanks holding stock. Red: outside a limit set on Master > Commodities. Amber: outside a watch limit. Arrow: moved 15% or more since yesterday.',
     specsTitle: 'Storage quality limits',
     specsBlurb: 'Each oil is judged against its own limits at each site. A result that breaks an "Out of spec" limit puts the tank out of spec on QC Storage and Live Ops; a "Watch" limit only marks the figure. An oil with no limits stays "No spec".',
     specsSite: 'Site',
@@ -2088,6 +2108,16 @@ export const MESSAGES: Record<Locale, Messages> = {
     overMax: 'Melewati batas',
     watch: 'Pantau',
     noSpec: 'Tanpa spek',
+    qualityAverageOf: 'Rata-rata {n} tangki',
+    qualityLimit: 'Batas {range}',
+    qualityOutTanks: '{n} dari {total} tangki di luar spek',
+    qualityWatchTanks: '{n} dari {total} tangki dipantau',
+    qualityAverageOut: 'Rata-rata di luar batas',
+    qualityChange: '{pct} sejak kemarin (sebelumnya {previous})',
+    qualityChangedFlag: 'Berubah sejak kemarin',
+    qualityOdourFailed: 'Bau tidak lolos di {n} tangki',
+    qualityByProduct: 'Mutu per produk',
+    qualityHint: 'Rata-rata hasil lab tangki yang berisi stok. Merah: di luar batas di Master > Komoditas. Kuning: di luar batas pantau. Panah: berubah 15% atau lebih sejak kemarin.',
     specsTitle: 'Batas mutu penyimpanan',
     specsBlurb: 'Setiap minyak dinilai dengan batasnya sendiri di setiap site. Hasil yang melanggar batas "Di luar spek" membuat tangki di luar spek di QC Storage dan Live Ops; batas "Pantau" hanya menandai angkanya. Minyak tanpa batas tetap "Tanpa spek".',
     specsSite: 'Site',

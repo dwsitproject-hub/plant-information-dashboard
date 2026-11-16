@@ -14,10 +14,20 @@ test('a certificate gives colour under the codes the screens look up', () => {
 
 test('tests we do not show, and tests with no number, are left out', () => {
   const rows = labParameters([
-    { canonical_code: 'lab.carotene', numeric_value: 500 },
+    { canonical_code: 'lab.unknown_test', numeric_value: 500 },
     { canonical_code: 'lab.color_r', numeric_value: null },
     { canonical_code: 'lab.ffa', numeric_value: 4.1 },
   ])
   assert.deepEqual(rows.map((row) => row.code), ['FFA'])
   assert.deepEqual(labParameters(undefined), [])
+})
+
+test('product-specific tests come through under their short codes', () => {
+  const rows = labParameters([
+    { canonical_code: 'lab.carotene', numeric_value: 585 },
+    { canonical_code: 'lab.cloud_point', numeric_value: '9.4' },
+    { canonical_code: 'lab.smp', numeric_value: 36 },
+    { canonical_code: 'lab.totox', numeric_value: 7.3 },
+  ])
+  assert.deepEqual(rows.map((row) => [row.code, row.value]), [['CAROTENE', 585], ['CP', 9.4], ['SMP', 36], ['TOTOX', 7.3]])
 })

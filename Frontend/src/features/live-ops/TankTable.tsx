@@ -3,7 +3,10 @@ import { Info } from 'lucide-react'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import type { TankLive } from '../../domain/types.ts'
 import { formatDay, formatMeasure, parameter, tankLabel } from '../../domain/format.ts'
-import { findVariance, formatVariancePct, type LabVarianceAlert } from '../../domain/qualityVariance.ts'
+import { qualityFor, type ParamView } from '../../domain/qualityView.ts'
+import { ChangeArrow, QualityChips } from './QualityChips.tsx'
+import { useQualityTitle } from './qualityTitle.ts'
+import { labMetric, tankSample } from './tankQuality.ts'
 import { LevelCue } from './LevelCue.tsx'
 import { useMass } from './massUnit.ts'
 import type { HistoryMetric } from './quantitySeries.ts'
@@ -15,20 +18,22 @@ type SortValue = string | number | null
 
 export function TankTable({
   tanks,
+  before,
   averageTemperature,
-  varianceByTank,
   hasLabData = true,
   onHistory,
 }: {
   tanks: TankLive[]
+  /** The same tanks as of yesterday, for the change since yesterday. */
+  before: Map<string, TankLive>
   averageTemperature: number | null
-  varianceByTank: Map<string, LabVarianceAlert[]>
   /** False for a site with no lab results: the lab columns are left out instead of filled with dashes. */
   hasLabData?: boolean
   onHistory: (tankId: string, metric: HistoryMetric) => void
 }) {
   const { t, locale } = useLocale()
   const mass = useMass()
+  const qualityTitle = useQualityTitle()
   const [key, setKey] = useState<string | null>(null)
   const [dir, setDir] = useState<SortDir>('asc')
   const sort = {
@@ -60,8 +65,7 @@ export function TankTable({
           <col className="tank-col tank-col--temp" />
           {hasLabData && <col className="tank-col tank-col--lab" />}
           {hasLabData && <col className="tank-col tank-col--lab" />}
-          {hasLabData && <col className="tank-col tank-col--lab" />}
-          {hasLabData && <col className="tank-col tank-col--lab" />}
+          {hasLabData && <col className="tank-col tank-col--quality" />}
         </colgroup>
         <thead>
           <tr>
@@ -76,26 +80,26 @@ export function TankTable({
             <SortHeader label={t.tempAxis} column="temp" sort={sort} align="right" hint={t.tempSpikeHint} />
             {hasLabData && <SortHeader label="FFA" column="ffa" sort={sort} align="right" hint={t.ffaAgeHint} />}
             {hasLabData && <SortHeader label="M&I" column="moisture" sort={sort} align="right" hint={t.ffaAgeHint} />}
-            {hasLabData && <SortHeader label={t.colourRLov} column="colorR" sort={sort} align="right" hint={t.ffaAgeHint} />}
-            {hasLabData && <SortHeader label={t.colourYLov} column="colorY" sort={sort} align="right" hint={t.ffaAgeHint} />}
+            {hasLabData && <th><span className="th-label">{t.quality}<HeaderHint text={t.qualityHint} /></span></th>}
           </tr>
         </thead>
         <tbody>
           {rows.map((tank) => {
             const empty = isEmptyTank(tank)
             const quarantined = tank.quality?.storageVerdict === 'quarantine'
-            const ffa = parameter(tank.quality?.parameters, 'FFA')
-            const moisture = parameter(tank.quality?.parameters, 'MI')
-            const colorR = parameter(tank.quality?.parameters, 'COLOR_R')
-            const colorY = parameter(tank.quality?.parameters, 'COLOR_Y')
-            const alerts = varianceByTank.get(tank.tankId)
+            const quality = qualityFor([tankSample(tank, before.get(tank.tankId))])
+            const ffa = quality.find((view) => view.code === 'FFA') ?? null
+            const moisture = quality.find((view) => view.code === 'MI') ?? null
+            // FFA and M&I have their own columns; the product's other parameters share one.
+            const others = quality.filter((view) => view.code !== 'FFA' && view.code !== 'MI')
+            const outOfSpec = quality.some((view) => view.status === 'reject')
             const stale = qualityStale(tank)
             const ageTitle = stale ? qualityAgeTitle(tank, t.qualityAge, locale) : undefined
             // A blank is either "not on this product's certificate" or "no certificate yet". The tooltip says which.
             const missingTitle = tank.quality ? t.labNotOnCertificate : t.labNoResult
             const rowClass = [
               empty ? 'prod-row--empty' : '',
-              quarantined ? 'prod-row--quarantine' : '',
+              quarantined || outOfSpec ? 'prod-row--quarantine' : '',
             ].filter(Boolean).join(' ')
             return (
               <tr key={tank.tankId} className={rowClass || undefined}>
@@ -112,10 +116,15 @@ export function TankTable({
                   </button>
                 </td>
                 <HistoryCell value={tank.temperatureC == null ? t.unavailable : formatMeasure(tank.temperatureC, 1)} missing={tank.temperatureC == null} alert={isTempAnomaly(tank.temperatureC, averageTemperature)} onClick={() => onHistory(tank.tankId, 'temperature')} />
-                {hasLabData && <HistoryCell value={ffa == null ? t.unavailable : formatMeasure(ffa)} missing={ffa == null} alert={ffa != null && stale} title={ffa != null ? ageTitle : missingTitle} variance={findVariance(alerts, 'FFA')} onClick={() => onHistory(tank.tankId, 'ffa')} />}
-                {hasLabData && <HistoryCell value={moisture == null ? t.unavailable : formatMeasure(moisture)} missing={moisture == null} alert={moisture != null && stale} title={moisture != null ? ageTitle : missingTitle} variance={findVariance(alerts, 'MI')} onClick={() => onHistory(tank.tankId, 'moisture')} />}
-                {hasLabData && <HistoryCell value={colorR == null ? t.unavailable : formatMeasure(colorR, 1)} missing={colorR == null} alert={colorR != null && stale} title={colorR != null ? ageTitle : missingTitle} variance={findVariance(alerts, 'COLOR_R')} onClick={() => onHistory(tank.tankId, 'colorR')} />}
-                {hasLabData && <HistoryCell value={colorY == null ? t.unavailable : formatMeasure(colorY, 1)} missing={colorY == null} alert={colorY != null && stale} title={colorY != null ? ageTitle : missingTitle} variance={findVariance(alerts, 'COLOR_Y')} onClick={() => onHistory(tank.tankId, 'colorY')} />}
+                {hasLabData && <LabCell view={ffa} stale={stale} ageTitle={ageTitle} missingTitle={missingTitle} title={qualityTitle} onClick={() => onHistory(tank.tankId, 'ffa')} />}
+                {hasLabData && <LabCell view={moisture} stale={stale} ageTitle={ageTitle} missingTitle={missingTitle} title={qualityTitle} onClick={() => onHistory(tank.tankId, 'moisture')} />}
+                {hasLabData && (
+                  <td className="tank-quality-cell">
+                    {others.length === 0 || !tank.quality
+                      ? <span className="qty-link qty-link--missing" title={missingTitle}>{t.unavailable}</span>
+                      : <QualityChips views={others} onPick={(code) => onHistory(tank.tankId, labMetric(code))} />}
+                  </td>
+                )}
               </tr>
             )
           })}
@@ -151,8 +160,6 @@ function sortValue(tank: TankLive, key: string): SortValue {
   if (key === 'temp') return tank.temperatureC
   if (key === 'ffa') return parameter(tank.quality?.parameters, 'FFA')
   if (key === 'moisture') return parameter(tank.quality?.parameters, 'MI')
-  if (key === 'colorR') return parameter(tank.quality?.parameters, 'COLOR_R')
-  if (key === 'colorY') return parameter(tank.quality?.parameters, 'COLOR_Y')
   return null
 }
 
@@ -206,7 +213,8 @@ function HistoryCell({
   alert = false,
   missing = false,
   title,
-  variance,
+  change = null,
+  spec = null,
 }: {
   value: string
   onClick: () => void
@@ -214,7 +222,10 @@ function HistoryCell({
   alert?: boolean
   missing?: boolean
   title?: string
-  variance?: LabVarianceAlert
+  /** Signed fraction moved since yesterday, when it is large enough to mark. */
+  change?: number | null
+  /** Outside a limit on Master > Commodities: 'reject' (out of spec) or 'watch'. */
+  spec?: 'reject' | 'watch' | null
 }) {
   const className = [
     'qty-link',
@@ -222,20 +233,47 @@ function HistoryCell({
     stale ? 'qty-link--stale' : '',
     alert ? 'qty-link--alert' : '',
   ].filter(Boolean).join(' ')
-  const varianceTitle = variance
-    ? `${formatVariancePct(variance.pctChange)} vs ${variance.previous}${variance.previousDate ? ` (${variance.previousDate})` : ''}`
-    : undefined
+  const cell = ['num', change != null ? 'num--variance' : '', spec === 'reject' ? 'num--spec-out' : spec === 'watch' ? 'num--spec-watch' : '']
+    .filter(Boolean)
+    .join(' ')
   return (
-    <td className={variance ? 'num num--variance' : 'num'}>
-      <button type="button" className={className} title={varianceTitle ?? title} onClick={onClick}>
+    <td className={cell}>
+      <button type="button" className={className} title={title} onClick={onClick}>
         {value}
-        {variance ? (
-          <span className={variance.pctChange >= 0 ? 'num-variance-arrow num-variance-arrow--up' : 'num-variance-arrow num-variance-arrow--down'} aria-hidden="true">
-            {variance.pctChange >= 0 ? '\u25b2' : '\u25bc'}
-          </span>
-        ) : null}
+        {change != null ? <ChangeArrow pctChange={change} /> : null}
       </button>
     </td>
+  )
+}
+
+/** FFA or M&I for one tank: its value, coloured by its limits, with the change since yesterday. */
+function LabCell({
+  view,
+  stale,
+  ageTitle,
+  missingTitle,
+  title,
+  onClick,
+}: {
+  view: ParamView | null
+  stale: boolean
+  ageTitle: string | undefined
+  missingTitle: string
+  title: (view: ParamView, tanks: number) => string
+  onClick: () => void
+}) {
+  const { t } = useLocale()
+  const value = view?.value ?? null
+  if (!view || value == null) return <HistoryCell value={t.unavailable} missing title={missingTitle} onClick={onClick} />
+  return (
+    <HistoryCell
+      value={formatMeasure(value)}
+      alert={stale}
+      title={[title(view, 1), ageTitle].filter(Boolean).join('\n')}
+      change={view.change?.pctChange ?? null}
+      spec={view.status}
+      onClick={onClick}
+    />
   )
 }
 

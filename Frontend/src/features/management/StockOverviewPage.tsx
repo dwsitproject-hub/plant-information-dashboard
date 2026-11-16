@@ -26,6 +26,7 @@ import { SourceBadge } from '../dataSource/SourceBadge.tsx'
 import { ClassAtSiteCard, CommodityCard, KpiCard, SiteStockCard } from './Cards.tsx'
 import { CardActionsContext, HoverTarget } from './HoverCard.tsx'
 import { MixStrip } from './MixTip.tsx'
+import { ClassDialog } from './ClassDialog.tsx'
 import { ViewOptionsContext, useViewOptions } from './viewOptions.ts'
 import { Count, stagger } from './motion.tsx'
 import { Change, ClassDot, DataBadge, DataStamp, FillText, Kpi, Legend, Skeleton, StatusChip, StockBar, fill, useClassLabel } from './parts.tsx'
@@ -86,6 +87,8 @@ export function StockOverviewPage() {
   const { data, failed } = usePortfolio()
   const [copied, setCopied] = useState(false)
   const [highlight, setHighlight] = useState<CommodityClass | null>(null)
+  // A Mix segment that was clicked: its site, class and, when the page splits products, its product.
+  const [mix, setMix] = useState<{ siteId: string; code: CommodityClass; product: string | null } | null>(null)
   const nav = readNav(params)
 
   // Refined oils shown as one group or split into products. The last choice is remembered, and the link carries it.
@@ -191,7 +194,7 @@ export function StockOverviewPage() {
   ) : nav.cls ? (
     <SitesForClass sites={sites} cls={nav.cls} onSite={(id) => go({ site: id, cls: nav.cls, view: 'commodity' })} />
   ) : (
-    <Overview data={data} view={nav.view} nearFullPct={nearFullPct} go={go} onHighlight={setHighlight} />
+    <Overview data={data} view={nav.view} nearFullPct={nearFullPct} go={go} onHighlight={setHighlight} onOpenMix={(siteId, code, product) => setMix({ siteId, code, product: product ?? null })} />
   )
 
   return (
@@ -242,6 +245,12 @@ export function StockOverviewPage() {
       {data ? <p className="mg-foot">{t.mgCapacityNote}</p> : null}
 
       {dialog ? <TankDialog site={dialog.site} tank={dialog.tank} onClose={closeTank} /> : null}
+      <ClassDialog
+        site={mix ? sites.find((item) => item.id === mix.siteId) ?? null : null}
+        code={mix?.code ?? null}
+        product={mix?.product}
+        onClose={() => setMix(null)}
+      />
     </div>
     </ViewOptionsContext>
     </CardActionsContext>
@@ -271,12 +280,15 @@ function Overview({
   nearFullPct,
   go,
   onHighlight,
+  onOpenMix,
 }: {
   data: PortfolioPayload
   view: 'site' | 'commodity'
   nearFullPct: number
   go: (next: Partial<Nav>) => void
   onHighlight: (cls: CommodityClass | null) => void
+  /** A click on a Mix segment: the same dialog as a commodity card on the Tank & Stock Dashboard. */
+  onOpenMix: (siteId: string, code: CommodityClass, product?: string) => void
 }) {
   const { t, locale } = useLocale()
   const { split } = useViewOptions()
@@ -357,7 +369,7 @@ function Overview({
                 <span className="num mg-fill"><FillText ratio={site.fillRatio} /></span>
                 <MixStrip
                   site={site}
-                  onOpenClass={(siteId, cls) => go({ site: siteId, cls })}
+                  onOpenClass={onOpenMix}
                 />
                 <span className="num">
                   <Change kg={site.changeKg} />

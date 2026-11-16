@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.js'
 import { requireAny, requireAuth, requireSiteAccess, requireSiteModule } from '../access.js'
 import { loadCatalog, tankIdsByCode } from '../catalog.js'
-import { evaluateStorage, loadStorageRules, valuesFromTests } from '../qualityRules.js'
+import { evaluateStorage, limitsFor, loadStorageRules, valuesFromTests } from '../qualityRules.js'
 import { labParameters } from '../domain/lab.js'
 import { massToKg, stockFromGauge, stockFromProfile } from '../domain/stock.js'
 import { assessStorage, oilFamilyOf, presentLogistics, presentTank } from '../domain/present.js'
@@ -93,7 +93,14 @@ function labFrom(row) {
     temperatureC: num(row.temperature_c),
     parameters: labParameters(row.tests),
     judged: row.judged ?? null,
+    commodityId: row.commodity_id ?? null,
+    limits: row.limits ?? [],
   }
+}
+
+/** What assessStorage needs from a lab row: the verdict, the limits broken, and the product's limits. */
+export function labJudgement(lab) {
+  return { ...(lab?.judged ?? {}), commodityId: lab?.commodityId ?? null, limits: lab?.limits ?? [] }
 }
 
 async function certificateLabs(siteId) {
@@ -120,6 +127,7 @@ async function certificateLabs(siteId) {
   const rules = await loadStorageRules({ query }, siteId)
   for (const row of grouped.values()) {
     row.judged = evaluateStorage(rules.get(row.commodity_id), valuesFromTests(row.tests, row.odor))
+    row.limits = limitsFor(rules.get(row.commodity_id))
   }
   return [...grouped.values()]
 }
@@ -452,7 +460,7 @@ router.get('/sites/:siteId/tanks/:tankId/labs', async (req, res, next) => {
     }
     const series = [...byAnalysis.values()].sort((a, b) => (a.analysisDate ?? '').localeCompare(b.analysisDate ?? ''))
     res.json(series.map((lab) => {
-      const quality = assessStorage(oilFamilyOf(lab.productName), lab.parameters, lab.analysisDate, site.timezone, lab.judged)
+      const quality = assessStorage(oilFamilyOf(lab.productName), lab.parameters, lab.analysisDate, site.timezone, labJudgement(lab))
       return {
         snapshotOn: lab.snapshotOn,
         analysisDate: lab.analysisDate,

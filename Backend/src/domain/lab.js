@@ -11,7 +11,12 @@ export const LAB_LABEL = {
   'lab.iv': ['IV', 'IV', ''],
   'lab.pv': ['PV', 'PV', ''],
   'lab.dobi': ['DOBI', 'DOBI', ''],
-  'lab.totox': ['Totox', 'Totox', ''],
+  'lab.totox': ['TOTOX', 'Totox', ''],
+  'lab.anv': ['ANV', 'AnV', ''],
+  'lab.smp': ['SMP', 'Slip MP', '°C'],
+  'lab.cloud_point': ['CP', 'Cloud pt', '°C'],
+  'lab.carotene': ['CAROTENE', 'β-Carotene', 'ppm'],
+  'lab.phosphorus': ['P', 'P', 'ppm'],
 }
 
 const num = (value) => {

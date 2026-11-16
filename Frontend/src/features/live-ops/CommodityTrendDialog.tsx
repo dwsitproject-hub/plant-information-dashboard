@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useRepository } from '../../data/OperationsContext.tsx'
-import type { StockGroup } from '../../domain/commodityStock.ts'
-import { commoditySources } from '../../domain/commodityStock.ts'
-import { formatDay, formatMeasure, parameter, tankLabel } from '../../domain/format.ts'
+import { formatDay, formatMeasure, tankLabel } from '../../domain/format.ts'
+import { qualityFor, type QualitySample } from '../../domain/qualityView.ts'
 import type { SoundingPoint, TankLive } from '../../domain/types.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import { DateRangeFilter } from '../daily-production/DateRangeFilter.tsx'
@@ -13,19 +12,36 @@ import { useMass } from './massUnit.ts'
 import { commodityDayReading, commodityQuantitySeries, type HistoryDay } from './quantitySeries.ts'
 import { isOverfilled, isTempAnomaly } from './tankAlerts.ts'
 import { SHOW_LOADABLE } from './columns.ts'
+import { QualityChips } from './QualityChips.tsx'
+
+/** One tank in the dialog: its stock, and its quality with yesterday's values. */
+export interface TrendTank extends Pick<TankLive, 'tankId' | 'quantityKg' | 'operationalStatus'> {
+  productName?: string
+  sample: QualitySample
+}
 
 const DEFAULT_DAYS = 30
 
 export function CommodityTrendDialog({
   code,
-  tanks,
+  title,
+  sources,
   day,
   averageTemperature,
   hasLabData = true,
+  showProduct = false,
+  loadHistory,
   onClose,
 }: {
-  code: StockGroup | null
-  tanks: TankLive[]
+  /** What is open; null closes the dialog. */
+  code: string | null
+  /** The heading, such as "CPO" or "RBDPO · Bekasi". */
+  title: string
+  sources: TrendTank[]
+  /** Where each tank's daily readings come from. Defaults to the active site's repository. */
+  loadHistory?: (tankId: string) => Promise<SoundingPoint[]>
+  /** Show each tank's product, for a dialog that covers several products. */
+  showProduct?: boolean
   /** Dashboard day. The dialog range defaults to the 30 days ending here. */
   day: string
   averageTemperature: number | null
@@ -41,7 +57,10 @@ export function CommodityTrendDialog({
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [range, setRange] = useState(() => defaultRange(day))
   const { start, end } = range
-  const sources = code ? commoditySources(tanks, code) : []
+  const loadRef = useRef(loadHistory)
+  useEffect(() => {
+    loadRef.current = loadHistory
+  }, [loadHistory])
   const sourceKey = sources.map((tank) => tank.tankId).join(',')
   const series = useMemo(() => {
     const ids = new Set(sourceKey ? sourceKey.split(',') : [])
@@ -72,7 +91,8 @@ export function CommodityTrendDialog({
     if (!code) return
     const ids = sourceKey ? sourceKey.split(',') : []
     let active = true
-    Promise.all(ids.map(async (tankId) => ({ tankId, points: await repository.getSoundingHistory(tankId) })))
+    const load = loadRef.current ?? ((tankId: string) => repository.getSoundingHistory(tankId))
+    Promise.all(ids.map(async (tankId) => ({ tankId, points: await load(tankId) })))
       .then((rows) => {
         if (!active) return
         setHistories(rows)
@@ -110,7 +130,7 @@ export function CommodityTrendDialog({
         <>
           <div className="stock-dialog__head">
             <div>
-              <h2>{code} - {t.quantity}</h2>
+              <h2>{title} - {t.quantity}</h2>
               <p className="stock-dialog__updated">
                 {t.tanksHolding.replace('{held}', String(sources.filter((tank) => tank.quantityKg != null && tank.quantityKg > 0).length)).replace('{total}', String(sources.length))}
               </p>
@@ -157,16 +177,14 @@ export function CommodityTrendDialog({
                   <thead>
                     <tr>
                       <th>{t.tank}</th>
+                      {showProduct && <th>{t.commodity}</th>}
                       <th className="num">{t.levelAxis}</th>
                       <th className="num">{t.quantity} ({mass.symbol})</th>
                       <th className="num">{t.emptySpace} ({mass.symbol})</th>
                       {SHOW_LOADABLE && <th className="num">{t.loadable} ({mass.symbol})</th>}
                       <th className="num">{t.tankLevelPct}</th>
                       <th className="num">{t.tempAxis}</th>
-                      {hasLabData && <th className="num">FFA</th>}
-                      {hasLabData && <th className="num">M&I</th>}
-                      {hasLabData && <th className="num">{t.colourRLov}</th>}
-                      {hasLabData && <th className="num">{t.colourYLov}</th>}
+                      {hasLabData && <th title={t.qualityHint}>{t.quality}</th>}
                       <th>{t.status}</th>
                     </tr>
                   </thead>
@@ -174,15 +192,13 @@ export function CommodityTrendDialog({
                     {readings.map(({ tank, reading }) => {
                       const overfilled = isOverfilled(reading?.levelRatio)
                       const hot = isTempAnomaly(reading?.temperatureC, averageTemperature)
-                      const ffa = parameter(tank.quality?.parameters, 'FFA')
-                      const moisture = parameter(tank.quality?.parameters, 'MI')
-                      const colorR = parameter(tank.quality?.parameters, 'COLOR_R')
-                      const colorY = parameter(tank.quality?.parameters, 'COLOR_Y')
-                      const missingTitle = tank.quality ? t.labNotOnCertificate : t.labNoResult
+                      const quality = qualityFor([tank.sample])
+                      const outOfSpec = quality.some((view) => view.status === 'reject')
                       const status = reading?.operationalStatus || tank.operationalStatus || t.unavailable
                       return (
-                        <tr key={tank.tankId} className={overfilled || hot ? 'stock-dialog__row--alert' : undefined}>
+                        <tr key={tank.tankId} className={overfilled || hot || outOfSpec ? 'stock-dialog__row--alert' : undefined}>
                           <td>{tankLabel(tank.tankId)}</td>
+                          {showProduct && <td>{tank.productName || t.unavailable}</td>}
                           <td className="num">{reading?.soundingLevelM == null ? t.unavailable : formatMeasure(reading.soundingLevelM, 3)}</td>
                           <td className="num">{reading?.quantityKg == null ? t.unavailable : mass.amount(reading.quantityKg)}</td>
                           <td className="num">{reading?.emptySpaceKg == null ? t.unavailable : mass.amount(reading.emptySpaceKg)}</td>
@@ -191,10 +207,13 @@ export function CommodityTrendDialog({
                           <td className={hot ? 'num stock-dialog__alert' : 'num'}>
                             {reading?.temperatureC == null ? t.unavailable : `${formatMeasure(reading.temperatureC, 1)} °C`}
                           </td>
-                          {hasLabData && <td className="num" title={ffa == null ? missingTitle : undefined}>{ffa == null ? t.unavailable : formatMeasure(ffa, 2)}</td>}
-                          {hasLabData && <td className="num" title={moisture == null ? missingTitle : undefined}>{moisture == null ? t.unavailable : formatMeasure(moisture, 2)}</td>}
-                          {hasLabData && <td className="num" title={colorR == null ? missingTitle : undefined}>{colorR == null ? t.unavailable : formatMeasure(colorR, 1)}</td>}
-                          {hasLabData && <td className="num" title={colorY == null ? missingTitle : undefined}>{colorY == null ? t.unavailable : formatMeasure(colorY, 1)}</td>}
+                          {hasLabData && (
+                            <td className="tank-quality-cell">
+                              {tank.sample.parameters.length === 0
+                                ? <span className="um-muted" title={t.labNoResult}>{t.unavailable}</span>
+                                : <QualityChips views={quality} />}
+                            </td>
+                          )}
                           <td>
                             <span className={status === 'EMPTY' ? 'badge badge--muted' : overfilled ? 'badge badge--danger' : 'badge'}>{status}</span>
                           </td>
@@ -205,11 +224,12 @@ export function CommodityTrendDialog({
                   <tfoot>
                     <tr>
                       <td>{t.totalQuantity}</td>
+                      {showProduct && <td />}
                       <td />
                       <td className="num">{quantityTotal == null ? t.unavailable : mass.amount(quantityTotal)}</td>
                       <td className="num">{emptyTotal == null ? t.unavailable : mass.amount(emptyTotal)}</td>
                       {SHOW_LOADABLE && <td className="num">{loadableTotal == null ? t.unavailable : mass.amount(loadableTotal)}</td>}
-                      <td colSpan={(SHOW_LOADABLE ? 4 : 3) + (hasLabData ? 4 : 0)} />
+                      <td colSpan={(SHOW_LOADABLE ? 4 : 3) + (hasLabData ? 1 : 0)} />
                     </tr>
                   </tfoot>
                 </table>

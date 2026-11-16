@@ -2788,13 +2788,15 @@ td.num.num--variance {
   display: block;
 }
 
-.tank-col--id { width: 10%; }
+.tank-col--id { width: 6%; }
 .tank-col--name { width: 9%; }
-.tank-col--kg { width: 11%; }
-.tank-col--level { width: 7%; }
-.tank-col--fill { width: 10%; }
-.tank-col--temp { width: 8%; }
-.tank-col--lab { width: 6%; }
+.tank-col--kg { width: 9%; }
+.tank-col--level { width: 6%; }
+.tank-col--fill { width: 9%; }
+.tank-col--temp { width: 6%; }
+.tank-col--lab { width: 5%; }
+/* The product's other lab parameters, as chips. */
+.tank-col--quality { width: 26%; }
 
 .prod-table--tanks td.prod-plant {
   white-space: normal;
@@ -2927,4 +2929,135 @@ td.num.num--variance {
   margin: 0 0 var(--spacing-2);
   color: var(--color-text-steel);
   font-size: var(--font-size-sm);
+}
+
+/* Quality chips: a product's lab figures on cards, tank rows and management cards. */
+.q-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.q-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--color-bg-light);
+  color: var(--color-text-charcoal);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+button.q-chip {
+  cursor: pointer;
+}
+
+button.q-chip:hover {
+  border-color: var(--color-border-medium);
+}
+
+.q-chip small {
+  color: var(--color-text-steel);
+  font-size: 10px;
+}
+
+.q-chip b {
+  font-weight: var(--font-weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+}
+
+.q-chip--empty b {
+  color: var(--color-text-steel);
+  font-weight: 400;
+}
+
+.q-chip--changed {
+  background: color-mix(in srgb, var(--color-sea-mid) 14%, white);
+}
+
+.q-chip--watch {
+  border-color: #d9a400;
+  background: #fff7d6;
+}
+
+.q-chip--watch b {
+  color: #7a4f06;
+}
+
+.q-chip--reject {
+  border-color: var(--color-destructive);
+  background: #fdecec;
+}
+
+.q-chip--reject b,
+.q-chip--reject small {
+  color: var(--color-brand-red-deep);
+}
+
+.q-flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Commodity cards that hold something out of spec, or that moved since yesterday. */
+.commodity-card--quality-out {
+  box-shadow: inset 0 0 0 2px var(--color-destructive);
+}
+
+.commodity-card--quality-change:not(.commodity-card--quality-out) {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-sea-mid) 55%, white);
+}
+
+.commodity-card__quality {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+}
+
+.tank-quality-cell {
+  min-width: 180px;
+}
+
+/* Tank & Stock: a lab figure outside its limits (Master > Commodities). */
+.prod-table td.num--spec-out .qty-link,
+td.num.num--spec-out .qty-link {
+  color: var(--color-brand-red-deep);
+  font-weight: var(--font-weight-semibold, 600);
+}
+
+.prod-table td.num--spec-out,
+td.num.num--spec-out {
+  background: #fdecec;
+}
+
+.prod-table td.num--spec-watch,
+td.num.num--spec-watch {
+  background: #fff7d6;
+}
+
+.tank-lab__cell--reject b {
+  color: var(--color-brand-red-deep);
+}
+
+.tank-lab__cell--reject {
+  background: #fdecec;
+  border-radius: 4px;
+}
+
+.tank-lab__cell--watch {
+  background: #fff7d6;
+  border-radius: 4px;
+}
+
+.tank-lab__cell--changed:not(.tank-lab__cell--reject):not(.tank-lab__cell--watch) {
+  background: color-mix(in srgb, var(--color-sea-mid) 12%, white);
+  border-radius: 4px;
 }

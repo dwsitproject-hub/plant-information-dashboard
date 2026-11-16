@@ -68,6 +68,10 @@ router.get('/portfolio/sites/:siteId/tanks/:tankId/history', async (req, res, ne
         quantityKg: point.quantityKg,
         capacityKg: point.capacityKg,
         fillRatio: point.fillRatio,
+        // The commodity dialog's tank table reads these too.
+        emptySpaceKg: point.emptySpaceKg,
+        loadableKg: point.loadableKg,
+        operationalStatus: point.operationalStatus,
         levelM: point.soundingLevelM,
         temperatureC: point.temperatureC,
       })),

@@ -53,6 +53,9 @@ export function assessStorage(oilFamily, parameters, analysisDate, timeZone, jud
     parameters,
     storageVerdict: judged?.verdict ?? 'spec-pending',
     breaches: judged?.breaches ?? [],
+    commodityId: judged?.commodityId ?? null,
+    // The product's limits from Master > Commodities, in the short codes the screens use (FFA, MI, ...).
+    limits: judged?.limits ?? [],
   }
 }
 
@@ -87,7 +90,7 @@ export function presentTank(sounding, lab, stock, timeZone) {
     massAvailability: stock.quantityKg == null ? 'unavailable' : 'known',
     fillRatio: stock.levelRatio,
     quality: lab
-      ? assessStorage(oilFamily, lab.parameters, lab.analysisDate, timeZone, lab.judged)
+      ? assessStorage(oilFamily, lab.parameters, lab.analysisDate, timeZone, { ...(lab.judged ?? {}), commodityId: lab.commodityId ?? null, limits: lab.limits ?? [] })
       : null,
   }
 }

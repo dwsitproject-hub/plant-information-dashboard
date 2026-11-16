@@ -8,21 +8,21 @@
 
 /** The parameters a spec can bound. `field` is the name the storage rows and screens use. */
 export const SPEC_PARAMETERS = [
-  { code: 'lab.ffa', field: 'ffa', label: 'FFA', unit: '%' },
-  { code: 'lab.moisture', field: 'moisture', label: 'M&I', unit: '%' },
-  { code: 'lab.color_r', field: 'colorR', label: 'Colour R (Lovibond)', unit: '' },
-  { code: 'lab.color_y', field: 'colorY', label: 'Colour Y (Lovibond)', unit: '' },
-  { code: 'lab.iv', field: 'iv', label: 'IV', unit: '' },
-  { code: 'lab.pv', field: 'pv', label: 'PV', unit: 'meq/kg' },
-  { code: 'lab.anv', field: 'anv', label: 'AnV', unit: '' },
-  { code: 'lab.totox', field: 'totox', label: 'Totox', unit: '' },
-  { code: 'lab.smp', field: 'smp', label: 'Slip melting point', unit: '°C' },
-  { code: 'lab.cloud_point', field: 'cloudPoint', label: 'Cloud point', unit: '°C' },
-  { code: 'lab.carotene', field: 'carotene', label: 'β-Carotene', unit: 'ppm' },
-  { code: 'lab.phosphorus', field: 'phosphorus', label: 'Phosphorus', unit: 'ppm' },
-  { code: 'lab.dobi', field: 'dobi', label: 'DOBI', unit: '' },
+  { code: 'lab.ffa', lab: 'FFA', field: 'ffa', label: 'FFA', unit: '%' },
+  { code: 'lab.moisture', lab: 'MI', field: 'moisture', label: 'M&I', unit: '%' },
+  { code: 'lab.color_r', lab: 'COLOR_R', field: 'colorR', label: 'Colour R (Lovibond)', unit: '' },
+  { code: 'lab.color_y', lab: 'COLOR_Y', field: 'colorY', label: 'Colour Y (Lovibond)', unit: '' },
+  { code: 'lab.iv', lab: 'IV', field: 'iv', label: 'IV', unit: '' },
+  { code: 'lab.pv', lab: 'PV', field: 'pv', label: 'PV', unit: 'meq/kg' },
+  { code: 'lab.anv', lab: 'ANV', field: 'anv', label: 'AnV', unit: '' },
+  { code: 'lab.totox', lab: 'TOTOX', field: 'totox', label: 'Totox', unit: '' },
+  { code: 'lab.smp', lab: 'SMP', field: 'smp', label: 'Slip melting point', unit: '°C' },
+  { code: 'lab.cloud_point', lab: 'CP', field: 'cloudPoint', label: 'Cloud point', unit: '°C' },
+  { code: 'lab.carotene', lab: 'CAROTENE', field: 'carotene', label: 'β-Carotene', unit: 'ppm' },
+  { code: 'lab.phosphorus', lab: 'P', field: 'phosphorus', label: 'Phosphorus', unit: 'ppm' },
+  { code: 'lab.dobi', lab: 'DOBI', field: 'dobi', label: 'DOBI', unit: '' },
   // Odour is written as a tick or a cross. Its rule has no number: the result must pass.
-  { code: 'lab.odor', field: 'odor', label: 'Odour', unit: '', kind: 'pass' },
+  { code: 'lab.odor', lab: 'ODOR', field: 'odor', label: 'Odour', unit: '', kind: 'pass' },
 ]
 
 const BY_CODE = new Map(SPEC_PARAMETERS.map((parameter) => [parameter.code, parameter]))
@@ -119,6 +119,18 @@ export async function loadStorageRules(db, siteId) {
   return byCommodity
 }
 
+/**
+ * A commodity's limits in the short codes the tank screens use (FFA, MI, COLOR_R, ...), so a screen can
+ * show which parameters matter for that product and judge an average against them.
+ */
+export function limitsFor(rules) {
+  return (rules ?? []).flatMap((rule) => {
+    const parameter = BY_CODE.get(rule.parameterCode)
+    if (!parameter) return []
+    return [{ code: parameter.lab, label: parameter.label, unit: parameter.unit, bound: rule.bound, limit: rule.limit, severity: rule.severity }]
+  })
+}
+
 /** Values keyed by field name (ffa, iv, odor, ...) from certificate tests keyed by canonical code. */
 export function valuesFromTests(tests, odor = null) {
   const values = { odor }
@@ -147,7 +159,7 @@ export function evaluateStorage(rules, values) {
       if (!odourRecorded(value)) continue
       judged += 1
       if (odourFailed(value)) {
-        breaches.push({ field: parameter.field, parameterCode: rule.parameterCode, bound: rule.bound, limit: null, value, severity: rule.severity })
+        breaches.push({ field: parameter.field, code: parameter.lab, parameterCode: rule.parameterCode, bound: rule.bound, limit: null, value, severity: rule.severity })
       }
       continue
     }
@@ -156,7 +168,7 @@ export function evaluateStorage(rules, values) {
     judged += 1
     const broken = rule.bound === 'max' ? value > rule.limit : value < rule.limit
     if (broken) {
-      breaches.push({ field: parameter.field, parameterCode: rule.parameterCode, bound: rule.bound, limit: rule.limit, value, severity: rule.severity })
+      breaches.push({ field: parameter.field, code: parameter.lab, parameterCode: rule.parameterCode, bound: rule.bound, limit: rule.limit, value, severity: rule.severity })
     }
   }
   if (judged === 0) return { verdict: 'spec-pending', breaches: [] }
