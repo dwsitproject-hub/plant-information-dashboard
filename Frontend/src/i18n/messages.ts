@@ -390,6 +390,41 @@ export interface Messages {
   overMax: string
   watch: string
   noSpec: string
+  specsTitle: string
+  specsBlurb: string
+  specsSite: string
+  specsLimitsCount: string
+  specsNone: string
+  specsEdit: string
+  specsView: string
+  specsFor: string
+  specsReadAs: string
+  specsParameter: string
+  specsBound: string
+  specsLimit: string
+  specsEffect: string
+  specsBoundMax: string
+  specsBoundMin: string
+  specsMustPass: string
+  specsEffectReject: string
+  specsEffectWatch: string
+  specsAdd: string
+  specsRemove: string
+  specsSave: string
+  specsSaved: string
+  specsEmptyEditor: string
+  specsNeedApi: string
+  specsUpdated: string
+  specsErrUnknownParameter: string
+  specsErrLimitRequired: string
+  specsErrDuplicate: string
+  specsErrMinAboveMax: string
+  specsErrInvalid: string
+  specsErrSite: string
+  storageSpecNoteSet: string
+  outOfSpec: string
+  inSpec: string
+  specBreachTitle: string
   notRecorded: string
   rangeFor: string
   tooFewToCompare: string
@@ -1205,6 +1240,41 @@ export const MESSAGES: Record<Locale, Messages> = {
     overMax: 'Over max',
     watch: 'Watch',
     noSpec: 'No spec',
+    specsTitle: 'Storage quality limits',
+    specsBlurb: 'Each oil is judged against its own limits at each site. A result that breaks an "Out of spec" limit puts the tank out of spec on QC Storage and Live Ops; a "Watch" limit only marks the figure. An oil with no limits stays "No spec".',
+    specsSite: 'Site',
+    specsLimitsCount: '{n} limits',
+    specsNone: 'No limits',
+    specsEdit: 'Edit limits',
+    specsView: 'View limits',
+    specsFor: '{name} at {site}',
+    specsReadAs: 'Read from logsheets as: {aliases}',
+    specsParameter: 'Parameter',
+    specsBound: 'Bound',
+    specsLimit: 'Limit',
+    specsEffect: 'If broken',
+    specsBoundMax: 'Max',
+    specsBoundMin: 'Min',
+    specsMustPass: 'Must pass',
+    specsEffectReject: 'Out of spec',
+    specsEffectWatch: 'Watch',
+    specsAdd: 'Add limit',
+    specsRemove: 'Remove limit',
+    specsSave: 'Save limits',
+    specsSaved: 'Limits for {name} at {site} saved.',
+    specsEmptyEditor: 'No limits yet. Results for this oil show "No spec" until you add one.',
+    specsNeedApi: 'Quality limits are kept on the server. Run the app with VITE_DATA_SOURCE=api to edit them.',
+    specsUpdated: 'Last changed {day}',
+    specsErrUnknownParameter: 'Pick a parameter for every limit.',
+    specsErrLimitRequired: 'Enter a number for every limit.',
+    specsErrDuplicate: 'A parameter can have one Max and one Min.',
+    specsErrMinAboveMax: 'A Min is above the Max for the same parameter.',
+    specsErrInvalid: 'The limits could not be saved. Check each row.',
+    specsErrSite: 'This site is not available to you.',
+    storageSpecNoteSet: 'Each oil is judged against its own limits, set per commodity on Master > Commodities. A red figure breaks an Out of spec limit; an amber figure breaks a Watch limit. A retest badge means the analysis is more than 2 days older than the snapshot. Figures are shown as written on the form.',
+    outOfSpec: 'Out of spec',
+    inSpec: 'In spec',
+    specBreachTitle: '{label} {value}, limit {bound} {limit}',
     notRecorded: 'Not recorded',
     rangeFor: 'Range for {product}, {from}–{to} · {count} results',
     tooFewToCompare: 'Too few results to compare',
@@ -2018,6 +2088,41 @@ export const MESSAGES: Record<Locale, Messages> = {
     overMax: 'Melewati batas',
     watch: 'Pantau',
     noSpec: 'Tanpa spek',
+    specsTitle: 'Batas mutu penyimpanan',
+    specsBlurb: 'Setiap minyak dinilai dengan batasnya sendiri di setiap site. Hasil yang melanggar batas "Di luar spek" membuat tangki di luar spek di QC Storage dan Live Ops; batas "Pantau" hanya menandai angkanya. Minyak tanpa batas tetap "Tanpa spek".',
+    specsSite: 'Site',
+    specsLimitsCount: '{n} batas',
+    specsNone: 'Tanpa batas',
+    specsEdit: 'Ubah batas',
+    specsView: 'Lihat batas',
+    specsFor: '{name} di {site}',
+    specsReadAs: 'Terbaca dari logsheet sebagai: {aliases}',
+    specsParameter: 'Parameter',
+    specsBound: 'Batas',
+    specsLimit: 'Nilai',
+    specsEffect: 'Jika dilanggar',
+    specsBoundMax: 'Maks',
+    specsBoundMin: 'Min',
+    specsMustPass: 'Harus lolos',
+    specsEffectReject: 'Di luar spek',
+    specsEffectWatch: 'Pantau',
+    specsAdd: 'Tambah batas',
+    specsRemove: 'Hapus batas',
+    specsSave: 'Simpan batas',
+    specsSaved: 'Batas {name} di {site} tersimpan.',
+    specsEmptyEditor: 'Belum ada batas. Hasil minyak ini tampil "Tanpa spek" sampai batas ditambahkan.',
+    specsNeedApi: 'Batas mutu disimpan di server. Jalankan aplikasi dengan VITE_DATA_SOURCE=api untuk mengubahnya.',
+    specsUpdated: 'Terakhir diubah {day}',
+    specsErrUnknownParameter: 'Pilih parameter untuk setiap batas.',
+    specsErrLimitRequired: 'Isi angka untuk setiap batas.',
+    specsErrDuplicate: 'Satu parameter hanya boleh punya satu Maks dan satu Min.',
+    specsErrMinAboveMax: 'Nilai Min lebih tinggi dari Maks untuk parameter yang sama.',
+    specsErrInvalid: 'Batas tidak dapat disimpan. Periksa setiap baris.',
+    specsErrSite: 'Site ini tidak tersedia untuk Anda.',
+    storageSpecNoteSet: 'Setiap minyak dinilai dengan batasnya sendiri, diatur per komoditas di Master > Komoditas. Angka merah melanggar batas Di luar spek; angka kuning melanggar batas Pantau. Lencana uji ulang berarti analisis lebih dari 2 hari dari tanggal snapshot. Angka ditampilkan sesuai formulir.',
+    outOfSpec: 'Di luar spek',
+    inSpec: 'Sesuai spek',
+    specBreachTitle: '{label} {value}, batas {bound} {limit}',
     notRecorded: 'Tidak dicatat',
     rangeFor: 'Rentang {product}, {from}–{to} · {count} hasil',
     tooFewToCompare: 'Hasil terlalu sedikit untuk dibandingkan',

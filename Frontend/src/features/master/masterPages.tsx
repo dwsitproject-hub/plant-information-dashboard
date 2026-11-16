@@ -5,6 +5,7 @@ import { formatMeasure, tankLabel } from '../../domain/format.ts'
 import { canonicalTankId, emptyProfile } from '../../domain/tankCalibration.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import { MasterRecordPage } from './MasterRecordPage.tsx'
+import { CommoditySpecsPage } from './CommoditySpecsPage.tsx'
 
 /** The site a plant row belongs to. Plants are an internal key, so screens show the site. */
 function siteOfPlant(data: MasterData, plantId: string): string {
@@ -22,6 +23,12 @@ function nameOf(rows: Array<{ id: string; name: string }>, id: string, fallback:
 }
 
 export function CommoditiesPage() {
+  // With the API, commodities and their storage quality limits come from the server and are edited there.
+  if (import.meta.env.VITE_DATA_SOURCE === 'api') return <CommoditySpecsPage />
+  return <LocalCommoditiesPage />
+}
+
+function LocalCommoditiesPage() {
   const { t } = useLocale()
   const master = useMaster()
   return (

@@ -5,6 +5,7 @@ import { formatDay, tankLabel } from '../../domain/format.ts'
 import {
   STORAGE_TANK_IDS,
   ageAtSnapshot,
+  breachFor,
   historyForTank,
   latestByTank,
   productRange,
@@ -27,7 +28,7 @@ import { AgeDot, Bullet, Identity, Legend, ProductBoard, fill, type LegendItem }
 type Slot = { tankId: string; row: StorageRow | null }
 type View = 'table' | 'cards'
 type Group = 'sample' | 'core' | 'oxidation' | 'composition' | 'notes'
-type StorageDialog = null | 'tanks' | 'retest' | 'oils' | 'variance'
+type StorageDialog = null | 'tanks' | 'retest' | 'oils' | 'variance' | 'spec'
 
 type Column = {
   column: string
@@ -56,6 +57,7 @@ export function StoragePage() {
   )
   const withResult = roster.filter((slot): slot is { tankId: string; row: StorageRow } => slot.row != null)
   const retests = withResult.filter((slot) => retestDue(slot.row)).length
+  const { outOfSpec, hasSpecs, anyReject, anyWatch, anyNoSpec } = specSummary(withResult.map((slot) => slot.row))
   const families = new Set(withResult.map((slot) => slot.row.oil).filter(Boolean)).size
   const columns = useStorageColumns().filter((column) => withResult.some((slot) => {
     const value = column.field ? slot.row[column.field] : column.text?.(slot.row)
@@ -111,9 +113,12 @@ export function StoragePage() {
     if (!openTank && dialog.open) dialog.close()
   }, [openTank])
 
-  const legend: LegendItem[] = ['nospec', 'missing']
+  const legend: LegendItem[] = ['missing']
+  if (anyNoSpec) legend.unshift('nospec')
   if (varianceTankCount > 0) legend.unshift('variance')
   if (retests > 0) legend.unshift('retest')
+  if (anyWatch) legend.unshift('watch')
+  if (anyReject) legend.unshift('over')
 
   return (
     <QcChrome
@@ -121,11 +126,14 @@ export function StoragePage() {
       start={start}
       end={end}
       setRange={setRange}
-      note={t.storageSpecNote}
-      legend={<Legend items={legend} />}
+      note={hasSpecs ? t.storageSpecNoteSet : t.storageSpecNote}
+      legend={<Legend items={legend} labels={{ over: t.outOfSpec }} />}
     >
       <section className="prod-kpis" aria-label={t.qcStorage}>
         <QcKpi label={t.tanksLogged} value={String(withResult.length)} onOpen={() => setDialog('tanks')} />
+        {hasSpecs ? (
+          <QcKpi label={t.outOfSpec} value={String(outOfSpec.length)} tone={outOfSpec.length > 0 ? 'alert' : undefined} onOpen={() => setDialog('spec')} />
+        ) : null}
         <QcKpi label={t.retestDue} value={String(retests)} tone={retests > 0 ? 'alert' : undefined} onOpen={() => setDialog('retest')} />
         <QcKpi label={t.varianceAlerts} value={String(varianceTankCount)} tone={varianceTankCount > 0 ? 'alert' : undefined} onOpen={() => setDialog('variance')} />
         <QcKpi label={t.oilTypes} value={String(families)} onOpen={() => setDialog('oils')} />
@@ -163,6 +171,7 @@ export function StoragePage() {
                 {rows.map((slot) => {
                   const names = ['qc-pick']
                   if (!slot.row) names.push('prod-row--empty')
+                  else if (slot.row.verdict === 'quarantine') names.push('prod-row--quarantine')
                   else if (retestDue(slot.row)) names.push('qc-retest')
                   return (
                     <tr key={slot.tankId} className={names.join(' ')} onClick={() => setOpenTank(slot.tankId)}>
@@ -175,6 +184,7 @@ export function StoragePage() {
                           )}
                           product={slot.row?.oil ?? null}
                         />
+                        <SpecBadge row={slot.row} />
                       </td>
                       <ResultCells row={slot.row} columns={columns} variance={slot.row ? varianceByTank.get(slot.row.tankId) : undefined} />
                     </tr>
@@ -201,12 +211,14 @@ export function StoragePage() {
       </QcPanelOpen>
       <QcDetailDialog
         open={dialog != null}
-        title={dialog === 'retest' ? t.retestDue : dialog === 'oils' ? t.oilTypes : dialog === 'variance' ? t.varianceAlerts : t.tanksLogged}
+        title={dialog === 'spec' ? t.outOfSpec : dialog === 'retest' ? t.retestDue : dialog === 'oils' ? t.oilTypes : dialog === 'variance' ? t.varianceAlerts : t.tanksLogged}
         start={start}
         end={end}
         onClose={() => setDialog(null)}
       >
-        {dialog === 'retest' ? (
+        {dialog === 'spec' ? (
+          <StorageLatestDetail rows={outOfSpec} />
+        ) : dialog === 'retest' ? (
           <StorageLatestDetail rows={withResult.filter((slot) => retestDue(slot.row)).map((slot) => slot.row)} />
         ) : dialog === 'variance' ? (
           <VarianceDetail rows={varianceRows} />
@@ -368,8 +380,19 @@ function ResultCells({
         if (column.text) {
           const value = row ? column.text(row) : null
           const wrap = column.column === 'remark' ? 'qc-wrap' : ''
-          return <td key={column.column} className={[className, wrap].filter(Boolean).join(' ') || undefined}>{value || '-'}</td>
+          const failed = column.column === 'odor' ? breachFor(row, 'odor') : null
+          const tone = failed ? (failed.severity === 'reject' ? 'num--neg' : 'num--watch') : ''
+          return (
+            <td
+              key={column.column}
+              className={[className, wrap, tone].filter(Boolean).join(' ') || undefined}
+              title={failed ? `${column.label}: ${t.specsMustPass}` : undefined}
+            >
+              {value || '-'}
+            </td>
+          )
         }
+        const broken = column.field ? breachFor(row, column.field) : null
         return (
           <Num
             key={column.column}
@@ -377,6 +400,14 @@ function ResultCells({
             value={row && column.field ? row[column.field] : null}
             code={column.code ?? 'ffa'}
             variance={variance?.[column.column] ?? null}
+            breach={broken?.severity === 'reject'}
+            watch={broken?.severity === 'watch'}
+            limitTitle={broken ? fill(t.specBreachTitle, {
+              label: column.label,
+              value: String(broken.value),
+              bound: broken.bound === 'max' ? '≤' : '≥',
+              limit: String(broken.limit ?? ''),
+            }) : undefined}
           />
         )
       })}
@@ -411,6 +442,7 @@ function StorageCard({
           product={row.oil}
         />
         <span>
+          <SpecBadge row={row} />
           <AgeDot age={ageAtSnapshot(row.analysisDate, row.snapshotOn)} />
           {retest ? <span className="badge badge--warning qc-badge">{t.retest}</span> : null}
           {varianceCount > 0 ? (
@@ -439,6 +471,26 @@ function StorageCard({
       </dl>
     </article>
   )
+}
+
+/** Verdicts from each commodity's limits on Master > Commodities (api mode only). */
+function specSummary(rows: StorageRow[]) {
+  const severities = rows.flatMap((row) => (row.breaches ?? []).map((breach) => breach.severity))
+  return {
+    outOfSpec: rows.filter((row) => row.verdict === 'quarantine'),
+    hasSpecs: rows.some((row) => row.verdict != null && row.verdict !== 'spec-pending'),
+    anyReject: severities.includes('reject'),
+    anyWatch: severities.includes('watch'),
+    anyNoSpec: rows.some((row) => (row.verdict ?? 'spec-pending') === 'spec-pending'),
+  }
+}
+
+/** In spec or out of spec against the commodity's limits. Nothing when no limit applies. */
+function SpecBadge({ row }: { row: StorageRow | null }) {
+  const { t } = useLocale()
+  if (!row?.verdict || row.verdict === 'spec-pending') return null
+  if (row.verdict === 'quarantine') return <span className="badge badge--danger qc-badge">{t.outOfSpec}</span>
+  return <span className="badge badge--pass qc-badge">{t.inSpec}</span>
 }
 
 /** Small direction arrow shown next to a card metric that moved 15%+ from its last result. */

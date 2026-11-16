@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth, requirePermission, requireSiteAccess, requireSiteModule } from '../access.js'
 import { query } from '../db.js'
+import { evaluateStorage, loadStorageRules } from '../qualityRules.js'
 import { finishedOilFromDays, historyFromDays, hourlyFromDays, ledgerFromDays, snapshotFromDays } from '../refineryQuality.js'
 
 const router = Router({ mergeParams: true })
@@ -41,15 +42,21 @@ router.get('/storage', async (req, res, next) => {
   try {
     const from = req.query.from || null
     const to = req.query.to || null
+    // The commodity is the one set at import; an older row without one is matched through the site's
+    // aliases (for example "RPL/RPOL" -> olein), so its limits still apply.
     const result = await query(
       `SELECT c.id, t.code AS tank_code, c.oil, c.analysis_date, c.capacity, c.quantity, c.empty_space,
-              c.temperature_c, c.odor, c.remark, c.snapshot_on, c.revision
+              c.temperature_c, c.odor, c.remark, c.snapshot_on, c.revision,
+              COALESCE(c.commodity_id, a.commodity_id, al.commodity_id) AS commodity_id
        FROM storage_certificates c
        JOIN tanks t ON t.id = c.tank_id
+       LEFT JOIN commodity_aliases a ON a.site_id = c.site_id AND a.source_text = c.oil
+       LEFT JOIN commodity_aliases al ON al.site_id = c.site_id AND al.source_text = LOWER(c.oil)
        WHERE c.site_id = $1
        ORDER BY c.snapshot_on, t.code, c.revision`,
       [req.params.siteId],
     )
+    const rules = await loadStorageRules({ query }, req.params.siteId)
     const tests = await query(
       `SELECT p.certificate_id, p.canonical_code, p.numeric_value
        FROM certificate_parameters p
@@ -74,7 +81,11 @@ router.get('/storage', async (req, res, next) => {
           const field = CERT_FIELD[test.canonical_code]
           if (field) testsForRow[field] = num(test.numeric_value)
         }
+        const judged = evaluateStorage(rules.get(row.commodity_id), { ...testsForRow, odor: row.odor })
         return {
+          commodityId: row.commodity_id ?? null,
+          verdict: judged.verdict,
+          breaches: judged.breaches,
           tankId: row.tank_code,
           oil: row.oil,
           analysisDate: row.analysis_date,

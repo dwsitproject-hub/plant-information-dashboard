@@ -27,6 +27,26 @@ export interface StorageRow {
   remark: string | null
   snapshotOn: string | null
   revision: number
+  /** Set by the API: the commodity this result was judged as, and the verdict against its limits. */
+  commodityId?: string | null
+  verdict?: 'pass' | 'quarantine' | 'spec-pending'
+  breaches?: SpecBreach[]
+}
+
+/** One limit a storage result broke. `field` is the StorageRow field, such as ffa or odor. */
+export interface SpecBreach {
+  field: string
+  parameterCode: string
+  bound: 'max' | 'min'
+  limit: number | null
+  value: number | string
+  severity: 'reject' | 'watch'
+}
+
+/** Rejecting limits outrank watch limits for the same figure. */
+export function breachFor(row: StorageRow | null, field: string): SpecBreach | null {
+  const hits = (row?.breaches ?? []).filter((breach) => breach.field === field)
+  return hits.find((breach) => breach.severity === 'reject') ?? hits[0] ?? null
 }
 
 export interface PalkaSample {
@@ -269,7 +289,7 @@ export function commodityFamily(raw: string): string {
 }
 
 export type NumericStorageField = {
-  [K in keyof StorageRow]: StorageRow[K] extends number | null ? K : never
+  [K in keyof StorageRow]-?: StorageRow[K] extends number | null ? K : never
 }[keyof StorageRow]
 
 export interface ProductRange {

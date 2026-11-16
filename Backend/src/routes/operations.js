@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { query } from '../db.js'
 import { requireAny, requireAuth, requireSiteAccess, requireSiteModule } from '../access.js'
 import { loadCatalog, tankIdsByCode } from '../catalog.js'
+import { evaluateStorage, loadStorageRules, valuesFromTests } from '../qualityRules.js'
 import { labParameters } from '../domain/lab.js'
 import { massToKg, stockFromGauge, stockFromProfile } from '../domain/stock.js'
 import { assessStorage, oilFamilyOf, presentLogistics, presentTank } from '../domain/present.js'
@@ -91,15 +92,19 @@ function labFrom(row) {
     snapshotOn: row.snapshot_on,
     temperatureC: num(row.temperature_c),
     parameters: labParameters(row.tests),
+    judged: row.judged ?? null,
   }
 }
 
 async function certificateLabs(siteId) {
   const result = await query(
-    `SELECT t.code AS tank_code, c.oil AS product_name, c.analysis_date, c.snapshot_on, c.temperature_c,
+    `SELECT t.code AS tank_code, c.oil AS product_name, c.analysis_date, c.snapshot_on, c.temperature_c, c.odor,
+            COALESCE(c.commodity_id, a.commodity_id, al.commodity_id) AS commodity_id,
             p.canonical_code, p.numeric_value
      FROM storage_certificates c
      JOIN tanks t ON t.id = c.tank_id
+     LEFT JOIN commodity_aliases a ON a.site_id = c.site_id AND a.source_text = c.oil
+     LEFT JOIN commodity_aliases al ON al.site_id = c.site_id AND al.source_text = LOWER(c.oil)
      LEFT JOIN certificate_parameters p ON p.certificate_id = c.id
      WHERE c.site_id = $1
      ORDER BY c.snapshot_on, t.code`,
@@ -110,6 +115,11 @@ async function certificateLabs(siteId) {
     const key = `${row.tank_code}|${row.snapshot_on}|${row.analysis_date}`
     if (!grouped.has(key)) grouped.set(key, { ...row, tests: [] })
     if (row.canonical_code) grouped.get(key).tests.push(row)
+  }
+  // Each result is judged against its commodity's storage limits for this site (Master > Commodities).
+  const rules = await loadStorageRules({ query }, siteId)
+  for (const row of grouped.values()) {
+    row.judged = evaluateStorage(rules.get(row.commodity_id), valuesFromTests(row.tests, row.odor))
   }
   return [...grouped.values()]
 }
@@ -442,7 +452,7 @@ router.get('/sites/:siteId/tanks/:tankId/labs', async (req, res, next) => {
     }
     const series = [...byAnalysis.values()].sort((a, b) => (a.analysisDate ?? '').localeCompare(b.analysisDate ?? ''))
     res.json(series.map((lab) => {
-      const quality = assessStorage(oilFamilyOf(lab.productName), lab.parameters, lab.analysisDate, site.timezone)
+      const quality = assessStorage(oilFamilyOf(lab.productName), lab.parameters, lab.analysisDate, site.timezone, lab.judged)
       return {
         snapshotOn: lab.snapshotOn,
         analysisDate: lab.analysisDate,
