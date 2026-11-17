@@ -28,7 +28,7 @@ const ADVISORY_LOCK_KEY = 930932
  * A session lock must be taken and released on the same connection, so it gets its own client.
  * @returns {Promise<import('pg').PoolClient | null>} the client holding the lock, or null when it is taken
  */
-async function acquireLock(pool) {
+export async function acquireLock(pool) {
   const client = await pool.connect()
   const r = await client.query('SELECT pg_try_advisory_lock($1) AS ok', [ADVISORY_LOCK_KEY])
   if (r.rows[0]?.ok) return client
@@ -36,7 +36,7 @@ async function acquireLock(pool) {
   return null
 }
 
-async function releaseLock(client) {
+export async function releaseLock(client) {
   await client.query('SELECT pg_advisory_unlock($1)', [ADVISORY_LOCK_KEY]).catch(() => {})
   client.release()
 }

@@ -31,8 +31,11 @@ export function CommodityStock({
   const rows = commodityStock(tanks)
   const [openCode, setOpenCode] = useState<StockGroup | null>(null)
   // Only a gauge reading taken for today is live. The newest of them says how fresh the screen is.
-  const readings = tanks.filter((tank) => tank.readingKind === 'live' && tank.readingAt).map((tank) => tank.readingAt as string).sort()
+  const live = tanks.filter((tank) => tank.readingKind === 'live' && tank.readingAt)
+  const readings = live.map((tank) => tank.readingAt as string).sort()
   const liveAt = readings.at(-1) ?? null
+  // The server knows the site's round times; it marks a reading old when the last round's poll was missed.
+  const liveStale = live.length > 0 && live.every((tank) => tank.stale === true)
   const sourcesOf = (code: StockGroup): TrendTank[] => commoditySources(tanks, code).map((tank) => ({
     tankId: tank.tankId,
     quantityKg: tank.quantityKg,
@@ -45,7 +48,7 @@ export function CommodityStock({
     <section className="commodity-stock" aria-label={t.commodityStock}>
       <h2 className="card__title">
         {t.commodityStock}
-        <LiveBadge readingAt={liveAt} />
+        <LiveBadge readingAt={liveAt} stale={liveStale} />
       </h2>
       <ul className="commodity-grid">
         {rows.map((row) => {

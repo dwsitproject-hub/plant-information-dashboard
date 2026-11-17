@@ -3,7 +3,7 @@
  * Live Ops shows this for today and the daily rounds for earlier days, so a site shows data as soon as
  * it is polled and does not wait for a round time.
  */
-import { hasEvidence, roundStatus, roundValues } from './rounds.js'
+import { addDays, hasEvidence, loadRoundSettings, localDate, roundSlots, roundStatus, roundValues } from './rounds.js'
 
 const num = (value) => {
   if (value == null || value === '') return null
@@ -33,7 +33,32 @@ export async function loadGaugedTanks(db, siteId) {
      ORDER BY t.sort_order, t.code`,
     [siteId],
   )
-  return withReferenceDensity(result.rows)
+  const rows = withReferenceDensity(result.rows)
+  const before = await readingDueSince(db, siteId)
+  for (const row of rows) row.stale_before = before
+  return rows
+}
+
+/** Minutes a scheduled poll gets after a round time before a reading from before it counts as old. */
+export const ROUND_GRACE_MINUTES = 30
+
+/**
+ * The poller reads a site at its round times, so a reading is old when it was fetched before the last
+ * round that should have been taken: that round's poll did not get through. Null when no round has passed.
+ */
+export function lastRoundDue(timeZone, roundTimes, now = new Date(), graceMinutes = ROUND_GRACE_MINUTES) {
+  const cutoff = new Date(now.getTime() - graceMinutes * 60_000)
+  const today = localDate(cutoff, timeZone)
+  const slots = roundSlots([addDays(today, -1), today], roundTimes, timeZone, cutoff)
+  return slots.length ? slots[slots.length - 1].target : null
+}
+
+async function readingDueSince(db, siteId) {
+  const site = await db.query('SELECT timezone FROM sites WHERE id = $1', [siteId])
+  const timeZone = site.rows[0]?.timezone
+  if (!timeZone) return null
+  const { roundTimes } = await loadRoundSettings(db, siteId)
+  return lastRoundDue(timeZone, roundTimes)
 }
 
 /**
@@ -66,20 +91,22 @@ export function newestReading(rows) {
   return times.length ? new Date(Math.max(...times)) : null
 }
 
-/** Minutes after which a gauge reading is flagged as old (TANK_GAUGING_STALE_MINUTES, default 120). */
+/** Without round times to go by, minutes after which a reading is old (TANK_GAUGING_STALE_MINUTES, default 120). */
 export function staleAfterMinutes(env = process.env) {
   const n = Number(env.TANK_GAUGING_STALE_MINUTES)
   return Number.isFinite(n) && n > 0 ? n : 120
 }
 
 /**
- * A reading is old when it was fetched long ago, for example because the poller stopped.
+ * A reading is old when the poll of the last round time did not get through (`stale_before`, set by
+ * loadGaugedTanks), or, without round times to go by, when it was fetched long ago.
  * The gauge's own timestamp is not used: it may be the time a value last changed, which is old for
  * a tank that is simply standing still, and plant gauge clocks are not always set.
  */
 export function isStale(row, now = new Date(), minutes = staleAfterMinutes()) {
   const fetched = row.fetched_at ? new Date(row.fetched_at).getTime() : NaN
   if (!Number.isFinite(fetched)) return true
+  if (row.stale_before) return fetched < new Date(row.stale_before).getTime()
   return now.getTime() - fetched > minutes * 60_000
 }
 
@@ -115,7 +142,7 @@ export function gaugeMeta(row, kind, readingAt) {
     stockGroup: row.stock_group ?? null,
     readingKind: kind,
     readingAt: readingAt ? new Date(readingAt).toISOString() : null,
-    // A live reading fetched longer ago than TANK_GAUGING_STALE_MINUTES: the poller may have stopped.
+    // A live reading from before the last round time: that round's poll did not get through.
     stale: kind === 'live' && isStale(row),
     capacityLitre: num(row.max_capacity_litre),
     tankState: row.tank_state ?? null,

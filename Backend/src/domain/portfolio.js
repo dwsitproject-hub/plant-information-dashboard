@@ -146,7 +146,11 @@ export function summariseSite(site, tanks, context) {
   const ageMinutes = context.live && newest ? Math.round((now.getTime() - newest.getTime()) / 60000) : null
   const ageDays =
     !context.live && context.day ? Math.floor((now.getTime() - new Date(`${context.day}T12:00:00Z`).getTime()) / 86400000) : null
-  const stale = context.live ? newest == null || ageMinutes > LIVE_STALE_MINUTES : ageDays == null || ageDays >= ROUNDS_STALE_DAYS
+  // A gauged site is read at its round times, so its tanks say themselves whether the last round's poll
+  // got through. Anything else live falls back to the age of the newest reading.
+  const gauged = used.filter((tank) => tank.readingKind === 'live' && typeof tank.stale === 'boolean')
+  const liveStale = newest == null || (gauged.length > 0 ? gauged.every((tank) => tank.stale) : ageMinutes > LIVE_STALE_MINUTES)
+  const stale = context.live ? liveStale : ageDays == null || ageDays >= ROUNDS_STALE_DAYS
 
   const change = context.previous ? sameTankDelta(used, context.previous) : null
 

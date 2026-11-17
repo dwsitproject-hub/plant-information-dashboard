@@ -1,10 +1,10 @@
 /**
  * Turn gauge readings into daily rounds in soundings, at the same times a logsheet round is taken.
  * The existing Live Ops, history and charts read soundings, so a gauged site shows up there with
- * no change to those screens.
+ * no change to those screens. Rounds are never purged, so they are the site's history.
  *
- * A round is written once, from the sample nearest to its time, when that time has passed.
- * A day or two of missed rounds are filled in on the next run.
+ * A round is written once, from the sample nearest to its time, when that time has passed. A round no
+ * sample is close enough for is taken from the gauge's own archive instead (archive.js).
  */
 
 export const DEFAULT_ROUND_TIMES = '06:30,14:30'
@@ -49,7 +49,7 @@ export function localDate(instant, timeZone) {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant)
 }
 
-function addDays(date, days) {
+export function addDays(date, days) {
   const d = new Date(`${date}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
@@ -90,6 +90,53 @@ export async function saveRoundSettings(db, siteId, { roundTimes, toleranceMin }
 
 const BAD_STATUS = new Set(['NODATA', 'FAIL', 'INVALIDDATA'])
 
+/** Whether the unit marks a value as no data, failed or invalid. It still sends a number for it. */
+export function isBadStatus(status) {
+  return BAD_STATUS.has(String(status || '').toUpperCase().replace(/\s+/g, ''))
+}
+
+/**
+ * The rounds of the given days whose time has passed, oldest first.
+ * @returns {Array<{ date: string, roundIndex: number, time: string, target: Date }>}
+ */
+export function roundSlots(dates, roundTimes, timeZone, now = new Date()) {
+  const slots = []
+  for (const date of dates) {
+    roundTimes.forEach((time, index) => {
+      const target = zonedTimeToUtc(date, time, timeZone)
+      if (target <= now) slots.push({ date, roundIndex: index + 1, time, target })
+    })
+  }
+  return slots.sort((a, b) => a.target - b.target)
+}
+
+/** Save one round. An existing round for the tank, day and round number is kept. Returns 1 when saved. */
+export async function insertRound(db, { siteId, plantId, tankId, date, roundIndex, productName, values, sampledAt }) {
+  const result = await db.query(
+    `INSERT INTO soundings (
+       site_id, plant_id, tank_id, submission_id, recorded_on, round_index, product_name, level_m,
+       temperature_c, operational_status, source, mass_kg, density_kg_m3, volume_litre, sampled_at
+     ) VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,'atg',$10,$11,$12,$13)
+     ON CONFLICT (tank_id, recorded_on, round_index) DO NOTHING`,
+    [
+      siteId,
+      plantId,
+      tankId,
+      date,
+      roundIndex,
+      productName ?? '',
+      values.levelMm == null ? null : values.levelMm / 1000,
+      values.temperatureC,
+      roundStatus(values),
+      values.massTon == null ? null : values.massTon * 1000,
+      values.densityKgM3,
+      values.volumeLitre,
+      sampledAt,
+    ],
+  )
+  return result.rowCount
+}
+
 function parameterOf(sample, id) {
   const list = sample.raw_payload?.parameterlist
   return Array.isArray(list) ? list.find((p) => Number(p.id) === id) ?? null : null
@@ -110,7 +157,7 @@ function number(value) {
 export function roundValues(sample) {
   const pick = (id, column) => {
     const parameter = parameterOf(sample, id)
-    if (parameter && BAD_STATUS.has(String(parameter.statusString || '').toUpperCase().replace(/\s+/g, ''))) return null
+    if (parameter && isBadStatus(parameter.statusString)) return null
     return number(sample[column])
   }
   let massTon = pick(730, 'total_mass')
@@ -139,10 +186,11 @@ export function roundStatus(values) {
 }
 
 /**
- * Write the rounds that are due and not yet written, for yesterday and today in the site's timezone.
- * @returns {Promise<{ written: number, missing: number, due: number }>}
+ * Write the rounds that are due and not yet written, from stored samples within the tolerance.
+ * By default it looks at yesterday and today in the site's timezone; `opts.slots` narrows it to given rounds.
+ * @returns {Promise<{ written: number, missing: number, due: number, missingTanks: Array<{ tankId: string, plantId: string, slot: object }> }>}
  */
-export async function writeRounds(db, siteId, now = new Date()) {
+export async function writeRounds(db, siteId, now = new Date(), opts = {}) {
   const site = await db.query('SELECT timezone FROM sites WHERE id = $1', [siteId])
   if (!site.rows[0]) throw new Error(`Site ${siteId} does not exist`)
   const timeZone = site.rows[0].timezone
@@ -153,27 +201,22 @@ export async function writeRounds(db, siteId, now = new Date()) {
      WHERE p.site_id = $1 AND t.source = 'atg'`,
     [siteId],
   )
-  if (tanks.rows.length === 0) return { written: 0, missing: 0, due: 0 }
+  const none = { written: 0, missing: 0, due: 0, missingTanks: [] }
+  if (tanks.rows.length === 0) return none
 
   const today = localDate(now, timeZone)
-  const dates = [addDays(today, -1), today]
-  const due = []
-  for (const date of dates) {
-    roundTimes.forEach((time, index) => {
-      const target = zonedTimeToUtc(date, time, timeZone)
-      if (target <= now) due.push({ date, roundIndex: index + 1, target })
-    })
-  }
-  if (due.length === 0) return { written: 0, missing: 0, due: 0 }
+  const due = opts.slots ?? roundSlots([addDays(today, -1), today], roundTimes, timeZone, now)
+  if (due.length === 0) return none
+  const dates = [...new Set(due.map((slot) => slot.date))]
 
   const have = await db.query(
     `SELECT tank_id, recorded_on, round_index FROM soundings WHERE tank_id = ANY($1::text[]) AND recorded_on = ANY($2::date[])`,
     [tanks.rows.map((t) => t.id), dates],
   )
-  const exists = new Set(have.rows.map((r) => `${r.tank_id}|${r.recorded_on}|${r.round_index}`))
+  const exists = new Set(have.rows.map((r) => `${r.tank_id}|${dayText(r.recorded_on)}|${r.round_index}`))
 
   let written = 0
-  let missing = 0
+  const missingTanks = []
   for (const tank of tanks.rows) {
     for (const slot of due) {
       if (exists.has(`${tank.id}|${slot.date}|${slot.roundIndex}`)) continue
@@ -186,33 +229,26 @@ export async function writeRounds(db, siteId, now = new Date()) {
       const sample = pick.rows[0]
       const values = sample ? roundValues(sample) : null
       if (!values || !hasEvidence(values)) {
-        missing += 1
+        missingTanks.push({ tankId: tank.id, plantId: tank.plant_id, slot })
         continue
       }
-      const result = await db.query(
-        `INSERT INTO soundings (
-           site_id, plant_id, tank_id, submission_id, recorded_on, round_index, product_name, level_m,
-           temperature_c, operational_status, source, mass_kg, density_kg_m3, volume_litre, sampled_at
-         ) VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,'atg',$10,$11,$12,$13)
-         ON CONFLICT (tank_id, recorded_on, round_index) DO NOTHING`,
-        [
-          siteId,
-          tank.plant_id,
-          tank.id,
-          slot.date,
-          slot.roundIndex,
-          sample.product_name ?? '',
-          values.levelMm == null ? null : values.levelMm / 1000,
-          values.temperatureC,
-          roundStatus(values),
-          values.massTon == null ? null : values.massTon * 1000,
-          values.densityKgM3,
-          values.volumeLitre,
-          sample.sampled_at,
-        ],
-      )
-      written += result.rowCount
+      written += await insertRound(db, {
+        siteId,
+        plantId: tank.plant_id,
+        tankId: tank.id,
+        date: slot.date,
+        roundIndex: slot.roundIndex,
+        productName: sample.product_name,
+        values,
+        sampledAt: sample.sampled_at,
+      })
     }
   }
-  return { written, missing, due: due.length }
+  return { written, missing: missingTanks.length, due: due.length, missingTanks }
+}
+
+/** A date column as YYYY-MM-DD, whether the driver gives text or a Date. */
+export function dayText(value) {
+  if (value instanceof Date) return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  return String(value ?? '').slice(0, 10)
 }
