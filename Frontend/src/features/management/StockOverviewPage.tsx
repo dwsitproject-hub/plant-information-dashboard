@@ -27,6 +27,7 @@ import { ClassAtSiteCard, CommodityCard, KpiCard, SiteStockCard } from './Cards.
 import { CardActionsContext, HoverTarget } from './HoverCard.tsx'
 import { MixStrip } from './MixTip.tsx'
 import { ClassDialog } from './ClassDialog.tsx'
+import { SiteMovement } from './SiteMovement.tsx'
 import { ViewOptionsContext, useViewOptions } from './viewOptions.ts'
 import { Count, stagger } from './motion.tsx'
 import { Change, ClassDot, DataBadge, DataStamp, FillText, Kpi, Legend, Skeleton, StatusChip, StockBar, fill, useClassLabel } from './parts.tsx'
@@ -241,6 +242,9 @@ export function StockOverviewPage() {
       <div key={levelKey} className={`mg-level mg-level--${level.direction}`}>
         {body}
       </div>
+
+      {/* The movement of every site over the last month, on the overview itself (not when drilled in). */}
+      {data && sites.length > 0 && !nav.status && !nav.site && !nav.cls ? <SiteMovement /> : null}
 
       {data ? <p className="mg-foot">{t.mgCapacityNote}</p> : null}
 

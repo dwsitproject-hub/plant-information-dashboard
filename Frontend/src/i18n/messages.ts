@@ -390,6 +390,23 @@ export interface Messages {
   overMax: string
   watch: string
   noSpec: string
+  qualityPeriodAverage: string
+  qualityDayAverage: string
+  stockMovement: string
+  stockMovementBlurb: string
+  stockMovementSitesBlurb: string
+  movementAll: string
+  movementStart: string
+  movementLatest: string
+  movementChange: string
+  movementHigh: string
+  movementLow: string
+  movementTrend: string
+  movementNoData: string
+  movementShowOnChart: string
+  movementTopMoves: string
+  movementOnDay: string
+  movementGapNote: string
   qualityAverageOf: string
   qualityLimit: string
   qualityOutTanks: string
@@ -1250,6 +1267,23 @@ export const MESSAGES: Record<Locale, Messages> = {
     overMax: 'Over max',
     watch: 'Watch',
     noSpec: 'No spec',
+    qualityPeriodAverage: 'Average quality in period',
+    qualityDayAverage: 'Average quality that day',
+    stockMovement: 'Commodity Stock Movement',
+    stockMovementBlurb: 'Stock over the last 30 days. Change is the latest reading against the first one in the period.',
+    stockMovementSitesBlurb: 'Each site\'s total stock over the last 30 days. Change is the latest reading against the first one in the period.',
+    movementAll: 'All commodities',
+    movementStart: 'First',
+    movementLatest: 'Latest',
+    movementChange: 'Change',
+    movementHigh: 'High',
+    movementLow: 'Low',
+    movementTrend: 'Trend',
+    movementNoData: 'No stock readings in the last 30 days.',
+    movementShowOnChart: 'Show {name} on the chart',
+    movementTopMoves: 'Largest moves',
+    movementOnDay: '{value} on {day}',
+    movementGapNote: 'Days without a reading are left out of the line, not counted as zero.',
     qualityAverageOf: 'Average of {n} tanks',
     qualityLimit: 'Limit {range}',
     qualityOutTanks: '{n} of {total} tanks out of spec',
@@ -2108,6 +2142,23 @@ export const MESSAGES: Record<Locale, Messages> = {
     overMax: 'Melewati batas',
     watch: 'Pantau',
     noSpec: 'Tanpa spek',
+    qualityPeriodAverage: 'Rata-rata mutu dalam periode',
+    qualityDayAverage: 'Rata-rata mutu hari itu',
+    stockMovement: 'Pergerakan Stok Komoditas',
+    stockMovementBlurb: 'Stok 30 hari terakhir. Perubahan adalah pembacaan terakhir dibanding pembacaan pertama dalam periode.',
+    stockMovementSitesBlurb: 'Total stok setiap site 30 hari terakhir. Perubahan adalah pembacaan terakhir dibanding pembacaan pertama dalam periode.',
+    movementAll: 'Semua komoditas',
+    movementStart: 'Awal',
+    movementLatest: 'Terakhir',
+    movementChange: 'Perubahan',
+    movementHigh: 'Tertinggi',
+    movementLow: 'Terendah',
+    movementTrend: 'Tren',
+    movementNoData: 'Tidak ada pembacaan stok dalam 30 hari terakhir.',
+    movementShowOnChart: 'Tampilkan {name} di grafik',
+    movementTopMoves: 'Perubahan terbesar',
+    movementOnDay: '{value} pada {day}',
+    movementGapNote: 'Hari tanpa pembacaan dilewati pada garis, tidak dihitung nol.',
     qualityAverageOf: 'Rata-rata {n} tangki',
     qualityLimit: 'Batas {range}',
     qualityOutTanks: '{n} dari {total} tangki di luar spek',

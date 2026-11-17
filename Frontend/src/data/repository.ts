@@ -9,6 +9,12 @@ import type {
   TankLive,
 } from '../domain/types.ts'
 
+/** One tank's readings over time, keyed by its tank code. */
+export interface TankHistory {
+  tankId: string
+  points: SoundingPoint[]
+}
+
 /**
  * The only door between screens and data.
  *
@@ -35,6 +41,8 @@ export interface OperationsRepository {
   getLiveLogistics(): Promise<LogisticsVehicle[]>
   getSoundingHistory(tankId: string): Promise<SoundingPoint[]>
   getLabHistory(tankId: string): Promise<LabHistoryPoint[]>
+  /** Every tank's daily readings between two days (inclusive), for the stock movement view. */
+  getStockHistory(from: string, to: string): Promise<TankHistory[]>
   getMovementSummary(): Promise<MovementTotal[]>
   getAnalyticsSummary(tankId: string | null): Promise<AnalyticsSummary>
 }

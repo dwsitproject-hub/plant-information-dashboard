@@ -788,3 +788,14 @@ div.mg-row--sub { cursor: default; }
   font-size: 10px;
   padding: 0 6px;
 }
+
+/* Commodity Stock Movement: each site's total stock over the last month */
+.mg-movement { margin-top: var(--spacing-3); }
+.mg-movement__blurb { margin: 0 0 8px; font-size: var(--font-size-sm); }
+.mg-movement__chart { margin-bottom: var(--spacing-2); }
+.mg-movement__note { margin: 2px 0 0; font-size: 11px; }
+.mg-movement__site { display: inline-flex; align-items: center; gap: 2px; font-weight: var(--font-weight-semibold); }
+.mg-movement__moves { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+.mg-movement__move { display: inline-flex; align-items: center; }
+.mg-movement__change--up { color: #0f7a55; }
+.mg-movement__change--down { color: var(--color-brand-red-deep); }

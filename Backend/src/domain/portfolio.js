@@ -226,3 +226,48 @@ export function summarisePortfolio(sites, nearFull = NEAR_FULL) {
     attention,
   }
 }
+
+/** Every day from `from` to `to`, inclusive, as YYYY-MM-DD. */
+export function daysBetween(from, to) {
+  const days = []
+  const cursor = new Date(`${from}T12:00:00Z`)
+  const end = new Date(`${to}T12:00:00Z`)
+  while (cursor <= end && days.length < 400) {
+    days.push(cursor.toISOString().slice(0, 10))
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return days
+}
+
+/**
+ * Daily stock totals for a site's tanks: the whole site, and each group given by `groupOf(tankId)`.
+ * A tank counts with its last reading of the day. A day with no reading from any tank stays null, not
+ * zero, so a chart shows a gap instead of a drop to empty.
+ *
+ * @param {Array<{ tankId: string, points: Array<{ recordedOn: string, quantityKg: number|null }> }>} histories
+ */
+export function movementSeries(histories, days, groupOf = () => null) {
+  const lastByDay = histories.map((history) => {
+    const byDay = new Map()
+    for (const point of history.points) {
+      if (point.recordedOn && point.quantityKg != null) byDay.set(point.recordedOn, point.quantityKg)
+    }
+    return { tankId: history.tankId, group: groupOf(history.tankId), byDay }
+  })
+  const groups = [...new Set(lastByDay.map((tank) => tank.group).filter(Boolean))]
+  const seriesFor = (tanks) => days.map((day) => {
+    let total = 0
+    let tanksCounted = 0
+    for (const tank of tanks) {
+      const value = tank.byDay.get(day)
+      if (value == null) continue
+      total += value
+      tanksCounted += 1
+    }
+    return { day, quantityKg: tanksCounted > 0 ? total : null, tanks: tanksCounted }
+  })
+  return {
+    total: seriesFor(lastByDay),
+    groups: groups.map((code) => ({ code, series: seriesFor(lastByDay.filter((tank) => tank.group === code)) })),
+  }
+}

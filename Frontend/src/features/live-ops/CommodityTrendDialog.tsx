@@ -2,8 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useRepository } from '../../data/OperationsContext.tsx'
 import { formatDay, formatMeasure, tankLabel } from '../../domain/format.ts'
-import { qualityFor, type QualitySample } from '../../domain/qualityView.ts'
-import type { SoundingPoint, TankLive } from '../../domain/types.ts'
+import {
+  breachesOf,
+  codesFor,
+  dailyQuality,
+  periodQuality,
+  previousDay,
+  qualityFor,
+  valuesAsOf,
+  type LabPointLike,
+  type ParamView,
+  type QualitySample,
+} from '../../domain/qualityView.ts'
+import type { LabHistoryPoint, SoundingPoint, TankLive } from '../../domain/types.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import { DateRangeFilter } from '../daily-production/DateRangeFilter.tsx'
 import { addDays } from '../usePeriodRange.ts'
@@ -31,6 +42,7 @@ export function CommodityTrendDialog({
   hasLabData = true,
   showProduct = false,
   loadHistory,
+  loadLabs,
   onClose,
 }: {
   /** What is open; null closes the dialog. */
@@ -40,6 +52,8 @@ export function CommodityTrendDialog({
   sources: TrendTank[]
   /** Where each tank's daily readings come from. Defaults to the active site's repository. */
   loadHistory?: (tankId: string) => Promise<SoundingPoint[]>
+  /** Where each tank's lab results come from. Defaults to the active site's repository. */
+  loadLabs?: (tankId: string) => Promise<LabHistoryPoint[]>
   /** Show each tank's product, for a dialog that covers several products. */
   showProduct?: boolean
   /** Dashboard day. The dialog range defaults to the 30 days ending here. */
@@ -58,9 +72,12 @@ export function CommodityTrendDialog({
   const [range, setRange] = useState(() => defaultRange(day))
   const { start, end } = range
   const loadRef = useRef(loadHistory)
+  const labsRef = useRef(loadLabs)
   useEffect(() => {
     loadRef.current = loadHistory
-  }, [loadHistory])
+    labsRef.current = loadLabs
+  }, [loadHistory, loadLabs])
+  const [labs, setLabs] = useState<Map<string, LabPointLike[]>>(new Map())
   const sourceKey = sources.map((tank) => tank.tankId).join(',')
   const series = useMemo(() => {
     const ids = new Set(sourceKey ? sourceKey.split(',') : [])
@@ -79,6 +96,7 @@ export function CommodityTrendDialog({
   useEffect(() => {
     setSelectedDay(null)
     setHistories([])
+    setLabs(new Map())
     if (code) setRange(defaultRange(day))
   }, [code, day])
 
@@ -106,8 +124,55 @@ export function CommodityTrendDialog({
     }
   }, [repository, code, sourceKey])
 
+  // Lab results per tank, for the product's average quality on each day. A tank whose results fail to
+  // load only drops out of the averages; the stock figures still show.
+  useEffect(() => {
+    if (!code || !hasLabData) return
+    const ids = sourceKey ? sourceKey.split(',') : []
+    let active = true
+    const load = labsRef.current ?? ((tankId: string) => repository.getLabHistory(tankId))
+    Promise.all(ids.map(async (tankId) => [tankId, await load(tankId).catch(() => [])] as const)).then((rows) => {
+      if (active) setLabs(new Map(rows))
+    })
+    return () => {
+      active = false
+    }
+  }, [repository, code, sourceKey, hasLabData])
+
   const stats = seriesStats(series)
   const historyByTank = useMemo(() => new Map(histories.map((history) => [history.tankId, history.points])), [histories])
+
+  // The product's parameters and limits (Master > Commodities), then its average quality per day over the
+  // tanks holding stock that day, and over the whole period.
+  const codes = codesFor(sources.map((tank) => tank.sample))
+  const limits = sources.flatMap((tank) => tank.sample.limits)
+  const daily = useMemo(() => {
+    if (labs.size === 0) return new Map<string, ParamView[]>()
+    const tanks = sources.map((tank) => ({ tankId: tank.tankId, limits: tank.sample.limits, labs: labs.get(tank.tankId) ?? [] }))
+    const holds = (tankId: string, on: string) => {
+      const reading = commodityDayReading(tankId, historyByTank.get(tankId) ?? [], on)
+      return reading?.quantityKg != null && reading.quantityKg > 0
+    }
+    return dailyQuality(tanks, series.map((point) => point.day), codes, holds)
+    // codes and sources follow sourceKey and the labs loaded for them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labs, series, historyByTank, sourceKey])
+  const period = periodQuality(daily, codes, limits)
+  const hasPeriodQuality = period.some((view) => view.value != null)
+
+  /** A tank's quality on the chosen day, from its lab results; today's result until they load. */
+  const sampleOn = (tank: TrendTank, on: string | null): QualitySample => {
+    const tankLabs = labs.get(tank.tankId)
+    if (!on || !tankLabs) return tank.sample
+    const now = valuesAsOf(tankLabs, on) ?? []
+    return {
+      tankId: tank.tankId,
+      parameters: now,
+      limits: tank.sample.limits,
+      breaches: breachesOf(now, tank.sample.limits),
+      before: valuesAsOf(tankLabs, previousDay(on)),
+    }
+  }
   const soundingDays = useMemo(() => [...new Set(histories.flatMap((history) => history.points.flatMap((point) => (point.recordedOn ? [point.recordedOn] : []))))], [histories])
 
   useEffect(() => {
@@ -154,12 +219,19 @@ export function CommodityTrendDialog({
               <dd>{stats ? `${mass.amount(stats.min)} ${mass.symbol}` : t.unavailable}</dd>
             </div>
           </dl>
+          {hasLabData && hasPeriodQuality ? (
+            <div className="qty-quality" title={t.qualityHint}>
+              <span className="qty-quality__label">{t.qualityPeriodAverage}</span>
+              <QualityChips views={period} tanks={sources.length} />
+            </div>
+          ) : null}
           {stats
             ? (
               <CommodityChart
                 series={series}
                 selectedDay={selectedDay}
                 onSelect={setSelectedDay}
+                quality={daily}
               />
             )
             : <p className="empty">{t.unavailable}</p>}
@@ -192,7 +264,8 @@ export function CommodityTrendDialog({
                     {readings.map(({ tank, reading }) => {
                       const overfilled = isOverfilled(reading?.levelRatio)
                       const hot = isTempAnomaly(reading?.temperatureC, averageTemperature)
-                      const quality = qualityFor([tank.sample])
+                      const sample = sampleOn(tank, selectedDay)
+                      const quality = qualityFor([sample])
                       const outOfSpec = quality.some((view) => view.status === 'reject')
                       const status = reading?.operationalStatus || tank.operationalStatus || t.unavailable
                       return (
@@ -209,7 +282,7 @@ export function CommodityTrendDialog({
                           </td>
                           {hasLabData && (
                             <td className="tank-quality-cell">
-                              {tank.sample.parameters.length === 0
+                              {sample.parameters.length === 0
                                 ? <span className="um-muted" title={t.labNoResult}>{t.unavailable}</span>
                                 : <QualityChips views={quality} />}
                             </td>
@@ -261,10 +334,13 @@ function CommodityChart({
   series,
   selectedDay,
   onSelect,
+  quality,
 }: {
   series: HistoryDay[]
   selectedDay: string | null
   onSelect: (day: string) => void
+  /** The product's average quality on each day, shown in the tooltip. */
+  quality: Map<string, ParamView[]>
 }) {
   const { locale } = useLocale()
   const mass = useMass()
@@ -287,7 +363,7 @@ function CommodityChart({
             height={24}
           />
           <YAxis tick={{ fontSize: 11 }} width={72} tickFormatter={(value: number) => mass.axis(value)} />
-          <Tooltip content={<CommodityTooltip locale={locale} />} />
+          <Tooltip content={<CommodityTooltip locale={locale} quality={quality} />} />
           {selectedDay && (
             <ReferenceLine
               x={selectedDay}
@@ -374,11 +450,13 @@ function CommodityTooltip({
   payload,
   label,
   locale,
+  quality,
 }: {
   active?: boolean
   payload?: Array<{ payload?: HistoryDay }>
   label?: string | number
   locale: 'en' | 'id'
+  quality?: Map<string, ParamView[]>
 }) {
   const { t } = useLocale()
   const mass = useMass()
@@ -388,6 +466,12 @@ function CommodityTooltip({
     <div className="chart-tip">
       <strong>{formatDay(label == null ? null : String(label), locale)}</strong>
       <p>{t.quantity}: {mass.amount(row.value)} {mass.symbol}</p>
+      {quality?.get(row.day)?.some((view) => view.value != null) ? (
+        <div className="chart-tip__quality">
+          <small>{t.qualityDayAverage}</small>
+          <QualityChips views={quality.get(row.day) ?? []} tanks={quality.get(row.day)?.[0]?.count ?? 1} />
+        </div>
+      ) : null}
     </div>
   )
 }

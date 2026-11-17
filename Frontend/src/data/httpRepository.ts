@@ -1,5 +1,5 @@
 import { notifySessionExpired } from './api.ts'
-import type { OperationsRepository } from './repository.ts'
+import type { OperationsRepository, TankHistory } from './repository.ts'
 import type {
   AnalyticsSummary,
   LabHistoryPoint,
@@ -77,6 +77,12 @@ export class HttpOperationsRepository implements OperationsRepository {
   async getLabHistory(tankId: string) {
     const siteId = await this.siteId()
     return this.get<LabHistoryPoint[]>(`/sites/${siteId}/tanks/${encodeURIComponent(tankId)}/labs`)
+  }
+
+  async getStockHistory(from: string, to: string) {
+    const siteId = await this.siteId()
+    const query = new URLSearchParams({ from, to })
+    return this.get<TankHistory[]>(`/sites/${siteId}/stock-history?${query.toString()}`)
   }
 
   async getMovementSummary() {

@@ -224,3 +224,110 @@ export function sampleOf(
     before: before ?? null,
   }
 }
+
+/* ------------------------------------------------------------------ quality over time */
+
+export interface LabPointLike {
+  analysisDate: string | null
+  snapshotOn: string | null
+  parameters: CodeValue[]
+}
+
+/** The calendar day before an ISO day. */
+export function previousDay(day: string): string {
+  const date = new Date(`${day}T12:00:00Z`)
+  date.setUTCDate(date.getUTCDate() - 1)
+  return date.toISOString().slice(0, 10)
+}
+
+/** A tank's lab values on a day: its latest result analysed on or before that day. */
+export function valuesAsOf(points: LabPointLike[], day: string): CodeValue[] | null {
+  let found: LabPointLike | null = null
+  let foundDay = ''
+  for (const point of points) {
+    const when = point.analysisDate ?? point.snapshotOn
+    if (!when || when > day) continue
+    if (!found || when >= foundDay) {
+      found = point
+      foundDay = when
+    }
+  }
+  return found ? found.parameters : null
+}
+
+/** The limits a set of values breaks, in the shape a sample carries. */
+export function breachesOf(values: CodeValue[], limits: SpecLimit[]): SpecHit[] {
+  const hits: SpecHit[] = []
+  for (const item of values) {
+    const own = limits.filter((limit) => limit.code === item.code)
+    const judged = judge(item.value, own)
+    if (!judged.status || item.value == null) continue
+    const broken = own.find((limit) => limit.severity === judged.status && limit.limit != null && (limit.bound === 'max' ? (item.value as number) > limit.limit : (item.value as number) < limit.limit))
+    if (broken) hits.push({ code: item.code, bound: broken.bound, limit: broken.limit, value: item.value, severity: broken.severity })
+  }
+  return hits
+}
+
+export interface TankLabs {
+  tankId: string
+  limits: SpecLimit[]
+  labs: LabPointLike[]
+}
+
+/**
+ * The average quality of a product on each day: every tank's result as of that day, averaged per
+ * parameter, judged against the product's limits, and compared with the day before.
+ * `holds(tankId, day)` says whether a tank held stock that day; tanks that did not are left out.
+ */
+export function dailyQuality(
+  tanks: TankLabs[],
+  days: string[],
+  codes: string[],
+  holds: (tankId: string, day: string) => boolean = () => true,
+): Map<string, ParamView[]> {
+  const result = new Map<string, ParamView[]>()
+  for (const day of days) {
+    const samples: QualitySample[] = []
+    for (const tank of tanks) {
+      if (!holds(tank.tankId, day)) continue
+      const now = valuesAsOf(tank.labs, day)
+      if (!now) continue
+      samples.push({
+        tankId: tank.tankId,
+        parameters: now,
+        limits: tank.limits,
+        breaches: breachesOf(now, tank.limits),
+        before: valuesAsOf(tank.labs, previousDay(day)),
+      })
+    }
+    if (samples.length > 0) result.set(day, qualityFor(samples, codes))
+  }
+  return result
+}
+
+/** Each parameter's average over the days given, judged against the limits. */
+export function periodQuality(daily: Map<string, ParamView[]>, codes: string[], limits: SpecLimit[]): ParamView[] {
+  return codes.map((code) => {
+    const display = displayOf(code)
+    const values = [...daily.values()]
+      .map((views) => views.find((view) => view.code === code)?.value ?? null)
+      .filter((value): value is number => value != null)
+    const value = values.length ? values.reduce((sum, item) => sum + item, 0) / values.length : null
+    const own = limits.filter((limit) => limit.code === code)
+    const judged = judge(value, own)
+    return {
+      code,
+      label: display.label,
+      unit: display.unit,
+      digits: display.digits,
+      value,
+      count: values.length,
+      status: judged.status,
+      limitText: judged.limitText,
+      range: rangeText(own, code),
+      rejectTanks: 0,
+      watchTanks: 0,
+      change: null,
+    }
+  })
+}

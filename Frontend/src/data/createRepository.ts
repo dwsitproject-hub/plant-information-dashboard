@@ -37,6 +37,10 @@ class LazyLocalRepository implements OperationsRepository {
     return (await this.repo()).getLabHistory(tankId)
   }
 
+  async getStockHistory(from: string, to: string) {
+    return (await this.repo()).getStockHistory(from, to)
+  }
+
   async getMovementSummary() {
     return (await this.repo()).getMovementSummary()
   }
