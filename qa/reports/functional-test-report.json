@@ -1,0 +1,1853 @@
+{
+  "title": "Functional Test Report",
+  "subtitle": "Plant Information Dashboard",
+  "orientation": "landscape",
+  "footer": "PID · Functional test",
+  "meta": [
+    [
+      "Application",
+      "Plant Information Dashboard (PID)"
+    ],
+    [
+      "Code tested",
+      "Branch sit. Before fixes: ed63d97. After fixes: 8aad28b (fixes) and 6d35510 (QA suites)"
+    ],
+    [
+      "Environment tested",
+      "Isolated local QA copy: API 127.0.0.1:3010, frontend localhost:5176, throwaway PostgreSQL 16 seeded with Bekasi data and a second test site"
+    ],
+    [
+      "Date",
+      "17 November 2026"
+    ],
+    [
+      "Prepared by",
+      "Claude Code (prod-readiness-checks), for the PID project team"
+    ],
+    [
+      "Overall result",
+      "Pass. API 132/132, UI 27/28 after fixes. 13 of 14 defects fixed; 1 Low open (F-11)."
+    ]
+  ],
+  "sections": [
+    {
+      "heading": "1. Summary",
+      "blocks": [
+        {
+          "p": "Every backend route group and every main page was tested with **positive** (the feature works) and **negative** (bad input, missing rights, another site, switched-off module, unknown ids, duplicates) scenarios. Defects found were fixed, then the suites were run again on the fixed code."
+        },
+        {
+          "table": {
+            "columns": [
+              [
+                "",
+                2
+              ],
+              [
+                "Scenarios",
+                1
+              ],
+              [
+                "Pass",
+                1
+              ],
+              [
+                "Fail",
+                1
+              ],
+              [
+                "Blocked",
+                1
+              ]
+            ],
+            "rows": [
+              [
+                "API, before fixes",
+                "131",
+                "116",
+                "15",
+                "0"
+              ],
+              [
+                "API, after fixes",
+                "132",
+                "132",
+                "0",
+                "0"
+              ],
+              [
+                "UI, before fixes",
+                "28",
+                "23",
+                "5",
+                "0"
+              ],
+              [
+                "UI, after fixes",
+                "28",
+                "27",
+                "1",
+                "0"
+              ]
+            ]
+          }
+        },
+        {
+          "p": "No Critical or High defects were found. **14 defects** (3 Medium, 11 Low) came from 20 failing scenarios; **13 are fixed** and verified. The one open item, F-11, is Low: the two stock pages agree on totals but classify an empty tank differently, which shifts that tank's capacity between commodity rows."
+        },
+        {
+          "note": "Go/no-go (functional): **Go.** F-11 does not block production; schedule it for the next release."
+        }
+      ]
+    },
+    {
+      "heading": "2. Approach",
+      "blocks": [
+        {
+          "bullets": [
+            "**Environment:** a local copy started from the repository: its own PostgreSQL container (migrated, seeded with the Bekasi logsheet, lab and stock data), the API and the frontend dev server. No shared server was written to.",
+            "**API scenarios:** `qa/functional/api-suite.mjs`, 132 scenarios, re-runnable and idempotent. It creates its own fixtures (company qa-ft-co, sites qa-ft-site and qa-ft-site2, qa-ft- users and roles) and writes `results.json`.",
+            "**UI scenarios:** 28 scenarios run in a browser against the frontend: sign-in, every main page, dialogs, validation, restricted users, navigation, console errors.",
+            "**Accounts:** the dev-only seed admin, plus a restricted user, a master-data editor and a delegated user-admin created by the suite.",
+            "**Out of scope:** real gauges and DataHub (only unreachable test addresses), load testing, browsers other than Chromium."
+          ]
+        },
+        {
+          "p": "Positive/negative split of the API scenarios: 60 positive, 72 negative."
+        }
+      ]
+    },
+    {
+      "heading": "3. Results by area (API, after fixes)",
+      "blocks": [
+        {
+          "p": "\"PASS (fixed)\" failed before the fixes and passes now. \"(new)\" was added with the fixes: FT-TG-15 checks that loopback and cloud-metadata gauge addresses are refused."
+        }
+      ]
+    },
+    {
+      "heading": "Auth & session",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-AUTH-01",
+                "Health endpoint answers",
+                "Positive",
+                "200 {ok:true}",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-02",
+                "Login with valid credentials sets an httpOnly session cookie and returns the session",
+                "Positive",
+                "200, Set-Cookie pid_session HttpOnly SameSite=Lax, body has id/username/sites/permissions, no password hash",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-03",
+                "Login is case-insensitive on the username",
+                "Positive",
+                "200",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-04",
+                "Login with the e-mail address instead of the username",
+                "Positive",
+                "200, username qa-ft-ops",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-05",
+                "Login with a wrong password",
+                "Negative",
+                "401 invalid_credentials, no cookie",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-06",
+                "Login for an unknown user",
+                "Negative",
+                "401 invalid_credentials (same answer as a wrong password)",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-07",
+                "Login with missing username or password",
+                "Negative",
+                "400 invalid_credentials for both",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-08",
+                "Login with a malformed JSON body",
+                "Negative",
+                "400 (client error), not a 500",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-AUTH-09",
+                "Login for a deactivated user",
+                "Negative",
+                "401",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-10",
+                "GET /auth/me returns the signed-in session",
+                "Positive",
+                "200 with sites bekasi + qa-ft-site and their modules",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-11",
+                "GET /auth/me without a session",
+                "Negative",
+                "401 unauthenticated",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-12",
+                "GET /auth/me with a tampered token",
+                "Negative",
+                "401",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-13",
+                "Logout clears the session cookie",
+                "Positive",
+                "204, Set-Cookie clears pid_session, /me then 401",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-14",
+                "A session ends when the user is deactivated",
+                "Negative",
+                "/me 401 right after deactivation",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-15",
+                "Login throttle locks an account after 10 failures, even for the right password",
+                "Negative",
+                "Failures 1-10 -> 401; 11th (correct password) -> 429 too_many_attempts; other accounts unaffected",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-16",
+                "Change password: missing, short, same and wrong current password",
+                "Negative",
+                "400 current_password_required, 400 new_password_required, 400 password_short, 400 same_password, 401 bad_current_password",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-17",
+                "Change password, then sign in with the new password only",
+                "Positive",
+                "204; old password 401; new password 200",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-18",
+                "SSO status endpoint",
+                "Positive",
+                "200 {oidcEnabled:boolean, legacyBridgeEnabled:boolean}",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-19",
+                "Hub bridge without a token redirects to the SSO error page",
+                "Negative",
+                "302 to /sso-error?…",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-20",
+                "Unknown API path",
+                "Negative",
+                "404",
+                "PASS"
+              ],
+              [
+                "FT-AUTH-21",
+                "Every protected route group refuses an anonymous caller",
+                "Negative",
+                "401 for each",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Users & roles",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-ROLE-01",
+                "List roles with counts",
+                "Positive",
+                "200, includes Administrator (system) and qa-ft-ops with viewCount 5",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-02",
+                "Permission catalogue lists every page key",
+                "Positive",
+                "200, 19 keys incl. management-stock, admin-datahub",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-03",
+                "Create a role; edit/delete imply view",
+                "Positive",
+                "201; qc = view+edit, utility = view+delete, unknown key ignored",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-04",
+                "Create a role with a duplicate name",
+                "Negative",
+                "409 role_name_taken",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-05",
+                "Create a role without a name",
+                "Negative",
+                "400 role_name_required",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-06",
+                "Get a role by a non-numeric and a nonexistent id",
+                "Negative",
+                "400 ; 404",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-07",
+                "Rename and re-permission a role",
+                "Positive",
+                "200; GET shows new name and qc view only",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-08",
+                "Delete a system role and a role in use",
+                "Negative",
+                "409 system_role ; 409 role_in_use",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-09",
+                "Delete an unused role; deleting it again is 404",
+                "Positive",
+                "204 then 404",
+                "PASS"
+              ],
+              [
+                "FT-ROLE-10",
+                "A user without admin rights cannot read roles or users",
+                "Negative",
+                "403 forbidden each",
+                "PASS"
+              ],
+              [
+                "FT-USER-01",
+                "List and read users",
+                "Positive",
+                "200; qa-ft-ops has role qa-ft-ops and sites bekasi + qa-ft-site; no password data",
+                "PASS"
+              ],
+              [
+                "FT-USER-02",
+                "Get a nonexistent user and a non-numeric id",
+                "Negative",
+                "404 ; 400",
+                "PASS"
+              ],
+              [
+                "FT-USER-03",
+                "Create a user with a role and an activated site",
+                "Positive",
+                "201 {id, siteCount:1}; login 200 with site qa-ft-site",
+                "PASS"
+              ],
+              [
+                "FT-USER-04",
+                "Create a user: missing username, missing password, short password",
+                "Negative",
+                "400 username_required ; 400 password_required ; 400 password_short",
+                "PASS"
+              ],
+              [
+                "FT-USER-05",
+                "Create a user with a duplicate username or e-mail",
+                "Negative",
+                "409 username_taken ; 409 email_taken",
+                "PASS"
+              ],
+              [
+                "FT-USER-06",
+                "Create a user with a nonexistent role id",
+                "Negative",
+                "400, no user created",
+                "PASS"
+              ],
+              [
+                "FT-USER-07",
+                "Create a user with roleIds of the wrong type (string instead of array)",
+                "Negative",
+                "400 validation error (not a 500)",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-USER-08",
+                "Create a user with siteIds of the wrong type (object)",
+                "Negative",
+                "400 validation error (not a 500)",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-USER-09",
+                "Create a user with an invalid e-mail address",
+                "Negative",
+                "400 invalid e-mail",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-USER-10",
+                "Update a user with isActive as the string \"false\"",
+                "Negative",
+                "400 (wrong type) or the user deactivated; never silently left active",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-USER-11",
+                "Update a user: display name, password reset, roles",
+                "Positive",
+                "200 {siteCount:1}; login 200",
+                "PASS"
+              ],
+              [
+                "FT-USER-12",
+                "Update a user: short password, nonexistent id, non-numeric id",
+                "Negative",
+                "400 password_short ; 404 ; 400",
+                "PASS"
+              ],
+              [
+                "FT-USER-13",
+                "Administrator cannot deactivate or delete their own account",
+                "Negative",
+                "400 self_deactivate ; 400 self_delete (nothing changed)",
+                "PASS"
+              ],
+              [
+                "FT-USER-14",
+                "Delete a user: hidden from the list, cannot sign in, second delete is 404",
+                "Positive",
+                "204; not listed; login 401; 404",
+                "PASS"
+              ],
+              [
+                "FT-USER-15",
+                "A deleted user's username can be used again",
+                "Negative",
+                "201 (deleted users are hidden everywhere, so their name should be free) — or a message that says the name belongs to a deleted user",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-USER-16",
+                "An activated site of a non-activated company is not grantable",
+                "Negative",
+                "200; list contains qa-ft-site and not bekasi (documents the QA-seed state used by the other cases)",
+                "PASS"
+              ],
+              [
+                "FT-USER-17",
+                "Delegated admin creates a user with a role inside their own rights, only on sites they hold",
+                "Positive",
+                "201, siteCount 1 (qa-other silently not granted)",
+                "PASS"
+              ],
+              [
+                "FT-USER-18",
+                "Delegated admin cannot grant the Administrator role or a role with rights they lack",
+                "Negative",
+                "403 cannot_grant_role for both, no user created",
+                "PASS"
+              ],
+              [
+                "FT-USER-19",
+                "Delegated admin cannot change their own roles",
+                "Negative",
+                "403 cannot_change_own_roles",
+                "PASS"
+              ],
+              [
+                "FT-USER-20",
+                "Delegated admin cannot manage a user holding the Administrator role",
+                "Negative",
+                "403 cannot_manage_user for both",
+                "PASS"
+              ],
+              [
+                "FT-USER-21",
+                "Delegated admin cannot create a role holding rights they lack, nor edit a system role",
+                "Negative",
+                "403 cannot_grant_permission ; 403 system_role",
+                "PASS"
+              ],
+              [
+                "FT-USER-22",
+                "Delegated admin lists only the sites they may grant, and deletes the user they created",
+                "Positive",
+                "sites = [qa-ft-site]; 204",
+                "PASS"
+              ],
+              [
+                "FT-DH-01",
+                "DataHub configuration and runs are readable by the Administrator, without secrets",
+                "Positive",
+                "200 ; 200; no plain secret fields",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Site access & modules",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-SITE-01",
+                "Site list holds only the sites a user has",
+                "Positive",
+                "qa-ft-ops: [bekasi, qa-ft-site]; qa-ft-nosite: []",
+                "PASS"
+              ],
+              [
+                "FT-SITE-02",
+                "Site detail for a held site",
+                "Positive",
+                "200 {siteName:Bekasi, timezone:Asia/Jakarta}",
+                "PASS"
+              ],
+              [
+                "FT-SITE-03",
+                "Any site route for a site the user does not hold, or that does not exist",
+                "Negative",
+                "403 forbidden for each (no data leak)",
+                "PASS"
+              ],
+              [
+                "FT-SITE-04",
+                "Site module matrix",
+                "Positive",
+                "200, modules = [live-ops, qc, utility, daily-production]; qa-ft-site shows [qc]",
+                "PASS"
+              ],
+              [
+                "FT-SITE-05",
+                "Set site modules with invalid input",
+                "Negative",
+                "400 invalid_modules ; 400 invalid_modules ; 404 site_not_found",
+                "PASS"
+              ],
+              [
+                "FT-SITE-06",
+                "Pages of a module that is off for the site are refused",
+                "Negative",
+                "403 module_not_enabled for each",
+                "PASS"
+              ],
+              [
+                "FT-SITE-07",
+                "Switching a module on takes effect at once, switching it off blocks again",
+                "Positive",
+                "PUT 200; live/tanks 200 []; /me lists live-ops; after [] qc/storage 403 module_not_enabled",
+                "PASS"
+              ],
+              [
+                "FT-SITE-08",
+                "Module settings need master-sites rights",
+                "Negative",
+                "403 ; 403",
+                "PASS"
+              ],
+              [
+                "FT-SITE-09",
+                "A user with a site but no page rights sees no operational data",
+                "Negative",
+                "/me 200 with empty permissions; every other call 403",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Master data & commodity specs",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-MD-01",
+                "Organisation tree",
+                "Positive",
+                "200 with companies, sites (bekasi, qa-other, qa-ft-site), plants",
+                "PASS"
+              ],
+              [
+                "FT-MD-02",
+                "Commodity list for a site with rule counts",
+                "Positive",
+                "200, 9 commodities, cpo has ruleCount 6",
+                "PASS"
+              ],
+              [
+                "FT-MD-03",
+                "Commodity list without a site, or for an unknown site",
+                "Negative",
+                "400 or 404 site_not_found for both",
+                "PASS"
+              ],
+              [
+                "FT-MD-04",
+                "Read one commodity's storage specs and the parameter catalogue",
+                "Positive",
+                "200, 14 parameters (incl. lab.odor kind pass), rules list",
+                "PASS"
+              ],
+              [
+                "FT-MD-05",
+                "Specs of a nonexistent commodity",
+                "Negative",
+                "404 not_found for both",
+                "PASS"
+              ],
+              [
+                "FT-MD-06",
+                "Save a commodity's storage specs and read them back",
+                "Positive",
+                "200; 5 rules stored in quality_rules for qa-ft-site/cpo; odour limit null; \"0.5\" stored as 0.5; list ruleCount 5, rejectCount 3",
+                "PASS"
+              ],
+              [
+                "FT-MD-07",
+                "Spec validation: every invalid input is refused and nothing is changed",
+                "Negative",
+                "400 with invalid_rules, unknown_parameter, invalid_severity, invalid_bound, limit_required, limit_required, duplicate_rule, min_above_max; DB still 5…",
+                "PASS"
+              ],
+              [
+                "FT-MD-08",
+                "Spec limit boundaries: negative, zero and non-finite limits",
+                "Negative",
+                "Negative limit accepted 200 (cloud point can be below 0 °C); 1e309 (Infinity) refused 400 limit_required; 0 accepted 200",
+                "PASS"
+              ],
+              [
+                "FT-MD-09",
+                "Clearing all rules leaves the commodity spec-pending",
+                "Positive",
+                "200 {rules:[]}; DB 0 rows",
+                "PASS"
+              ],
+              [
+                "FT-MD-10",
+                "Non-admin cannot read or edit specs of a site they do not hold; viewer cannot edit",
+                "Negative",
+                "404 site_not_found ; 404 site_not_found ; 403 forbidden",
+                "PASS"
+              ],
+              [
+                "FT-MD-11",
+                "Non-admin master editor saves specs on a site they hold",
+                "Positive",
+                "200, 1 rule; clear 200",
+                "PASS"
+              ],
+              [
+                "FT-MD-12",
+                "Change a site timezone",
+                "Positive",
+                "200 {ok:true}; DB updated",
+                "PASS"
+              ],
+              [
+                "FT-MD-13",
+                "Site timezone: invalid zone, empty, unknown site",
+                "Negative",
+                "400 invalid_timezone ; 400 invalid_timezone ; 404",
+                "PASS"
+              ],
+              [
+                "FT-MD-14",
+                "Activation rules: company with an active site, site of an inactive company, bad input",
+                "Negative",
+                "409 company_has_active_sites ; site-on under an off company 409 company_not_activated ; 400 invalid_request ; 404",
+                "PASS"
+              ],
+              [
+                "FT-MD-15",
+                "A non-admin master-sites editor cannot change a site they do not hold",
+                "Negative",
+                "403/404 for both and qa-ft-site2 unchanged — as for commodity specs, tank gauging and site modules, a non-admin may act only on sites they hold",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-MD-16",
+                "Org changes need master rights",
+                "Negative",
+                "403 ; 403",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Tank & Stock (live-ops)",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-OPS-01",
+                "Snapshot of a site with logsheet data",
+                "Positive",
+                "200, soundingAsOf 2026-10-20, soundingDates sorted, hasLabData true",
+                "PASS"
+              ],
+              [
+                "FT-OPS-02",
+                "Tanks of the latest day",
+                "Positive",
+                "200, one row per tank, all recordedOn = 2026-10-20 or no reading; quantity <= capacity",
+                "PASS"
+              ],
+              [
+                "FT-OPS-03",
+                "Tanks of a chosen earlier day",
+                "Positive",
+                "200, rows recordedOn 2026-10-01",
+                "PASS"
+              ],
+              [
+                "FT-OPS-04",
+                "Tanks for a malformed day",
+                "Negative",
+                "400 invalid date (not 200 with recordedOn \"garbage\")",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-OPS-05",
+                "Stock history between two days (Commodity Stock Movement)",
+                "Positive",
+                "200, [{tankId, points}] and every point between the two days",
+                "PASS"
+              ],
+              [
+                "FT-OPS-06",
+                "Stock history: missing range, reversed range, wrong format",
+                "Negative",
+                "400 for each: invalid_range for a missing or reversed range, invalid_date for a malformed day",
+                "PASS"
+              ],
+              [
+                "FT-OPS-07",
+                "Stock history with an impossible calendar date",
+                "Negative",
+                "400 invalid_range (not a 500 with a database error)",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-OPS-08",
+                "One tank's sounding history and labs",
+                "Positive",
+                "200, soundings ordered by day; labs list with storageVerdict",
+                "PASS"
+              ],
+              [
+                "FT-OPS-09",
+                "History of a tank that does not exist",
+                "Negative",
+                "200 [] or 404 for both (no error)",
+                "PASS"
+              ],
+              [
+                "FT-OPS-10",
+                "Logistics, analytics summary and movements",
+                "Positive",
+                "200 each; summary approvalRate in [0,1]; with tankId approvalRate null",
+                "PASS"
+              ],
+              [
+                "FT-OPS-11",
+                "Live-ops data needs live-ops or ops-analytics view",
+                "Negative",
+                "403 forbidden each",
+                "PASS"
+              ],
+              [
+                "FT-OPS-12",
+                "A live-ops viewer reads the dashboard of a held site",
+                "Positive",
+                "200, same tank count as for the Administrator",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Stock Overview / portfolio",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-PF-01",
+                "Portfolio totals equal the sum of the sites and of the commodity classes",
+                "Positive",
+                "200; portfolio.quantityKg = Σ sites.quantityKg; per site Σ classes.quantityKg = site.quantityKg; tanksTotal = Σ counts",
+                "PASS"
+              ],
+              [
+                "FT-PF-02",
+                "Stock movement ends on the same figure as the overview total",
+                "Positive",
+                "movement site.to = overview site.day and the last series point = overview site.quantityKg; class series sum to the total on each day",
+                "PASS"
+              ],
+              [
+                "FT-PF-03",
+                "Movement period length follows ?days within 7..92",
+                "Positive",
+                "days 7 (7 points), 92, 7, 30 (default) respectively",
+                "PASS"
+              ],
+              [
+                "FT-PF-04",
+                "Overview lists only held sites with the Tank farm module on",
+                "Positive",
+                "sites = [bekasi] in both",
+                "PASS"
+              ],
+              [
+                "FT-PF-05",
+                "A management-only user reads the overview and tank history, but not the operational pages",
+                "Positive",
+                "200 ; 200 ; 200 ; 403",
+                "PASS"
+              ],
+              [
+                "FT-PF-06",
+                "Overview tank history of a site not held or without the module",
+                "Negative",
+                "403 ; 403",
+                "PASS"
+              ],
+              [
+                "FT-PF-07",
+                "Overview needs the management-stock right",
+                "Negative",
+                "403 ; 403",
+                "PASS"
+              ],
+              [
+                "FT-PF-08",
+                "A user with the right but no site gets an empty overview",
+                "Positive",
+                "200, sites [], portfolio totals 0 / sitesTotal 0",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "QC",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-QC-01",
+                "Storage certificates with verdicts",
+                "Positive",
+                "200, rows with verdict in {pass, quarantine, spec-pending}",
+                "PASS"
+              ],
+              [
+                "FT-QC-02",
+                "Storage filtered by date range",
+                "Positive",
+                "200, every snapshotOn within the range, fewer rows than unfiltered",
+                "PASS"
+              ],
+              [
+                "FT-QC-03",
+                "Vessels, trucks and oil movements",
+                "Positive",
+                "200 each; vessels have samples arrays; trucks have rows; movements {periodStart, rows}",
+                "PASS"
+              ],
+              [
+                "FT-QC-04",
+                "Refinery snapshot, history and ledger",
+                "Positive",
+                "200 each; history has oils[] and points[]",
+                "PASS"
+              ],
+              [
+                "FT-QC-05",
+                "Refinery hourly sheet of a day with data",
+                "Positive",
+                "200 {productionDate, oil, points[]}",
+                "PASS"
+              ],
+              [
+                "FT-QC-06",
+                "Refinery hourly without a date, without an oil, or for a day with no data",
+                "Negative",
+                "400 or 404 for the missing parameters; 404 for no data",
+                "PASS"
+              ],
+              [
+                "FT-QC-07",
+                "Refinery endpoints with a malformed date filter",
+                "Negative",
+                "400 for each (not a 500 with a database message)",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-QC-08",
+                "Storage/vessel filters with a malformed date",
+                "Negative",
+                "400 (invalid date) — not 200 with silently empty/unfiltered rows",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-QC-09",
+                "QC needs the qc right",
+                "Negative",
+                "403 ; 403",
+                "PASS"
+              ],
+              [
+                "FT-QC-10",
+                "A QC user on an empty site gets empty lists, not errors",
+                "Positive",
+                "200 each with empty data",
+                "PASS"
+              ],
+              [
+                "FT-QC-11",
+                "Storage verdict follows the commodity spec of the site",
+                "Positive",
+                "Rows with commodityId pfad and FFA >= 70 are not quarantined for FFA",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Utility",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-UT-01",
+                "Utility board lists all forms",
+                "Positive",
+                "200, 13 forms, from <= to",
+                "PASS"
+              ],
+              [
+                "FT-UT-02",
+                "Utility board with an explicit and a reversed range",
+                "Positive",
+                "200 with from/to as given; reversed range is swapped",
+                "PASS"
+              ],
+              [
+                "FT-UT-03",
+                "Utility board with an impossible calendar date",
+                "Negative",
+                "400 (or the default range) — not a 500",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-UT-04",
+                "Utility day: missing parameters, unknown form/day, impossible date",
+                "Negative",
+                "400 form_and_date_required ; 404 ; 400 (not 500)",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-UT-05",
+                "Utility needs the right, a held site and the module",
+                "Negative",
+                "403 forbidden ; 403 module_not_enabled ; 403",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Production",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-PR-01",
+                "Daily production days of a site",
+                "Positive",
+                "200 {days: []} (QA seed has no production days)",
+                "PASS"
+              ],
+              [
+                "FT-PR-02",
+                "Production needs the right, a held site and the module",
+                "Negative",
+                "403 ; 403 module_not_enabled ; 403",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "Tank gauging",
+      "level": 2,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.2
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                4
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-TG-01",
+                "Tank gauging overview of a site",
+                "Positive",
+                "200 {site, sources[], settings {roundTimes, toleranceMin, retryMinutes, maxRetries}, rounds[], tanks[]}",
+                "PASS"
+              ],
+              [
+                "FT-TG-02",
+                "Overview of an unknown site, and without master-tanks rights",
+                "Negative",
+                "404 ; 403 ; 404 (not held)",
+                "PASS"
+              ],
+              [
+                "FT-TG-03",
+                "Save daily round times and tolerance",
+                "Positive",
+                "200 {roundTimes:[\"06:30\",\"14:30\"], toleranceMin:45}; overview shows them",
+                "PASS"
+              ],
+              [
+                "FT-TG-04",
+                "Daily rounds validation: empty, out-of-range times, tolerance bounds",
+                "Negative",
+                "400 each, settings unchanged (06:30,14:30 / 45)",
+                "PASS"
+              ],
+              [
+                "FT-TG-05",
+                "Daily rounds with one valid and one invalid time",
+                "Negative",
+                "400 naming the invalid entries — not silently saved as [\"06:30\"]",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-TG-06",
+                "Daily rounds with a non-number tolerance (boolean)",
+                "Negative",
+                "400 (not saved as 1 minute)",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-TG-07",
+                "Add a gauge source (unreachable test address); secrets are never returned",
+                "Positive",
+                "201, baseUrl normalised to http://qa-unreachable-gauge.invalid (index.esp stripped), secretConfigured true, no secret in any response",
+                "PASS"
+              ],
+              [
+                "FT-TG-08",
+                "Gauge source validation: duplicate, missing/invalid/non-http URL, auth rules",
+                "Negative",
+                "409 source_exists ; 400 ×6",
+                "PASS"
+              ],
+              [
+                "FT-TG-09",
+                "Edit a source; blank secret keeps the stored one; switch to no auth",
+                "Positive",
+                "200 label changed, secretConfigured still true ; 200 secretConfigured false",
+                "PASS"
+              ],
+              [
+                "FT-TG-10",
+                "Test connection to an unreachable gauge",
+                "Negative",
+                "200 {ok:false, tankCount:0, error:<message>} within a few seconds",
+                "PASS"
+              ],
+              [
+                "FT-TG-11",
+                "Poll a site whose only gauge is unreachable",
+                "Negative",
+                "200 {ok:false, sources:[{error}]}; source last_poll_ok false",
+                "PASS"
+              ],
+              [
+                "FT-TG-12",
+                "Source routes with a bad id, someone else's source, or without edit rights",
+                "Negative",
+                "404 ; 404 ; 403 ; 403",
+                "PASS"
+              ],
+              [
+                "FT-TG-13",
+                "Delete a source; deleting it again is 404",
+                "Positive",
+                "204 then 404",
+                "PASS"
+              ],
+              [
+                "FT-TG-14",
+                "Poll a site with no enabled source is skipped",
+                "Positive",
+                "200 {skipped:true, reason:\"no_enabled_sources_for_site\"}",
+                "PASS"
+              ],
+              [
+                "FT-TG-15",
+                "Gauge source at a loopback, metadata or link-local address is refused",
+                "Negative",
+                "400 for each; nothing saved (server-side request forgery guard)",
+                "PASS (new)"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "4. Results (UI, after fixes)",
+      "pagebreak": true,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Scenario",
+                3.4
+              ],
+              [
+                "Type",
+                0.9
+              ],
+              [
+                "Expected",
+                3.8
+              ],
+              [
+                "Result",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "FT-UI-01",
+                "Visiting a protected page while signed out redirects to the sign-in page",
+                "Negative",
+                "/ redirects to /login with the sign-in form",
+                "PASS"
+              ],
+              [
+                "FT-UI-02",
+                "Sign-in with empty fields",
+                "Negative",
+                "Inline message asking for username and password; no request succeeds",
+                "PASS"
+              ],
+              [
+                "FT-UI-03",
+                "Sign-in with a wrong password",
+                "Negative",
+                "Message 'Invalid username or password.', stays on /login",
+                "PASS"
+              ],
+              [
+                "FT-UI-04",
+                "Sign-in as Administrator lands on Tank & Stock Dashboard with Bekasi data",
+                "Positive",
+                "Redirect to /, KPIs, commodity cards and tank table for Bekasi 20 Oct 2026; no console errors",
+                "PASS"
+              ],
+              [
+                "FT-UI-05",
+                "Deep link is restored after sign-in",
+                "Positive",
+                "Signed out, open /management -> /login; after signing in, land on /management",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-UI-06",
+                "Commodity card dialog (CPO)",
+                "Positive",
+                "Clicking the CPO card opens a dialog with quantity chart, average quality in period, and the tanks in this stock; Escap…",
+                "PASS"
+              ],
+              [
+                "FT-UI-07",
+                "Commodity Stock Movement section on Tank & Stock",
+                "Positive",
+                "Section shows the last 30 days; the latest All-commodities figure equals the current total; choosing a commodity switch…",
+                "PASS"
+              ],
+              [
+                "FT-UI-08",
+                "Day picker loads an earlier day",
+                "Positive",
+                "Choosing 15 Oct 2026 reloads KPIs and cards for that day",
+                "PASS"
+              ],
+              [
+                "FT-UI-09",
+                "Stock Overview renders totals and movement",
+                "Positive",
+                "Stock, capacity, fill, tanks reporting, attention list, By site table and Commodity Stock Movement agree with the API",
+                "PASS"
+              ],
+              [
+                "FT-UI-10",
+                "Stock Overview: By commodity view",
+                "Positive",
+                "Tab switches to per-commodity rows and the URL keeps the view",
+                "PASS"
+              ],
+              [
+                "FT-UI-11",
+                "Per-commodity figures agree between Tank & Stock and Stock Overview for the same day",
+                "Positive",
+                "Same day (20 Oct 2026): a commodity's capacity, tank count and fill are the same on both pages",
+                "FAIL"
+              ],
+              [
+                "FT-UI-12",
+                "QC pages render with data",
+                "Positive",
+                "/qc, /qc/storage, /qc/vessel, /qc/truck, /qc/movements, /qc/refinery render without console errors",
+                "PASS"
+              ],
+              [
+                "FT-UI-13",
+                "Oil in and out with no data shows a readable empty state",
+                "Negative",
+                "An empty state such as 'No movements in this period' with no broken sentence",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-UI-14",
+                "Utility pages render",
+                "Positive",
+                "/utility, /boiler, /coal, /water, /effluent, /loader render (QA seed has no utility days) with empty states",
+                "PASS"
+              ],
+              [
+                "FT-UI-15",
+                "Daily production pages render",
+                "Positive",
+                "/daily-production and a plant section page render with empty data",
+                "PASS"
+              ],
+              [
+                "FT-UI-16",
+                "Ops analytics renders",
+                "Positive",
+                "/ops-analytics shows tank picker and level/temperature chart",
+                "PASS"
+              ],
+              [
+                "FT-UI-17",
+                "Unknown URL shows a not-found page",
+                "Negative",
+                "A 'page not found' message inside the app shell with a way back",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-UI-18",
+                "Master Commodities list and Edit limits dialog",
+                "Positive",
+                "List per site with limit counts and aliases; Edit limits opens the editor",
+                "PASS"
+              ],
+              [
+                "FT-UI-19",
+                "Commodity spec editor validation",
+                "Negative",
+                "Empty limit, non-number limit, duplicate FFA Max, and FFA Min above Max are each refused with a message; nothing saved",
+                "PASS"
+              ],
+              [
+                "FT-UI-20",
+                "Tank gauging Daily rounds validation",
+                "Negative",
+                "Round time 25:00 and tolerance 0 are refused with a message",
+                "PASS"
+              ],
+              [
+                "FT-UI-21",
+                "Tank gauging Daily rounds with one valid and two invalid times",
+                "Negative",
+                "'06:30, 99:99, noon' is refused naming the invalid entries",
+                "PASS (fixed)"
+              ],
+              [
+                "FT-UI-22",
+                "Administration and master pages render for the Administrator",
+                "Positive",
+                "/admin/users, /admin/roles, /admin/site-modules, /admin/datahub, /master, /master/sites, /master/tank-farm render witho…",
+                "PASS"
+              ],
+              [
+                "FT-UI-23",
+                "Non-admin menu shows only permitted pages",
+                "Positive",
+                "qa-ft-ops (live-ops, ops-analytics, management-stock, utility, daily-production view) sees Stock Overview, Tank & Stock…",
+                "PASS"
+              ],
+              [
+                "FT-UI-24",
+                "Non-admin opening a forbidden page by URL",
+                "Negative",
+                "/qc/storage, /master/commodities, /admin/users show 'Access denied' and load no data",
+                "PASS"
+              ],
+              [
+                "FT-UI-25",
+                "Non-admin switches to a site where their modules are off",
+                "Negative",
+                "On QA FT Site (only qc on; user lacks qc) the landing page explains the module is off and the menu shrinks",
+                "PASS"
+              ],
+              [
+                "FT-UI-26",
+                "Sign out",
+                "Positive",
+                "Sign out returns to /login; protected pages then redirect to /login",
+                "PASS"
+              ],
+              [
+                "FT-UI-27",
+                "Dev-server proxy to the API",
+                "Positive",
+                "http://localhost:5176/api/v1/health answers {ok:true}",
+                "PASS"
+              ],
+              [
+                "FT-UI-28",
+                "No JavaScript errors on any page",
+                "Positive",
+                "read_console_messages shows no uncaught errors or React errors across the session",
+                "PASS"
+              ]
+            ],
+            "status": 4
+          }
+        },
+        {
+          "p": "FT-UI-05, -13 and -17 were re-checked in the browser after the fixes. FT-UI-21 is driven by the API change behind it (the save is refused with the bad entries named), covered by FT-TG-05."
+        }
+      ]
+    },
+    {
+      "heading": "5. Defects",
+      "pagebreak": true,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                0.6
+              ],
+              [
+                "Severity",
+                0.8
+              ],
+              [
+                "Defect",
+                3.2
+              ],
+              [
+                "Location",
+                1.6
+              ],
+              [
+                "Fix",
+                3.4
+              ],
+              [
+                "Status",
+                0.9
+              ]
+            ],
+            "rows": [
+              [
+                "F-01",
+                "Medium",
+                "Impossible or malformed dates (2026-02-30, garbage) returned 500 with the database error text",
+                "operations.js, qc.js, utility.js",
+                "Shared calendar-day check (dates.js) on every router: 400 invalid_date. Error handler maps database data errors to 400 as a safety net.",
+                "FIXED"
+              ],
+              [
+                "F-02",
+                "Medium",
+                "A non-admin master-sites editor could change the timezone of, or switch off, a site they do not hold",
+                "master.js",
+                "Site changes need the site in user_sites; only the Administrator switches a company.",
+                "FIXED"
+              ],
+              [
+                "F-03",
+                "Low",
+                "Malformed JSON body returned 500",
+                "index.js",
+                "errors.js: 400 invalid_json.",
+                "FIXED"
+              ],
+              [
+                "F-04",
+                "Low",
+                "roleIds / siteIds of the wrong type returned 500",
+                "admin.js",
+                "Type check: 400 roleIds_must_be_a_list / siteIds_must_be_a_list.",
+                "FIXED"
+              ],
+              [
+                "F-05",
+                "Low",
+                "isActive \"false\" (a string) left the user active",
+                "admin.js",
+                "Only true/false accepted: 400 otherwise.",
+                "FIXED"
+              ],
+              [
+                "F-06",
+                "Low",
+                "E-mail addresses were not validated",
+                "admin.js",
+                "Format check: 400 invalid_email.",
+                "FIXED"
+              ],
+              [
+                "F-07",
+                "Low",
+                "A deleted user's username and e-mail could never be reused",
+                "admin.js",
+                "Delete renames the account to deleted-<id>-<name> and clears its e-mail (existing deleted users too, migration 017).",
+                "FIXED"
+              ],
+              [
+                "F-08",
+                "Low",
+                "Round times \"06:30, 99:99, noon\" saved as 06:30 only, reported as saved",
+                "tankgauging/rounds.js",
+                "The save is refused, naming the bad entries.",
+                "FIXED"
+              ],
+              [
+                "F-09",
+                "Low",
+                "Round tolerance true saved as 1 minute",
+                "tankgauging/rounds.js",
+                "Only whole minutes accepted.",
+                "FIXED"
+              ],
+              [
+                "F-10",
+                "Low",
+                "Malformed date filters returned empty or unfiltered data",
+                "operations.js, qc.js",
+                "Same calendar-day check: 400.",
+                "FIXED"
+              ],
+              [
+                "F-11",
+                "Low",
+                "Tank & Stock and Stock Overview place empty tanks in different commodities (PFAD 300/900 t vs 300/460 t)",
+                "Frontend commodityStock.ts vs Backend portfolio.js",
+                "One classification computed by the API and used by both pages. Totals already agree; only per-commodity capacity of empty tanks differs.",
+                "OPEN"
+              ],
+              [
+                "F-12",
+                "Low",
+                "Unknown frontend URL showed a blank page",
+                "App.tsx",
+                "\"Page not found\" inside the app frame.",
+                "FIXED"
+              ],
+              [
+                "F-13",
+                "Low",
+                "The requested page was lost after sign-in",
+                "guards.tsx, LoginPage.tsx",
+                "Sign-in returns to the page asked for, query included.",
+                "FIXED"
+              ],
+              [
+                "F-14",
+                "Low",
+                "\"Oil in and out\" with no data showed \"The sheet spans .\"",
+                "MovementPage.tsx",
+                "The sentence is left out when the period is empty.",
+                "FIXED"
+              ]
+            ],
+            "status": 5
+          }
+        },
+        {
+          "p": "Test-design corrections (not product defects): five scenarios were corrected during the first run (wrong parameters or fixture clashes). After the fixes, the gauge fixture moved from 127.0.0.1 to an unresolvable `.invalid` host, because loopback addresses are now refused on purpose, and FT-OPS-06 accepts `invalid_date` as the code for a malformed day."
+        }
+      ]
+    },
+    {
+      "heading": "6. Automated checks",
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "Check",
+                2
+              ],
+              [
+                "Before",
+                2
+              ],
+              [
+                "After",
+                2
+              ]
+            ],
+            "rows": [
+              [
+                "Backend unit tests (npm test)",
+                "86 / 86 pass",
+                "92 / 92 pass (6 new: dates, errors, outbound guard, rate limit, round times)"
+              ],
+              [
+                "Frontend type check (tsc -b)",
+                "Pass (strict off)",
+                "Pass with strict mode on"
+              ],
+              [
+                "Frontend lint (oxlint)",
+                "0 errors, 61 warnings",
+                "0 errors; warnings unchanged (existing code)"
+              ],
+              [
+                "Frontend build (vite)",
+                "Pass; main chunk 781 kB",
+                "Pass; gzip now enabled in nginx"
+              ],
+              [
+                "Migrations on an empty database, twice",
+                "Pass",
+                "Pass (017, 018 added)"
+              ]
+            ],
+            "status": 2
+          }
+        }
+      ]
+    },
+    {
+      "heading": "7. How to re-run",
+      "blocks": [
+        {
+          "code": "docker run -d --name pid-qa-db -p 127.0.0.1:55450:5432 -e POSTGRES_PASSWORD=qa-only -e POSTGRES_DB=pid postgres:16-alpine\nnode --env-file=Backend/.env.qa Backend/scripts/migrate.js\nnode --env-file=Backend/.env.qa Backend/scripts/seed-from-mockup.js\nnode --env-file=Backend/.env.qa Backend/scripts/load-dashboard-files.js\n# start the API (LOGIN_RATE_LIMIT_PER_MINUTE=1000 API_RATE_LIMIT_PER_MINUTE=10000 for this suite) and the frontend\nnode qa/functional/api-suite.mjs"
+        },
+        {
+          "p": "`Backend/.env.qa` holds random test-only secrets and is gitignored. The suite signs in many times from one address, so it runs with the per-address limits raised; the limits themselves are tested by the penetration test (PT-RL-01)."
+        }
+      ]
+    }
+  ]
+}

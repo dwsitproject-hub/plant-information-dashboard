@@ -1,0 +1,541 @@
+{
+  "title": "Architecture Review Report",
+  "subtitle": "Plant Information Dashboard",
+  "orientation": "landscape",
+  "footer": "PID · Architecture review",
+  "meta": [
+    [
+      "Application",
+      "Plant Information Dashboard (PID)"
+    ],
+    [
+      "Code tested",
+      "Branch sit. Before fixes: ed63d97. After fixes: 8aad28b (fixes) and 6d35510 (QA suites)"
+    ],
+    [
+      "Environment tested",
+      "Isolated local QA copy: API 127.0.0.1:3010, frontend localhost:5176, throwaway PostgreSQL 16 seeded with Bekasi data and a second test site"
+    ],
+    [
+      "Date",
+      "17 November 2026"
+    ],
+    [
+      "Prepared by",
+      "Claude Code (prod-readiness-checks), for the PID project team"
+    ],
+    [
+      "Overall result",
+      "Conditional go. 26 findings (4 High, 16 Medium, 6 Low): 7 fixed, 10 partly fixed, 9 planned. All four High findings are fixed or reduced to deployment settings except AR-02 (performance), planned before data volume grows."
+    ]
+  ],
+  "sections": [
+    {
+      "heading": "1. Summary",
+      "blocks": [
+        {
+          "p": "The core design is sound: server-side access control reloaded on every request, a well-built SSO flow, a gauge scheduler with locks, retries and an archive fallback, transactional migrations, and disciplined per-site time zones. The gaps were in operations (no error logging, shallow health check, no timeouts), deployment (end-of-life Node, unsafe defaults) and performance (full-history reads)."
+        },
+        {
+          "table": {
+            "columns": [
+              [
+                "Viewpoint",
+                2.4
+              ],
+              [
+                "Before",
+                1.4
+              ],
+              [
+                "After fixes",
+                1.4
+              ],
+              [
+                "Key point",
+                4.4
+              ]
+            ],
+            "rows": [
+              [
+                "1. Structure and modularity",
+                "Partial",
+                "Partial",
+                "Duplicated frontend/backend logic and fat routes remain (planned)"
+              ],
+              [
+                "2. Data architecture",
+                "Partial",
+                "Pass",
+                "Indexes, case-insensitive uniqueness, deleted-user names freed; retention planned"
+              ],
+              [
+                "3. API design",
+                "Partial",
+                "Partial",
+                "Validation and error codes fixed; envelope and pagination planned"
+              ],
+              [
+                "4. Security architecture",
+                "Partial",
+                "Partial",
+                "SSRF, headers, sessions fixed; HTTPS, DB roles, dedicated key open"
+              ],
+              [
+                "5. Reliability and resilience",
+                "Partial",
+                "Pass",
+                "Timeouts, readiness, shutdown, async errors fixed"
+              ],
+              [
+                "6. Performance and scalability",
+                "Fail",
+                "Partial",
+                "gzip on; full-history reads (AR-02) still to fix"
+              ],
+              [
+                "7. Observability and operations",
+                "Fail",
+                "Partial",
+                "Errors logged; access log, audit and alerts planned"
+              ],
+              [
+                "8. Deployability and configuration",
+                "Partial",
+                "Partial",
+                "Node 22, pinned images, healthcheck, migrate first; backups and registry planned"
+              ],
+              [
+                "9. Maintainability and testability",
+                "Partial",
+                "Partial",
+                "Strict TS, new tests, QA suites; frontend tests planned"
+              ],
+              [
+                "10. Production readiness",
+                "Partial (conditional go)",
+                "Go with conditions",
+                "See the roadmap"
+              ]
+            ],
+            "status": 2
+          }
+        },
+        {
+          "note": "Go/no-go (architecture): **Go with conditions**: HTTPS and fail-closed production settings (prod-deploy-prep), a dedicated encryption key, a backup before the first production migration, and AR-02 scheduled before data volume grows."
+        }
+      ]
+    },
+    {
+      "heading": "2. System overview",
+      "blocks": [
+        {
+          "p": "Two hosts on Alibaba Cloud plus a managed database. The browser loads the React app from nginx on the app host, which proxies /api and /auth to the Express API on the API host (private network only). The API reads and writes ApsaraDB PostgreSQL, calls the Hub for sign-in, DataHub for master data, and the TankVision gauges at the plant. Cron on the API host runs the gauge schedule every 5 minutes and the daily purge. Logsheet data arrives from a site PC as JSON files."
+        },
+        {
+          "code": "                        +------------------------- Browser (SPA) -------------------------+\n                        |  React pages -> data/api.ts (fetch, cookie pid_session)         |\n                        +-------------------------------+---------------------------------+\n                                                        | HTTP :3091 (staging, plain HTTP)\n   APP host 172.28.92.56                                v\n   +--------------------------------------------------------------------------------------+\n   | pid-web (nginx:alpine)   /            -> SPA static files (index.html no-cache)       |\n   |                          /assets/     -> immutable, 1 y                               |\n   |                          /api/, /auth/ -> proxy_pass 172.28.92.57:3011 (120 s)        |\n   +---------------------------------------+----------------------------------------------+\n                                           | VPC, SG: only APP host may reach :3011\n   API host 172.28.92.57                   v\n   +--------------------------------------------------------------------------------------+\n   | pid-api (node:20-alpine, user node, Express 4, pg Pool defaults)                     |\n   |   requireAuth -> 5 RBAC queries/request -> routes -> (domain/*, catalog cache 5 min)  |\n   |   /auth/oidc/* <---> Hub OIDC provider (discovery, token, JWKS)                       |\n   |   /auth/hub    <---  Hub legacy bridge POST (HS256 shared secret)                     |\n   |   admin/datahub ---> DataHub (signed requests, 10 s timeout)                          |\n   |   tank-gauging \"Poll now\" ---> TankVision units (15 s timeout)                        |\n   |                                                                                       |\n   |   host cron (root) --docker compose exec--> node scripts/run-tank-gauging-poll.js     |\n   |                    (every 5 min)            node scripts/purge-tank-gauging-samples.js |\n   |                                                 |                                     |\n   |   staging-inbox/*.json <--scp-- dedicated PC     +--> TankVision units (round, archive)|\n   |   apply-staging-inbox.sh --docker exec--> node scripts/ingest-*.js                    |\n   +---------------------------------------+----------------------------------------------+\n                                           | 5432, SG: only API host\n                                           v\n                       ApsaraDB RDS PostgreSQL (single app role: DDL + DML)\n\n   Dedicated Windows PC (site office)\n     Task Scheduler -> Frontend/scripts/sync-*.mjs -> Logsheet Builder (HTTPS, login)\n                    -> outbox JSON -> push-staging.mjs (ssh/scp as root) -> API host inbox"
+        },
+        {
+          "p": "Diagram as reviewed (before fixes): the API image is now node:22-alpine with a health check, and the pool has limits."
+        }
+      ]
+    },
+    {
+      "heading": "3. Review method",
+      "blocks": [
+        {
+          "p": "Ten viewpoints, each with explicit pass criteria, checked against the code, configuration and documents, and (read-only) the local QA database with EXPLAIN ANALYZE and catalog queries. A production frontend build and one backend image were built for inspection."
+        },
+        {
+          "bullets": [
+            "Structure and modularity",
+            "Data architecture (schema, indexes vs queries, migrations, retention, time zones)",
+            "API design (consistency, validation, errors, limits)",
+            "Security architecture (authn/authz, sessions, secrets, SSO, least privilege, exposure)",
+            "Reliability (dependency failures, timeouts, scheduler, pool, shutdown, health)",
+            "Performance (expensive endpoints, caching, bundle)",
+            "Observability (logs, metrics, audit, alerting, runbooks)",
+            "Deployability (config, images, compose, CI, backups, migrations)",
+            "Maintainability (tests, typing, lint, docs)",
+            "Production readiness"
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "4. Findings",
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                0.6
+              ],
+              [
+                "Viewpoint",
+                1.3
+              ],
+              [
+                "Sev",
+                0.7
+              ],
+              [
+                "Finding",
+                3
+              ],
+              [
+                "Effort",
+                0.6
+              ],
+              [
+                "Status",
+                0.9
+              ],
+              [
+                "What was done / what is next",
+                3.6
+              ]
+            ],
+            "rows": [
+              [
+                "AR-01",
+                "Observability / API",
+                "High",
+                "Global error handler logs nothing; malformed JSON returns 500",
+                "S",
+                "FIXED",
+                "Errors logged as JSON with method, path, user; 4xx for bad JSON and invalid input; no internals in responses; X-Powered-By off; unknown /api paths answer JSON 404."
+              ],
+              [
+                "AR-02",
+                "Performance",
+                "High",
+                "Point-in-time screens load the full sounding and certificate history of each site, twice per site, every 60 s",
+                "M",
+                "PLANNED",
+                "Query only the needed days and the latest certificate per tank; cache per site; cap ranges. Plan with AR-15."
+              ],
+              [
+                "AR-03",
+                "Deployability",
+                "High",
+                "Node 20 runtime is end-of-life; base images are floating tags",
+                "S",
+                "FIXED",
+                "Node 22 in both Dockerfiles, CI and engines; nginx pinned to 1.28-alpine."
+              ],
+              [
+                "AR-04",
+                "Security / Config",
+                "High",
+                "Production-unsafe defaults: plain HTTP, COOKIE_SECURE=false, legacy SSO bridge on, staging origin baked in, no CSP/HSTS",
+                "S",
+                "PARTIAL",
+                "API security headers added. Open: HTTPS + COOKIE_SECURE=true + HSTS, SPA CSP with the Hub origin, legacy bridge off, fail-closed production compose (prod-deploy-prep)."
+              ],
+              [
+                "AR-05",
+                "Reliability",
+                "Medium",
+                "Health check ignores the DB; no container HEALTHCHECK; no graceful shutdown",
+                "S",
+                "FIXED",
+                "/api/v1/health/ready checks the database; image HEALTHCHECK; graceful shutdown on SIGTERM; deploy waits for ready."
+              ],
+              [
+                "AR-06",
+                "Reliability",
+                "Medium",
+                "DB pool and outbound OIDC calls have no limits or timeouts",
+                "S",
+                "FIXED",
+                "Pool: max, connection, idle and statement timeouts, application_name. OIDC calls time out after 10 s; JWKS cached per URI."
+              ],
+              [
+                "AR-07",
+                "Reliability",
+                "Medium",
+                "Unhandled async rejection path can stop the API process",
+                "S",
+                "FIXED",
+                "Rejected async handlers now reach the error handler (asyncErrors.js); unhandled rejections are logged, not fatal; the DataHub route fixed."
+              ],
+              [
+                "AR-08",
+                "Deployability",
+                "Medium",
+                "Migrations run after new code is live; no pre-deploy backup; images built on the host",
+                "M",
+                "PARTIAL",
+                "Migrations now run before the new container starts. Open: backup before migrate, build once in CI and push to a registry, restore test."
+              ],
+              [
+                "AR-09",
+                "Observability",
+                "Medium",
+                "No access log, no audit trail of admin actions, no metrics or alerting, unbounded container logs",
+                "M",
+                "PARTIAL",
+                "Server errors are logged. Open: access log, audit table for admin changes, log rotation, alert on failed gauge rounds."
+              ],
+              [
+                "AR-10",
+                "Data",
+                "Medium",
+                "Missing site_id and FK indexes on site-scoped tables; duplicate index on soundings",
+                "S",
+                "FIXED",
+                "Migration 017: site and foreign-key indexes; duplicate soundings index dropped."
+              ],
+              [
+                "AR-11",
+                "Data / Security",
+                "Medium",
+                "Username and email unique by case, but login matches case-insensitively with LIMIT 1",
+                "S",
+                "FIXED",
+                "Migration 017: case-insensitive unique usernames and e-mails (skipped with a notice if existing rows clash); login ignores deleted rows."
+              ],
+              [
+                "AR-12",
+                "Data",
+                "Medium",
+                "Retention moves growth instead of bounding it (purge log, submission history)",
+                "S-M",
+                "PLANNED",
+                "Retention for purge log, submission history and sync items."
+              ],
+              [
+                "AR-13",
+                "Performance",
+                "Medium",
+                "781 kB main chunk carries 399 kB of Bekasi calibration JSON; gzip is off in nginx",
+                "S / M",
+                "PARTIAL",
+                "gzip on in both nginx configs. Open: load calibration and mock JSON only where needed."
+              ],
+              [
+                "AR-14",
+                "Structure",
+                "Medium",
+                "Stock and quality logic duplicated in frontend and backend; calibration edits stored only in browser localStorage",
+                "M-L",
+                "PLANNED",
+                "Make the API the single owner of stock and verdict logic; calibration CRUD or read-only page (also fixes functional F-11)."
+              ],
+              [
+                "AR-15",
+                "Structure",
+                "Medium",
+                "Routes hold data access and domain assembly; portfolio router imports another router",
+                "L",
+                "PLANNED",
+                "Service and repository layer; withTransaction helper."
+              ],
+              [
+                "AR-16",
+                "API",
+                "Medium",
+                "Inconsistent error model and validation; no pagination; date filters applied in JS",
+                "M",
+                "PARTIAL",
+                "Real calendar-day validation on all routers; JSON error codes for bad JSON/unknown paths. Open: one error envelope, schema validation, pagination."
+              ],
+              [
+                "AR-17",
+                "Security",
+                "Medium",
+                "Encryption key for stored credentials falls back to JWT_SECRET; decrypt failures are swallowed",
+                "S",
+                "PARTIAL",
+                "Decrypt failures are logged. Open: dedicated encryption key with a re-encryption script."
+              ],
+              [
+                "AR-18",
+                "Security",
+                "Medium",
+                "One DB role for migrations and runtime (QA uses superuser)",
+                "S-M",
+                "PLANNED",
+                "Separate migration and runtime database roles."
+              ],
+              [
+                "AR-19",
+                "Security",
+                "Medium",
+                "Session design: no revocation, cookie and JWT lifetimes not tied, per-username lockout, state held in memory",
+                "M",
+                "PARTIAL",
+                "Session version in the token (password change/reset ends other sessions), cookie lifetime tied to the token, per-address sign-in limit. Open: revoke on logout, longer minimum password."
+              ],
+              [
+                "AR-20",
+                "Performance",
+                "Medium",
+                "5 RBAC queries per request; N+1 in live points; parallel site fan-out on a default pool",
+                "S-M",
+                "PLANNED",
+                "Collapse session queries; remove the N+1 in live points; limit portfolio concurrency."
+              ],
+              [
+                "AR-21",
+                "Maintainability",
+                "Low",
+                "TypeScript strict off (compiles clean with --strict); 62 lint warnings; no frontend tests; no API tests",
+                "S / M",
+                "PARTIAL",
+                "TypeScript strict on; 6 new backend tests; QA suites in the repo. Open: frontend unit tests, API integration tests in CI."
+              ],
+              [
+                "AR-22",
+                "Docs / Ops",
+                "Low",
+                "Docs drift from code; no production runbook or backup policy",
+                "S-M",
+                "PLANNED",
+                "Update DATABASE-DESIGN and TSD; production runbook from prod-deploy-prep."
+              ],
+              [
+                "AR-23",
+                "Structure",
+                "Low",
+                "Dead schema and dead code paths shipped",
+                "S-M",
+                "PLANNED",
+                "Remove dead tables and the shipped mock mode."
+              ],
+              [
+                "AR-24",
+                "Ops",
+                "Low",
+                "Scheduler and ingest coupled to the API container and to root SSH from a desk PC",
+                "M",
+                "PLANNED",
+                "Separate worker service; asynchronous Poll now; restricted ingest user."
+              ],
+              [
+                "AR-25",
+                "Security / Structure",
+                "Low",
+                "Authorization written four different ways; /master/org open to any signed-in user",
+                "S-M",
+                "PARTIAL",
+                "Site edits now limited to sites the user holds. Open: one policy per router; gate /master/org."
+              ],
+              [
+                "AR-26",
+                "Mixed",
+                "Low",
+                "Smaller consistency issues: DATE parsing per process, migration hygiene, no React error boundary or fetch abort, optional OIDC nonce",
+                "S",
+                "PARTIAL",
+                "Page error boundary added. Open: AbortController on site switch, required OIDC nonce, shared date helpers."
+              ]
+            ],
+            "status": 5
+          }
+        }
+      ]
+    },
+    {
+      "heading": "5. High findings in detail",
+      "pagebreak": true,
+      "blocks": [
+        {
+          "p": "**AR-01 Error handler logged nothing; bad JSON returned 500.** Evidence: `index.js:44-49` returned 500 for every error without logging; a malformed body returned the parser's message. Impact: production failures left no trace and client mistakes counted as server errors. Done: `errors.js` and a new handler (logged as JSON; 400/409/413 where the client is at fault; generic 500 body), `asyncErrors.js` so rejected async handlers reach it."
+        },
+        {
+          "p": "**AR-02 Point-in-time screens read the full site history.** Evidence: `loadSiteTanks` selects every sounding and certificate of a site, twice per site for Stock Overview, refreshed every 60 s per open tab. Impact: load grows linearly with history (about 730 rows per gauged tank per year). Next: query only the needed days, latest certificate per tank, a short per-site cache. Effort M; planned with AR-15."
+        },
+        {
+          "p": "**AR-03 Node 20 end-of-life; floating image tags.** Done: Node 22 LTS in both Dockerfiles, CI and package engines; nginx pinned to 1.28-alpine. Backend tests pass on Node 22."
+        },
+        {
+          "p": "**AR-04 Production-unsafe defaults.** Evidence: compose defaults COOKIE_SECURE=false and the legacy bridge on; plain HTTP; no CSP/HSTS. Done: API security headers. Next: production compose must require explicit secure values (fail closed), HTTPS with HSTS at the host nginx, the API bound to the private address, an SPA CSP allowing the Hub frame."
+        }
+      ]
+    },
+    {
+      "heading": "6. Strengths to keep",
+      "blocks": [
+        {
+          "bullets": [
+            "Server-side RBAC reloaded per request; site and module scoping in middleware; role-grant escalation prevented and tested.",
+            "SSO with PKCE, state and nonce, algorithm pinning, maximum token age, single-use replay guard, iframe breakout, verified-e-mail linking.",
+            "Gauge scheduler: advisory lock, persisted attempts per round, configurable retries, archive fallback at the round time, backfill script, unit tests.",
+            "Migrations: transactional under an advisory lock; CI proves a second run is a no-op.",
+            "Per-site time zones; DATE kept as text; round times local to each site.",
+            "Secrets encrypted at rest and never returned; .dockerignore excludes env files; the API runs as a non-root user.",
+            "Destructive-script guard (--confirm-site); idempotent ingest keyed on business keys."
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "7. Roadmap",
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "When",
+                1.2
+              ],
+              [
+                "Item",
+                4
+              ],
+              [
+                "Findings",
+                1.2
+              ]
+            ],
+            "rows": [
+              [
+                "Before go-live",
+                "HTTPS, COOKIE_SECURE=true, HSTS, fail-closed production compose, API bound to the private IP",
+                "AR-04"
+              ],
+              [
+                "Before go-live",
+                "Dedicated credential encryption key (with a re-encryption step for existing secrets)",
+                "AR-17"
+              ],
+              [
+                "Before go-live",
+                "Backup (RDS snapshot or pg_dump) before the first production migration; restore tested once",
+                "AR-08"
+              ],
+              [
+                "Before go-live",
+                "Docker log rotation; alert when a gauge round is marked Failed",
+                "AR-09"
+              ],
+              [
+                "First release after go-live",
+                "Bounded reads for Tank & Stock and Stock Overview; per-site cache",
+                "AR-02, AR-20"
+              ],
+              [
+                "First release after go-live",
+                "One stock/commodity classification owned by the API (fixes functional F-11)",
+                "AR-14"
+              ],
+              [
+                "Next quarter",
+                "Service layer, error envelope, pagination, audit log, separate DB roles, worker service",
+                "AR-09, AR-15, AR-16, AR-18, AR-24"
+              ],
+              [
+                "Next quarter",
+                "Frontend unit tests and API integration tests in CI; docs refresh",
+                "AR-21, AR-22"
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

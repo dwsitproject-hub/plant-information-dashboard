@@ -1,0 +1,656 @@
+{
+  "title": "Penetration Test Report",
+  "subtitle": "Plant Information Dashboard",
+  "orientation": "landscape",
+  "footer": "PID · Penetration test · Confidential",
+  "meta": [
+    [
+      "Application",
+      "Plant Information Dashboard (PID)"
+    ],
+    [
+      "Code tested",
+      "Branch sit. Before fixes: ed63d97. After fixes: 8aad28b (fixes) and 6d35510 (QA suites)"
+    ],
+    [
+      "Environment tested",
+      "Isolated local QA copy: API 127.0.0.1:3010, frontend localhost:5176, throwaway PostgreSQL 16 seeded with Bekasi data and a second test site"
+    ],
+    [
+      "Date",
+      "17 November 2026"
+    ],
+    [
+      "Prepared by",
+      "Claude Code (prod-readiness-checks), for the PID project team"
+    ],
+    [
+      "Staging",
+      "Passive only: about 20 unauthenticated GET/HEAD/OPTIONS requests to 172.28.92.56:3091 and 172.28.92.57:3011"
+    ],
+    [
+      "Overall result",
+      "Before fixes: 1 High, 3 Medium, 3 Low, 3 Info. After: 0 High; open items need HTTPS or a decision (F-02 part, F-04, F-05). Automated tests: 22 SECURE, 0 VULNERABLE, 3 INFO."
+    ]
+  ],
+  "sections": [
+    {
+      "heading": "1. Executive summary",
+      "blocks": [
+        {
+          "p": "An authorized penetration test of the PID web application and API, at the owner's request. Active tests ran only against an isolated local copy; the staging servers, which host other products, received passive read-only requests only. Plant gauges were never contacted by any test."
+        },
+        {
+          "table": {
+            "columns": [
+              [
+                "Severity",
+                2
+              ],
+              [
+                "Found",
+                1
+              ],
+              [
+                "Fixed",
+                1
+              ],
+              [
+                "Partly fixed",
+                1
+              ],
+              [
+                "Open",
+                1
+              ]
+            ],
+            "rows": [
+              [
+                "High",
+                "1",
+                "1",
+                "0",
+                "0"
+              ],
+              [
+                "Medium",
+                "3",
+                "1",
+                "1",
+                "1"
+              ],
+              [
+                "Low",
+                "3",
+                "2",
+                "0",
+                "1"
+              ],
+              [
+                "Info",
+                "3",
+                "1",
+                "2",
+                "0"
+              ]
+            ]
+          }
+        },
+        {
+          "table": {
+            "columns": [
+              [
+                "Automated tests (25)",
+                2
+              ],
+              [
+                "SECURE",
+                1
+              ],
+              [
+                "VULNERABLE",
+                1
+              ],
+              [
+                "INFO",
+                1
+              ]
+            ],
+            "rows": [
+              [
+                "Before fixes",
+                "18",
+                "2",
+                "5"
+              ],
+              [
+                "After fixes",
+                "22",
+                "0",
+                "3"
+              ]
+            ]
+          }
+        },
+        {
+          "note": "Go/no-go (security): **Go for production on HTTPS**, with the legacy SSO bridge switched off once OIDC is confirmed. The remaining items are deployment settings (HTTPS, Secure cookie, HSTS, SPA CSP with the Hub origin), not code defects."
+        }
+      ]
+    },
+    {
+      "heading": "2. Scope and method",
+      "blocks": [
+        {
+          "bullets": [
+            "**Active (local QA copy):** API 127.0.0.1:3010, frontend localhost:5176, PostgreSQL container. Fixtures prefixed qa-pt-; lockout tests used a victim account created for the purpose.",
+            "**Passive (staging):** frontend 172.28.92.56:3091 and API 172.28.92.57:3011, unauthenticated GET/HEAD/OPTIONS only, about 20 requests, no logins, no payloads, no scans.",
+            "**Out of scope:** everything else on 172.28.x.x and 172.16.x.x (plant gauges), denial-of-service and load tests.",
+            "**Coverage (OWASP Top 10 2021 / ASVS):** authentication, session management, vertical and horizontal authorization (14 cross-site routes), injection, XSS, CSRF/CORS, SSRF, security headers, error handling, rate limiting, mass assignment, SSO (code review), secrets in git history, dependencies (npm audit), containers and nginx (code review).",
+            "**Tools:** `qa/pentest/pentest-suite.mjs` (25 automated tests), `qa/pentest/rate-limit-check.mjs`, npm audit, code review."
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "3. Findings summary",
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                0.6
+              ],
+              [
+                "Severity (CVSS)",
+                1.1
+              ],
+              [
+                "Finding",
+                3.6
+              ],
+              [
+                "Component",
+                2.2
+              ],
+              [
+                "Status",
+                0.9
+              ]
+            ],
+            "rows": [
+              [
+                "F-01",
+                "High (7.6)",
+                "Server-side request forgery via gauge / DataHub address and Test connection",
+                "tankgauging/client.js, sources.js, datahub/*",
+                "FIXED"
+              ],
+              [
+                "F-02",
+                "Medium (6.1)",
+                "No CSP / clickjacking protection; no HSTS",
+                "index.js; nginx configs",
+                "PARTIAL"
+              ],
+              [
+                "F-03",
+                "Medium (6.9)",
+                "body-parser < 1.20.9 denial of service (GHSA-27r3-jxmh-p828)",
+                "Backend/package.json",
+                "FIXED"
+              ],
+              [
+                "F-04",
+                "Medium (5.3)",
+                "Legacy HS256 SSO bridge links accounts by an unverified e-mail",
+                "routes/hub-auth.js, sso/resolve-user.js",
+                "OPEN"
+              ],
+              [
+                "F-05",
+                "Low (3.7)",
+                "Session cookie not Secure; staging served over HTTP",
+                "access.js; deployment",
+                "OPEN"
+              ],
+              [
+                "F-06",
+                "Low (3.1)",
+                "Internal error messages returned outside production; 500 for client errors",
+                "index.js",
+                "FIXED"
+              ],
+              [
+                "F-07",
+                "Low (3.1)",
+                "No rate limit beyond the per-account sign-in lockout",
+                "index.js",
+                "FIXED"
+              ],
+              [
+                "F-08",
+                "Info",
+                "X-Powered-By: Express",
+                "index.js",
+                "FIXED"
+              ],
+              [
+                "F-09",
+                "Info",
+                "Session token still valid after logout (until expiry)",
+                "access.js",
+                "PARTIAL"
+              ],
+              [
+                "F-10",
+                "Info",
+                "JWT algorithm not pinned; credential key falls back to JWT_SECRET",
+                "access.js, datahub/config.js",
+                "PARTIAL"
+              ]
+            ],
+            "status": 4
+          }
+        }
+      ]
+    },
+    {
+      "heading": "4. Finding details",
+      "pagebreak": true,
+      "blocks": [
+        {
+          "p": "**F-01 Server-side request forgery (High, CVSS 7.6, AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:L/A:L)**"
+        },
+        {
+          "kv": [
+            [
+              "What",
+              "An administrator-entered gauge or DataHub address was called by the server with no check: the test made the API fetch itself (127.0.0.1:3010) and accepted the cloud metadata address 169.254.169.254, and redirects were followed anywhere."
+            ],
+            [
+              "Impact",
+              "An attacker with an admin session (or a stolen one) could read services only the API host can reach, including cloud instance metadata and credentials."
+            ],
+            [
+              "Fix",
+              "New `outboundGuard.js`: loopback, unspecified, link-local, cloud metadata (169.254.169.254, Alibaba 100.100.100.200), multicast and reserved addresses are refused when saved and again before every call, host names by what they resolve to. Redirects are followed only on the same origin (the Tanjung Pura gateway's own sign-in redirect still works). Private ranges stay allowed because the plant gauges live there."
+            ],
+            [
+              "Re-test",
+              "PT-SSRF-01 and PT-SSRF-02 SECURE: 127.0.0.1, localhost, [::1], 0.0.0.0, 169.254.169.254 and 100.100.100.200 all refused with 400. Verified against the real Bontang and Tanjung Pura gauges that polling and archive reads still work."
+            ]
+          ]
+        },
+        {
+          "p": "**F-02 Missing CSP / clickjacking / HSTS (Medium, CVSS 6.1)**"
+        },
+        {
+          "kv": [
+            [
+              "What",
+              "The SPA HTML had no X-Frame-Options or CSP; the API sent no security headers; no HSTS (plain HTTP)."
+            ],
+            [
+              "Impact",
+              "The page can be framed by another site (clickjacking); no browser-side limit on script sources."
+            ],
+            [
+              "Fix",
+              "API now sends nosniff, X-Frame-Options DENY, Referrer-Policy no-referrer, CSP default-src 'none'; frame-ancestors 'none', CORP same-site; the SSO breakout page keeps its own nonce-based policy so Hub sign-in still works. **Open:** the SPA must stay framable by the Hub, so its CSP needs `frame-ancestors 'self' <Hub origin>` (Hub origin to confirm), and HSTS needs HTTPS at the host nginx."
+            ],
+            [
+              "Re-test",
+              "PT-HDR-01: all API headers present except HSTS (INFO: needs HTTPS)."
+            ]
+          ]
+        },
+        {
+          "p": "**F-04 Legacy SSO bridge trusts an unverified e-mail (Medium, CVSS 5.3)**"
+        },
+        {
+          "kv": [
+            [
+              "What",
+              "The legacy HS256 bridge links a Hub token to a local account by e-mail without requiring it to be verified. Staging has both OIDC and the legacy bridge enabled."
+            ],
+            [
+              "Impact",
+              "Anyone who obtains or guesses SSO_TOKEN_SECRET can sign in as any user whose e-mail they put in a token."
+            ],
+            [
+              "Fix",
+              "**Decision needed:** switch the legacy bridge off (`SSO_LEGACY_BRIDGE_ENABLED=false`) wherever OIDC works, and require a long random SSO_TOKEN_SECRET until then. Not changed here because staging sign-in may rely on it."
+            ],
+            [
+              "Re-test",
+              "Code review; not executed (the bridge is off on the QA copy)."
+            ]
+          ]
+        },
+        {
+          "p": "**F-05 Session cookie not Secure (Low, CVSS 3.7)**"
+        },
+        {
+          "kv": [
+            [
+              "What",
+              "The cookie is HttpOnly and SameSite=Lax but not Secure; staging is plain HTTP."
+            ],
+            [
+              "Impact",
+              "On an untrusted network the session cookie can be read in transit."
+            ],
+            [
+              "Fix",
+              "**Infrastructure:** serve production over HTTPS and set `COOKIE_SECURE=true` (and HSTS). The cookie lifetime now follows the token lifetime."
+            ],
+            [
+              "Re-test",
+              "PT-AUTHN-03 INFO."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "4.1 Other findings",
+      "level": 2,
+      "blocks": [
+        {
+          "bullets": [
+            "**F-03 body-parser DoS (Medium):** updated to 1.20.9; `npm audit --omit=dev` reports 0 vulnerabilities in Backend and Frontend.",
+            "**F-06 error messages (Low):** errors now return short codes (invalid_json, invalid_input, request_failed) and are logged on the server with method, path and user; no internal text reaches the client. Re-test PT-ERR-01 SECURE.",
+            "**F-07 rate limiting (Low):** per client address, 30 sign-ins and 600 API calls a minute (configurable). Re-test PT-RL-01 SECURE: 40 sign-ins to 40 accounts from one address, refused from attempt 31.",
+            "**F-08 X-Powered-By (Info):** removed. PT-HDR-02 SECURE.",
+            "**F-09 token after logout (Info):** partly fixed. A password change or admin reset now ends every other session (session version in the token). Logout still only clears the browser cookie; the token expires after 8 hours. Accepted for now.",
+            "**F-10 JWT (Info):** the algorithm is pinned to HS256. The credential encryption key still falls back to JWT_SECRET when DATAHUB_SECRET_KEY is unset: set a dedicated key in production (see the architecture report, AR-17)."
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "5. Test results by category",
+      "pagebreak": true,
+      "blocks": [
+        {
+          "table": {
+            "columns": [
+              [
+                "ID",
+                1.1
+              ],
+              [
+                "Category",
+                1.6
+              ],
+              [
+                "Test",
+                3.2
+              ],
+              [
+                "Before",
+                1
+              ],
+              [
+                "After",
+                1
+              ],
+              [
+                "Evidence (after)",
+                4
+              ]
+            ],
+            "rows": [
+              [
+                "PT-AUTHN-01",
+                "A07 Auth failures",
+                "Wrong password rejected with generic error",
+                "SECURE",
+                "SECURE",
+                "status=401 body={\"error\":\"invalid_credentials\"} (generic error; no user-vs-pass oracle)"
+              ],
+              [
+                "PT-AUTHN-02",
+                "A07 Auth failures",
+                "Account lockout / login throttle after repeated failures",
+                "SECURE",
+                "SECURE",
+                "429 first at attempt 11; statuses=401,401,401,401,401,401,401,401,401,401,429"
+              ],
+              [
+                "PT-AUTHN-03",
+                "A05 Misconfiguration",
+                "Session cookie flags (HttpOnly / SameSite / Secure)",
+                "INFO",
+                "INFO",
+                "HttpOnly=true SameSite=Lax=true Secure=false | pid_session=<redacted>; Max-Age=28799; Path=/; Expires=Tue, 17 Nov 2026 13:36:54 GMT; HttpOnly; SameSite=Lax (Secure off o…"
+              ],
+              [
+                "PT-AUTHN-04",
+                "A02 Crypto / A07",
+                "JWT forgery (wrong HMAC secret / alg:none) rejected",
+                "SECURE",
+                "SECURE",
+                "wrong-secret -> 401; alg:none -> 401"
+              ],
+              [
+                "PT-AUTHN-05",
+                "A01 Access control",
+                "Protected endpoints reject unauthenticated requests",
+                "SECURE",
+                "SECURE",
+                "/auth/me=401 /admin/users=401"
+              ],
+              [
+                "PT-AUTHN-06",
+                "A07 Auth failures",
+                "Password change requires correct current password",
+                "SECURE",
+                "SECURE",
+                "wrong current -> 401 {\"error\":\"bad_current_password\"}"
+              ],
+              [
+                "PT-AUTHN-07",
+                "A07 Session mgmt",
+                "Logout clears cookie; stateless JWT not invalidated server-side",
+                "INFO",
+                "INFO",
+                "logout=204 cookieCleared=true; same token after logout -> /me=200 (JWT valid until exp)"
+              ],
+              [
+                "PT-AUTHZ-01",
+                "A01 Access control",
+                "Low-priv user cannot read admin user list",
+                "SECURE",
+                "SECURE",
+                "GET /admin/users -> 403 {\"error\":\"forbidden\"}"
+              ],
+              [
+                "PT-AUTHZ-02",
+                "A01 Access control",
+                "Low-priv user cannot create roles",
+                "SECURE",
+                "SECURE",
+                "POST /admin/roles -> 403 {\"error\":\"forbidden\"}"
+              ],
+              [
+                "PT-AUTHZ-03",
+                "A01 Privilege escalation",
+                "Role manager cannot grant a permission it does not hold",
+                "SECURE",
+                "SECURE",
+                "create role w/ admin-datahub -> 403 {\"error\":\"cannot_grant_permission\"}"
+              ],
+              [
+                "PT-AUTHZ-04",
+                "A01 Privilege escalation",
+                "Non-admin cannot change own roles",
+                "SECURE",
+                "SECURE",
+                "self role change -> 403 {\"error\":\"cannot_change_own_roles\"}"
+              ],
+              [
+                "PT-AUTHZ-05",
+                "A01 Access control",
+                "Cannot grant a site the actor does not hold",
+                "SECURE",
+                "SECURE",
+                "created; siteCount=0; resulting sites=[] (SITE_A must be absent - actor doesn't hold it)"
+              ],
+              [
+                "PT-MASS-01",
+                "A08 Integrity",
+                "Mass assignment: is_system_role cannot be set via request body",
+                "SECURE",
+                "SECURE",
+                "create=201; stored isSystemRole=false"
+              ],
+              [
+                "PT-IDOR-01",
+                "A01 IDOR",
+                "Cross-site data access blocked on all site-scoped routes",
+                "SECURE",
+                "SECURE",
+                "qa-pt-low1 (holds qa-pt-site-b only) got 403/404 on all 14 qa-pt-site-a routes"
+              ],
+              [
+                "PT-IDOR-02",
+                "A01 IDOR",
+                "Positive control: user reaches its own site",
+                "SECURE",
+                "SECURE",
+                "GET /sites/qa-pt-site-b as qa-pt-low1 -> 200 (control is scoped, not blanket-deny)"
+              ],
+              [
+                "PT-INJ-01",
+                "A03 Injection",
+                "SQL injection in siteId path parameter",
+                "SECURE",
+                "SECURE",
+                "payload siteId -> 404 {\"error\":\"not_found\"} (parameterized query; no SQL error, no data)"
+              ],
+              [
+                "PT-INJ-02",
+                "A03 Injection",
+                "SQL injection in query-string filter",
+                "SECURE",
+                "SECURE",
+                "qc/storage?from=<payload> -> 400 {\"error\":\"invalid_date\",\"parameter\":\"from\"}; no SQL error (bound params; malformed days refused with 400)"
+              ],
+              [
+                "PT-INJ-03",
+                "A03 Injection",
+                "Prototype-pollution-style JSON has no effect",
+                "SECURE",
+                "SECURE",
+                "crafted __proto__ bodies handled without crash; API healthy=true; inputs cast via String()"
+              ],
+              [
+                "PT-SSRF-01",
+                "A10 SSRF",
+                "Gauge source URL / Test connection allows SSRF to internal hosts",
+                "VULNERABLE",
+                "SECURE",
+                "link-local metadata IP (169.254.169.254) accepted at validation=false; http://100.100.100.200/latest/meta-data/ -> 400; http://localhost:3010 -> 400; http://[::1]:3010 -…"
+              ],
+              [
+                "PT-SSRF-02",
+                "A10 SSRF",
+                "Non-http(s) URL schemes rejected on gauge source",
+                "SECURE",
+                "SECURE",
+                "file:// -> 400, gopher:// -> 400 (scheme restricted to http/https)"
+              ],
+              [
+                "PT-HDR-01",
+                "A05 Misconfiguration",
+                "Security response headers on the API",
+                "VULNERABLE",
+                "INFO",
+                "missing on direct API: strict-transport-security (needs HTTPS: set HSTS where TLS terminates)"
+              ],
+              [
+                "PT-HDR-02",
+                "A05 Misconfiguration",
+                "Technology disclosure via X-Powered-By",
+                "INFO",
+                "SECURE",
+                "X-Powered-By=(absent)"
+              ],
+              [
+                "PT-CORS-01",
+                "A05 Misconfiguration",
+                "CORS does not reflect arbitrary origins with credentials",
+                "SECURE",
+                "SECURE",
+                "evil ACAO=(none); allowed ACAO=http://localhost:5176; credentials=true gated to allowlist"
+              ],
+              [
+                "PT-ERR-01",
+                "A05 Misconfiguration",
+                "Error handler leaks internal messages (dev mode)",
+                "INFO",
+                "SECURE",
+                "malformed JSON -> 400 {\"error\":\"invalid_json\"}"
+              ],
+              [
+                "PT-RL-01",
+                "A04 Design",
+                "Rate limiting per client address (sign-in spraying across accounts)",
+                "INFO",
+                "SECURE",
+                "fresh API, real limits: 40 sign-ins to 40 different accounts from one address -> attempts 1-30 answered 401, 10 refused with 429 from attempt 31"
+              ]
+            ],
+            "status": 4
+          }
+        },
+        {
+          "p": "Method notes: the suite runs with the sign-in limit raised so its lockout and authorization tests are not cut short by the per-address limit; `rate-limit-check.mjs` then tests that limit on a freshly started API with the real settings. PT-INJ-02 now answers 400 because the malformed date in the payload is refused before any query runs."
+        }
+      ]
+    },
+    {
+      "heading": "6. Staging passive observations",
+      "blocks": [
+        {
+          "bullets": [
+            "**Good:** no /.env or /.git exposure (the SPA fallback answers), no source maps, no directory listing, nginx version hidden, CORS allowlist enforced, admin and data endpoints require a session, API port 3011 not reachable from the office network.",
+            "**Weak (fixed in code, live after the next deploy):** X-Powered-By: Express; no security headers from the API.",
+            "**Weak (deployment):** SPA HTML framable and no CSP; no HSTS (plain HTTP).",
+            "**Note:** staging has both OIDC and the legacy HS256 bridge enabled (`/auth/sso/status`), so F-04 applies there."
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "7. Controls that held",
+      "blocks": [
+        {
+          "bullets": [
+            "Parameterized SQL everywhere: no SQL injection in path, query or body.",
+            "Vertical and horizontal authorization: role, permission and site-grant escalation refused; 14 cross-site routes answered 403/404; mass assignment ignored.",
+            "Login: bcrypt hashes, generic error messages, per-account lockout after 10 failures (re-tested: 429 at attempt 11).",
+            "Forged and alg:none tokens rejected; CORS allowlist with credentials; React escaping, no XSS sinks.",
+            "Secrets encrypted at rest (AES-256-GCM) and never returned; OIDC with PKCE, state, nonce and replay guard; containers run as non-root."
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "8. Residual risk and recommendations",
+      "blocks": [
+        {
+          "numbers": [
+            "Serve production over HTTPS; set COOKIE_SECURE=true and HSTS at the host nginx.",
+            "Switch the legacy SSO bridge off once OIDC sign-in is confirmed; until then use a long random SSO_TOKEN_SECRET.",
+            "Add a CSP for the SPA with frame-ancestors limited to the Hub origin.",
+            "Set a dedicated DATAHUB_SECRET_KEY (credential encryption) in production, separate from JWT_SECRET.",
+            "Re-run `node qa/pentest/pentest-suite.mjs` and `rate-limit-check.mjs` before each major release."
+          ]
+        }
+      ]
+    }
+  ]
+}
