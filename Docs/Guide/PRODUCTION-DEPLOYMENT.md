@@ -151,10 +151,11 @@ Add the printed key in GitHub: repository settings → Deploy keys → Add, **re
 grep -q '^Host github-pid$' /root/.ssh/config 2>/dev/null || printf '\nHost github-pid\n  HostName github.com\n  User git\n  IdentityFile /root/.ssh/pid_deploy_key\n  IdentitiesOnly yes\n' >> /root/.ssh/config
 ```
 ```bash
-ssh -o StrictHostKeyChecking=accept-new -T github-pid; mkdir -p /opt/pid && git clone git@github-pid:dwsitproject-hub/plant-information-dashboard.git /opt/pid/src && git -C /opt/pid/src -c advice.detachedHead=false checkout v1.0.0 && git -C /opt/pid/src log --oneline -1
+ssh -o StrictHostKeyChecking=accept-new -T github-pid; mkdir -p /opt/pid && git clone git@github-pid:dwsitproject-hub/plant-information-dashboard.git /opt/pid/src && git -C /opt/pid/src -c advice.detachedHead=false checkout origin/sit && git -C /opt/pid/src log --oneline -1
 ```
-Expected: `Hi dwsitproject-hub/plant-information-dashboard! You've successfully authenticated…`, then the
-release commit. (If the clone failed half way, `rm -rf /opt/pid/src` before retrying.)
+Expected: `Hi dwsitproject-hub/plant-information-dashboard! You've successfully authenticated…`, then the latest
+`sit` commit. This checkout is only for the preflight below: `release.sh` checks out the release tag itself (§7).
+(If the clone failed half way, `rm -rf /opt/pid/src` before retrying.)
 
 **Preflight** (read-only). PuTTY on 172.28.80.51:
 ```bash
