@@ -501,6 +501,8 @@ export interface Messages {
   loading: string
   loginInvalid: string
   loginThrottled: string
+  loginRateLimited: string
+  requestRateLimited: string
   signingIn: string
   administration: string
   adminMenuTitle: string
@@ -607,6 +609,9 @@ export interface Messages {
   noRoles: string
   noSites: string
   accessNotConfigured: string
+  pageNotFound: string
+  pageNotFoundBody: string
+  pageNotFoundHome: string
   noSiteBody: string
   accessDenied: string
   accessDeniedBody: string
@@ -1378,6 +1383,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     loading: 'Loading…',
     loginInvalid: 'Invalid username or password.',
     loginThrottled: 'Too many failed sign-in attempts. Wait 15 minutes and try again.',
+    loginRateLimited: 'Too many sign-in attempts from this network. Wait a minute and try again.',
+    requestRateLimited: 'Too many requests from this network. Wait a minute and try again.',
     signingIn: 'Signing in…',
     administration: 'Administration',
     adminMenuTitle: 'Administration',
@@ -1484,6 +1491,9 @@ export const MESSAGES: Record<Locale, Messages> = {
     noRoles: 'No roles found.',
     noSites: 'No sites found.',
     accessNotConfigured: 'Access not configured',
+    pageNotFound: 'Page not found',
+    pageNotFoundBody: 'There is no page at this address. It may have moved, or the link is incomplete.',
+    pageNotFoundHome: 'Go to the start page',
     noSiteBody: 'No site assigned. Contact a Plant Information Dashboard administrator.',
     accessDenied: 'Access denied',
     accessDeniedBody: 'You do not have permission to view this page.',
@@ -2253,6 +2263,8 @@ export const MESSAGES: Record<Locale, Messages> = {
     loading: 'Memuat…',
     loginInvalid: 'Nama pengguna atau kata sandi salah.',
     loginThrottled: 'Terlalu banyak percobaan masuk yang gagal. Tunggu 15 menit lalu coba lagi.',
+    loginRateLimited: 'Terlalu banyak percobaan masuk dari jaringan ini. Tunggu satu menit lalu coba lagi.',
+    requestRateLimited: 'Terlalu banyak permintaan dari jaringan ini. Tunggu satu menit lalu coba lagi.',
     signingIn: 'Masuk…',
     administration: 'Administrasi',
     adminMenuTitle: 'Administrasi',
@@ -2359,6 +2371,9 @@ export const MESSAGES: Record<Locale, Messages> = {
     noRoles: 'Tidak ada peran.',
     noSites: 'Tidak ada site.',
     accessNotConfigured: 'Akses belum dikonfigurasi',
+    pageNotFound: 'Halaman tidak ditemukan',
+    pageNotFoundBody: 'Tidak ada halaman di alamat ini. Halaman mungkin sudah dipindah, atau tautannya tidak lengkap.',
+    pageNotFoundHome: 'Ke halaman awal',
     noSiteBody: 'Tidak ada site yang ditetapkan. Hubungi administrator Plant Information Dashboard.',
     accessDenied: 'Akses ditolak',
     accessDeniedBody: 'Anda tidak memiliki izin untuk melihat halaman ini.',

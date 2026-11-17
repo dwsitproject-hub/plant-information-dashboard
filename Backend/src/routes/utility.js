@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth, requirePermission, requireSiteModule } from '../access.js'
 import { query } from '../db.js'
+import { isCalendarDay, rejectBadDays } from '../dates.js'
 
 const router = Router({ mergeParams: true })
 
@@ -26,7 +27,11 @@ const FORMS = [
 const READING_FORMS = ['F/UTI-012', 'F/WTP-001', 'F/WWTP-001']
 const BOILER_FORMS = ['F/UTI-001', 'F/UTI-002']
 
-const ISO = /^\d{4}-\d{2}-\d{2}$/
+// A real calendar day, not just its shape (2026-02-30 would reach the database and fail there).
+const ISO = { test: isCalendarDay }
+
+// Days in the query string must be real days.
+router.use(rejectBadDays)
 
 function num(value) {
   if (value == null || value === '') return null

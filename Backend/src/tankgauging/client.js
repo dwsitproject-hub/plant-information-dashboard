@@ -19,7 +19,34 @@
  * - Tank names are read with or without the space and dash: "TK 5201", "TK5101", "TK-5702".
  */
 
+import { assertAllowedUrl, sameOrigin } from '../outboundGuard.js'
+
 export const DEFAULT_TANK_PARAM_IDS = '622|625|628|717|724|730'
+
+/**
+ * fetch that follows a redirect only within the same origin (the units send /index.esp to their sign-in
+ * page), at most three hops, and refuses addresses outboundGuard.js blocks. Cookies set on the way are
+ * collected and sent on, like a browser. Returns { res, cookies }.
+ */
+async function guardedFetch(fetchImpl, url, init) {
+  let current = String(url)
+  // Cookies already in the request (the session, or a configured cookie) go first.
+  const jar = init.headers?.Cookie ? [init.headers.Cookie] : []
+  for (let hop = 0; hop < 4; hop += 1) {
+    await assertAllowedUrl(current)
+    const headers = { ...(init.headers ?? {}) }
+    if (jar.length) headers.Cookie = jar.join('; ')
+    const res = await fetchImpl(current, { ...init, headers, redirect: 'manual' })
+    const set = typeof res.headers?.getSetCookie === 'function' ? res.headers.getSetCookie() : []
+    for (const c of set) jar.push(c.split(';')[0])
+    const location = res.status >= 300 && res.status < 400 && typeof res.headers?.get === 'function' ? res.headers.get('location') : null
+    if (!location) return { res, cookies: jar.join('; ') }
+    const next = sameOrigin(current, location)
+    if (!next) throw Object.assign(new Error(`The unit redirected to another host (${location}); not followed`), { status: 502, code: 'redirect_refused' })
+    current = next
+  }
+  throw new Error('Too many redirects')
+}
 
 export function trimBaseUrl(raw) {
   return String(raw || '').trim().replace(/\/+$/, '')
@@ -53,14 +80,14 @@ function timeoutMs(opts) {
 export async function openSession(baseUrl, opts = {}) {
   const fetchImpl = opts.fetchImpl ?? fetch
   try {
-    const res = await fetchImpl(`${baseUrl}/index.esp`, {
+    const { cookies } = await guardedFetch(fetchImpl, `${baseUrl}/index.esp`, {
       headers: buildAuthHeaders(baseUrl, opts.auth),
-      redirect: 'follow',
       signal: AbortSignal.timeout(Math.min(timeoutMs(opts), 8000)),
     })
-    const set = typeof res.headers?.getSetCookie === 'function' ? res.headers.getSetCookie() : []
-    return set.map((c) => c.split(';')[0]).join('; ')
-  } catch {
+    return cookies
+  } catch (error) {
+    // A refused address must not be hidden as "no session": the call that follows reports it.
+    if (error?.code === 'blocked_address') throw error
     return ''
   }
 }
@@ -81,9 +108,8 @@ async function gwtGet(searchParams, opts = {}) {
 
   const cookie = opts.cookie ?? (await openSession(baseUrl, opts))
   const attempt = async () => {
-    const res = await fetchImpl(url, {
+    const { res } = await guardedFetch(fetchImpl, url, {
       headers: buildAuthHeaders(baseUrl, opts.auth, cookie),
-      redirect: 'follow',
       signal: AbortSignal.timeout(timeoutMs(opts)),
     })
     return { res, text: await res.text() }

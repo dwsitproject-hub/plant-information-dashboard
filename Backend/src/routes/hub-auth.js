@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import express, { Router } from 'express'
 import jwt from 'jsonwebtoken'
 import { signSession } from '../access.js'
@@ -112,7 +113,7 @@ router.get('/oidc/callback', async (req, res) => {
     })
     if (resolved.error) return fail(res, resolved.error)
 
-    signSession(res, resolved.userId)
+    await signSession(res, resolved.userId)
     clearOidcFlowCookie(res)
     return res.redirect(302, `${appPublicOrigin()}/`)
   } catch (error) {
@@ -147,7 +148,7 @@ router.post('/hub', urlencoded, async (req, res) => {
       emailVerified: false,
     })
     if (resolved.error) return redirectToSsoError(res, resolved.error)
-    signSession(res, resolved.userId)
+    await signSession(res, resolved.userId)
     return res.redirect(302, `${appPublicOrigin()}/`)
   } catch (error) {
     if (error?.name === 'TokenExpiredError' || error?.name === 'JsonWebTokenError' || error?.name === 'NotBeforeError') {
@@ -172,9 +173,14 @@ function absoluteRequestUrl(req) {
 function sendBreakout(res, target) {
   const safeJs = JSON.stringify(target)
   const href = escapeHtmlAttr(target)
+  // This page runs inside the Hub's iframe, so it is the one API response that may be framed; and only
+  // its own inline script may run (the nonce changes on every response).
+  const nonce = crypto.randomBytes(16).toString('base64')
+  res.removeHeader('X-Frame-Options')
+  res.set('Content-Security-Policy', `default-src 'none'; script-src 'nonce-${nonce}'`)
   return res.status(200).type('html').send(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Continue sign-in</title></head><body>
-<script>try{window.top.location.replace(${safeJs});}catch(e){window.location.replace(${safeJs});}</script>
+<script nonce="${nonce}">try{window.top.location.replace(${safeJs});}catch(e){window.location.replace(${safeJs});}</script>
 <noscript><p><a href="${href}" target="_top">Continue sign-in</a></p></noscript>
 </body></html>`)
 }

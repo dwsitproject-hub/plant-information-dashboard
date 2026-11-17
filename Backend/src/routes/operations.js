@@ -8,6 +8,7 @@ import { massToKg, stockFromGauge, stockFromProfile } from '../domain/stock.js'
 import { assessStorage, oilFamilyOf, presentLogistics, presentTank } from '../domain/present.js'
 import { gaugeMeta, liveSounding, loadGaugedTanks, newestReading } from '../tankgauging/live.js'
 import { localDate } from '../tankgauging/rounds.js'
+import { calendarDay, rejectBadDays } from '../dates.js'
 
 const router = Router()
 
@@ -142,6 +143,7 @@ function certificateAsOf(rows, day) {
 // Every route under /sites needs a session. The site in the URL must be one the user holds, and the
 // data routes also need a right on a page that shows operational data.
 router.use('/sites', requireAuth)
+router.use('/sites', rejectBadDays)
 router.use('/sites/:siteId', requireSiteAccess)
 router.use(
   ['/sites/:siteId/snapshot', '/sites/:siteId/live', '/sites/:siteId/tanks', '/sites/:siteId/analytics', '/sites/:siteId/stock-history'],
@@ -494,10 +496,8 @@ export async function loadTankLabs(site, tankId) {
   })
 }
 
-/** A day as YYYY-MM-DD, or null when the text is not one. */
-function isoDay(value) {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
-}
+/** A real day as YYYY-MM-DD, or null (2026-02-30 is not one). */
+const isoDay = calendarDay
 
 // Every tank's daily stock between two days, for the Commodity Stock Movement section.
 router.get('/sites/:siteId/stock-history', async (req, res, next) => {

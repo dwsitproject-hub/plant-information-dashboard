@@ -12,9 +12,24 @@ export function RequireAuth() {
     return <p className="page-note">{t.loading}</p>
   }
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    // Keep the query too: a shared Stock Overview link carries its view in it.
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
   }
   return <Outlet />
+}
+
+/** An address that matches no page: say so, inside the app frame, instead of an empty screen. */
+export function NotFoundPage() {
+  const { t } = useLocale()
+  return (
+    <div className="page">
+      <section className="master-panel access-card">
+        <h1 className="page-title">{t.pageNotFound}</h1>
+        <p className="page-note">{t.pageNotFoundBody}</p>
+        <p><a href="/">{t.pageNotFoundHome}</a></p>
+      </section>
+    </div>
+  )
 }
 
 export function SiteRequired() {

@@ -158,6 +158,17 @@ router.get('/org', async (_req, res, next) => {
   }
 })
 
+/**
+ * Whether this user may change a site's settings: the Administrator any site, anyone else only a site
+ * granted to them. Read from user_sites, not the session, so a site they switched off is still theirs to
+ * switch back on.
+ */
+async function holdsSite(user, siteId) {
+  if (user?.isAdministrator === true) return true
+  const held = await query('SELECT 1 FROM user_sites WHERE user_id = $1 AND site_id = $2', [user?.id, siteId])
+  return held.rows.length > 0
+}
+
 // Switch a company or site on or off for this application.
 // A site needs its company on. A company with a site that is on cannot be switched off.
 async function setActivation(req, res, next) {
@@ -168,6 +179,11 @@ async function setActivation(req, res, next) {
     }
     const page = entityType === 'company' ? 'master-companies' : 'master-sites'
     if (!req.sessionUser?.permissions?.[page]?.edit) return res.status(403).json({ error: 'forbidden' })
+
+    // A company carries every site under it, so only the Administrator switches one; a site only by
+    // someone who holds it.
+    if (entityType === 'company' && req.sessionUser?.isAdministrator !== true) return res.status(403).json({ error: 'forbidden' })
+    if (entityType === 'site' && !(await holdsSite(req.sessionUser, id))) return res.status(404).json({ error: 'not_found' })
 
     if (entityType === 'site') {
       const site = await query('SELECT s.id, c.is_activated AS company_on FROM sites s JOIN companies c ON c.id = s.company_id WHERE s.id = $1', [id])
@@ -195,6 +211,7 @@ router.put('/org/activation', setActivation)
 router.put('/org/sites/:id', async (req, res, next) => {
   try {
     if (!req.sessionUser?.permissions?.['master-sites']?.edit) return res.status(403).json({ error: 'forbidden' })
+    if (!(await holdsSite(req.sessionUser, req.params.id))) return res.status(404).json({ error: 'not_found' })
     const timezone = String(req.body?.timezone ?? '').trim()
     try {
       new Intl.DateTimeFormat('en', { timeZone: timezone })

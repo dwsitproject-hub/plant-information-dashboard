@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { query } from '../db.js'
-import { clearSession, hashPassword, loadSession, requireAuth, signSession, verifyPassword } from '../access.js'
+import { clearSession, endOtherSessions, hashPassword, loadSession, requireAuth, signSession, verifyPassword } from '../access.js'
 import { loginThrottle } from '../loginThrottle.js'
 
 const router = Router()
@@ -17,7 +17,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: 'invalid_credentials' })
     }
     loginThrottle.succeed(username)
-    signSession(res, userId)
+    await signSession(res, userId)
     res.json(await loadSession(userId))
   } catch (error) {
     next(error)
@@ -59,6 +59,9 @@ router.put('/password', requireAuth, async (req, res, next) => {
       `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
       [await hashPassword(newPassword), req.sessionUser.id],
     )
+    // Other devices (or a stolen cookie) are signed out; this browser gets a fresh session.
+    await endOtherSessions({ query }, req.sessionUser.id)
+    await signSession(res, req.sessionUser.id)
     res.status(204).end()
   } catch (error) {
     next(error)

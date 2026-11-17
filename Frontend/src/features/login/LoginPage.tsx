@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { ApiError, api } from '../../data/api.ts'
 import { useAuth } from '../../data/AuthContext.tsx'
@@ -11,7 +11,15 @@ import '../../styles/guest-branded.css'
 
 const HERO_PHOTO = '/pid-login-bg.jpg'
 
+/** The page the user asked for before signing in, when it is a path inside this app. */
+function returnTo(state: unknown): string {
+  const from = (state as { from?: unknown } | null)?.from
+  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//') || from.startsWith('/login')) return '/'
+  return from
+}
+
 export function LoginPage() {
+  const location = useLocation()
   const { t, locale, setLocale } = useLocale()
   const { user, loading, login } = useAuth()
   const [username, setUsername] = useState('')
@@ -65,7 +73,7 @@ export function LoginPage() {
     }
   }
 
-  if (!loading && user) return <Navigate to="/" replace />
+  if (!loading && user) return <Navigate to={returnTo(location.state)} replace />
 
   return (
     <div className="guest-branded">

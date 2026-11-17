@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useActiveSite } from '../data/ActiveSiteContext.tsx'
+import { useLocale } from '../i18n/LocaleContext.tsx'
+import { PageErrorBoundary } from './PageErrorBoundary.tsx'
 import { Sidebar } from './Sidebar.tsx'
 import { Topbar } from './Topbar.tsx'
 
@@ -8,6 +10,8 @@ export function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { siteId } = useActiveSite()
+  const { t } = useLocale()
+  const { pathname } = useLocation()
 
   return (
     <div className="app">
@@ -21,7 +25,9 @@ export function AppShell() {
         />
         <main>
           {/* Switching site remounts the page, so every screen loads the new site from scratch. */}
-          <Outlet key={siteId} />
+          <PageErrorBoundary key={`${siteId}|${pathname}`} message={t.loadFailed}>
+            <Outlet key={siteId} />
+          </PageErrorBoundary>
         </main>
       </div>
     </div>

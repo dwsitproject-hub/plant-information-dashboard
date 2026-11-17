@@ -65,8 +65,26 @@ export async function loadRoundSettings(db, siteId) {
   }
 }
 
+/** The entries of a round-times text that are not a time of day as HH:MM (such as "99:99" or "1430"). */
+export function badRoundTimes(text) {
+  const parts = Array.isArray(text) ? text.map(String) : String(text ?? '').split(',')
+  return parts.map((part) => part.trim()).filter((part) => part && parseRoundTimes(part).length === 0)
+}
+
 export async function saveRoundSettings(db, siteId, { roundTimes, toleranceMin }, userId) {
-  const times = parseRoundTimes(roundTimes)
+  // Refuse the whole save when an entry is not a time: dropping it quietly would remove a round.
+  const bad = badRoundTimes(roundTimes)
+  if (bad.length) {
+    const error = new Error(`Not a time as HH:MM: ${bad.join(', ')}`)
+    error.status = 400
+    throw error
+  }
+  if (toleranceMin !== undefined && toleranceMin !== null && typeof toleranceMin !== 'number' && !/^\d+$/.test(String(toleranceMin))) {
+    const error = new Error('The tolerance must be a whole number of minutes')
+    error.status = 400
+    throw error
+  }
+  const times = parseRoundTimes(Array.isArray(roundTimes) ? roundTimes.join(',') : roundTimes)
   if (times.length === 0) {
     const error = new Error('Enter at least one time as HH:MM, separated by commas')
     error.status = 400

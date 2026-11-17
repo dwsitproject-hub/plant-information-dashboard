@@ -128,10 +128,11 @@ router.get('/runs', view, async (req, res, next) => {
 router.post('/runs', edit, async (req, res, next) => {
   const entity = req.body?.entityType
   if (!ENTITY_TYPES.includes(entity)) return res.status(400).json({ error: 'entityType must be company or site' })
-  const cfg = await getEffectiveConfig(pool)
-  if (!cfg.enabled || !cfg.baseUrl) return res.status(400).json({ error: 'DataHub is not configured.' })
-  if (!cfg.publicKey || !cfg.privateKey) return res.status(400).json({ error: 'DataHub key pair is not configured.' })
+  // Inside the try: Express 4 does not catch a rejected await, so a database error here would stop the API.
   try {
+    const cfg = await getEffectiveConfig(pool)
+    if (!cfg.enabled || !cfg.baseUrl) return res.status(400).json({ error: 'DataHub is not configured.' })
+    if (!cfg.publicKey || !cfg.privateKey) return res.status(400).json({ error: 'DataHub key pair is not configured.' })
     const { runId, summary } = await pullAndStage(pool, cfg, entity, { createdBy: req.sessionUser.id })
     await recordSyncHealth(pool, true)
     if (runId == null) return res.status(201).json({ run: null, summary, noChanges: true })
