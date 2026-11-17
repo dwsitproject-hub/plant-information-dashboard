@@ -229,9 +229,9 @@ nano /opt/pid/secrets.production.env
 
 | File | Setting | Value |
 |---|---|---|
-| `.env` | `PID_SUBNET` | the BE preflight's suggested subnet |
-| `production.env` | `OIDC_ISSUER` | the issuer the preflight printed (§4) |
-| `production.env` | `OIDC_CLIENT_ID` | from the Hub registration (§4) |
+| `.env` | `PID_SUBNET` | `172.16.248.0/24` as shipped (preflight suggestion, confirmed by infra) |
+| `production.env` | `OIDC_ISSUER` | `https://dwshub.kpndomain.com` as shipped (the issuer the preflight printed) |
+| `production.env` | `OIDC_CLIENT_ID` | `plant-information-dashboard` as shipped (the Hub registration) |
 | `production.env` | everything else | as shipped: address http://172.28.80.50:3091, `COOKIE_SECURE=false` (HTTP), `TRUST_PROXY=172.28.80.50`, OIDC on, legacy bridge off |
 | `secrets.production.env` | `DATABASE_URL` | `postgresql://<account>:<password>@<RDS host>:5432/<database>` from §3 |
 | `secrets.production.env` | `JWT_SECRET` | first random value; **not** staging's |
@@ -257,7 +257,7 @@ PuTTY on 172.28.80.50:
 ```bash
 mkdir -p /opt/pid && cp /opt/pid/src/deploy/production/compose.env.example /opt/pid/.env && nano /opt/pid/.env
 ```
-Set `PID_SUBNET` to the FE preflight's suggested subnet. Then:
+`PID_SUBNET=172.16.248.0/24` as shipped (save and exit). Then:
 ```bash
 /opt/pid/src/deploy/production/release.sh fe v1.0.0
 ```
