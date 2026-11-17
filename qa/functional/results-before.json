@@ -1,0 +1,1312 @@
+[
+  {
+    "id": "FT-AUTH-01",
+    "title": "Health endpoint answers",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "200 {ok:true}",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/health -> 200 {\"ok\":true,\"env\":\"dev\"}"
+  },
+  {
+    "id": "FT-AUTH-02",
+    "title": "Login with valid credentials sets an httpOnly session cookie and returns the session",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "200, Set-Cookie pid_session HttpOnly SameSite=Lax, body has id/username/sites/permissions, no password hash",
+    "actual": "HTTP 200",
+    "evidence": "POST /api/v1/auth/login -> 200 {\"id\":6,\"username\":\"qa-ft-ops\",\"displayName\":\"qa-ft-ops\",\"email\":\"qa-ft-ops@example.test\",\"sites\":[{\"id\":\"bekasi\",\"name\":\"Bekasi\",\"timezone\":\"Asia/Jakarta\",\"siteCode\":null,\"companyName\":\"PRC GENERAL HO JAKARTA\",\"companyC…"
+  },
+  {
+    "id": "FT-AUTH-03",
+    "title": "Login is case-insensitive on the username",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "200",
+    "actual": "HTTP 200",
+    "evidence": "POST /api/v1/auth/login -> 200 {\"id\":6,\"username\":\"qa-ft-ops\",\"displayName\":\"qa-ft-ops\",\"email\":\"qa-ft-ops@example.test\",\"sites\":[{\"id\":\"bekasi\",\"name\":\"Bekasi\",\"timezone\":\"Asia/Jakarta\",\"siteCode\":null,\"companyName\":\"PRC GENERAL HO JAKARTA\",\"companyC…"
+  },
+  {
+    "id": "FT-AUTH-04",
+    "title": "Login with the e-mail address instead of the username",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "200, username qa-ft-ops",
+    "actual": "HTTP 200",
+    "evidence": "POST /api/v1/auth/login -> 200 {\"id\":6,\"username\":\"qa-ft-ops\",\"displayName\":\"qa-ft-ops\",\"email\":\"qa-ft-ops@example.test\",\"sites\":[{\"id\":\"bekasi\",\"name\":\"Bekasi\",\"timezone\":\"Asia/Jakarta\",\"siteCode\":null,\"companyName\":\"PRC GENERAL HO JAKARTA\",\"companyC…"
+  },
+  {
+    "id": "FT-AUTH-05",
+    "title": "Login with a wrong password",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "401 invalid_credentials, no cookie",
+    "actual": "HTTP 401 error=invalid_credentials",
+    "evidence": "POST /api/v1/auth/login -> 401 {\"error\":\"invalid_credentials\"}"
+  },
+  {
+    "id": "FT-AUTH-06",
+    "title": "Login for an unknown user",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "401 invalid_credentials (same answer as a wrong password)",
+    "actual": "HTTP 401 error=invalid_credentials",
+    "evidence": "POST /api/v1/auth/login -> 401 {\"error\":\"invalid_credentials\"}"
+  },
+  {
+    "id": "FT-AUTH-07",
+    "title": "Login with missing username or password",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "400 invalid_credentials for both",
+    "actual": "HTTP 400 / 400",
+    "evidence": "POST /api/v1/auth/login -> 400 {\"error\":\"invalid_credentials\"} | POST /api/v1/auth/login -> 400 {\"error\":\"invalid_credentials\"}"
+  },
+  {
+    "id": "FT-AUTH-08",
+    "title": "Login with a malformed JSON body",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "FAIL",
+    "expected": "400 (client error), not a 500",
+    "actual": "HTTP 500 error=Unexpected end of JSON input",
+    "evidence": "POST /api/v1/auth/login -> 500 {\"error\":\"Unexpected end of JSON input\"}"
+  },
+  {
+    "id": "FT-AUTH-09",
+    "title": "Login for a deactivated user",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "401",
+    "actual": "HTTP 401 error=invalid_credentials",
+    "evidence": "POST /api/v1/auth/login -> 401 {\"error\":\"invalid_credentials\"}"
+  },
+  {
+    "id": "FT-AUTH-10",
+    "title": "GET /auth/me returns the signed-in session",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "200 with sites bekasi + qa-ft-site and their modules",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/auth/me -> 200 {\"id\":6,\"username\":\"qa-ft-ops\",\"displayName\":\"qa-ft-ops\",\"email\":\"qa-ft-ops@example.test\",\"sites\":[{\"id\":\"bekasi\",\"name\":\"Bekasi\",\"timezone\":\"Asia/Jakarta\",\"siteCode\":null,\"companyName\":\"PRC GENERAL HO JAKARTA\",\"companyC…"
+  },
+  {
+    "id": "FT-AUTH-11",
+    "title": "GET /auth/me without a session",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "401 unauthenticated",
+    "actual": "HTTP 401 error=unauthenticated",
+    "evidence": "GET /api/v1/auth/me -> 401 {\"error\":\"unauthenticated\"}"
+  },
+  {
+    "id": "FT-AUTH-12",
+    "title": "GET /auth/me with a tampered token",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "401",
+    "actual": "HTTP 401 error=unauthenticated",
+    "evidence": "GET /api/v1/auth/me -> 401 {\"error\":\"unauthenticated\"}"
+  },
+  {
+    "id": "FT-AUTH-13",
+    "title": "Logout clears the session cookie",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "204, Set-Cookie clears pid_session, /me then 401",
+    "actual": "logout 204, me 401",
+    "evidence": "POST /api/v1/auth/logout -> 204  set-cookie=pid_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT | GET /api/v1/auth/me -> 401 {\"error\":\"unauthenticated\"}"
+  },
+  {
+    "id": "FT-AUTH-14",
+    "title": "A session ends when the user is deactivated",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "/me 401 right after deactivation",
+    "actual": "create 201, login 200, me-after 401",
+    "evidence": "GET /api/v1/auth/me -> 401 {\"error\":\"unauthenticated\"}"
+  },
+  {
+    "id": "FT-AUTH-15",
+    "title": "Login throttle locks an account after 10 failures, even for the right password",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "Failures 1-10 -> 401; 11th (correct password) -> 429 too_many_attempts; other accounts unaffected",
+    "actual": "failures=[401,401,401,401,401,401,401,401,401,401], correct-after=429, other=200",
+    "evidence": "POST /api/v1/auth/login -> 429 {\"error\":\"too_many_attempts\"}"
+  },
+  {
+    "id": "FT-AUTH-16",
+    "title": "Change password: missing, short, same and wrong current password",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "400 current_password_required, 400 new_password_required, 400 password_short, 400 same_password, 401 bad_current_password",
+    "actual": "400:current_password_required, 400:new_password_required, 400:password_short, 400:same_password, 401:bad_current_password",
+    "evidence": "PUT /api/v1/auth/password -> 400 {\"error\":\"current_password_required\"} | PUT /api/v1/auth/password -> 400 {\"error\":\"new_password_required\"} | PUT /api/v1/auth/password -> 400 {\"error\":\"password_short\"} | PUT /api/v1/auth/password -> 400 {\"error\":\"same_password\"} | PUT /api/v1/auth/password -> 401 {\"error\":\"bad_current_password\"}"
+  },
+  {
+    "id": "FT-AUTH-17",
+    "title": "Change password, then sign in with the new password only",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "204; old password 401; new password 200",
+    "actual": "change 204, old 401, new 200",
+    "evidence": "PUT /api/v1/auth/password -> 204 "
+  },
+  {
+    "id": "FT-AUTH-18",
+    "title": "SSO status endpoint",
+    "type": "Positive",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "200 {oidcEnabled:boolean, legacyBridgeEnabled:boolean}",
+    "actual": "HTTP 200",
+    "evidence": "GET /auth/sso/status -> 200 {\"oidcEnabled\":false,\"legacyBridgeEnabled\":false}"
+  },
+  {
+    "id": "FT-AUTH-19",
+    "title": "Hub bridge without a token redirects to the SSO error page",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "302 to /sso-error?…",
+    "actual": "HTTP 302",
+    "evidence": "POST /auth/hub -> 302 Found. Redirecting to http://localhost:5176/sso-error?code=legacy_bridge_disabled"
+  },
+  {
+    "id": "FT-AUTH-20",
+    "title": "Unknown API path",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "404",
+    "actual": "HTTP 404",
+    "evidence": "GET /api/v1/does-not-exist -> 404 <!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot GET /api/v1/does-not-exist</pre>\n</body>\n</html>\n"
+  },
+  {
+    "id": "FT-AUTH-21",
+    "title": "Every protected route group refuses an anonymous caller",
+    "type": "Negative",
+    "area": "Auth & session",
+    "status": "PASS",
+    "expected": "401 for each",
+    "actual": "all 11 -> 401",
+    "evidence": ""
+  },
+  {
+    "id": "FT-ROLE-01",
+    "title": "List roles with counts",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "200, includes Administrator (system) and qa-ft-ops with viewCount 5",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/admin/roles -> 200 [{\"id\":2,\"name\":\"Administrator\",\"description\":\"Full access\",\"isSystemRole\":true,\"userCount\":2,\"viewCount\":19,\"editCount\":19,\"deleteCount\":19},{\"id\":3,\"name\":\"Viewer\",\"description\":\"Operational view\",\"isSystemRole\":true,\"…"
+  },
+  {
+    "id": "FT-ROLE-02",
+    "title": "Permission catalogue lists every page key",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "200, 19 keys incl. management-stock, admin-datahub",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/admin/permissions -> 200 [\"management-stock\",\"live-ops\",\"ops-analytics\",\"qc\",\"daily-production\",\"refinery-fractionation\",\"utility\",\"coverage\",\"master-companies\",\"master-sites\",\"master-plants\",\"master-commodities\",\"master-calibration\",\"master-tan…"
+  },
+  {
+    "id": "FT-ROLE-03",
+    "title": "Create a role; edit/delete imply view",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "201; qc = view+edit, utility = view+delete, unknown key ignored",
+    "actual": "create 201; qc={\"resourceKey\":\"qc\",\"view\":true,\"edit\":true,\"delete\":false} utility={\"resourceKey\":\"utility\",\"view\":true,\"edit\":false,\"delete\":true}",
+    "evidence": "POST /api/v1/admin/roles -> 201 {\"id\":23}"
+  },
+  {
+    "id": "FT-ROLE-04",
+    "title": "Create a role with a duplicate name",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "409 role_name_taken",
+    "actual": "HTTP 409 error=role_name_taken",
+    "evidence": "POST /api/v1/admin/roles -> 409 {\"error\":\"role_name_taken\"}"
+  },
+  {
+    "id": "FT-ROLE-05",
+    "title": "Create a role without a name",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "400 role_name_required",
+    "actual": "HTTP 400 error=role_name_required",
+    "evidence": "POST /api/v1/admin/roles -> 400 {\"error\":\"role_name_required\"}"
+  },
+  {
+    "id": "FT-ROLE-06",
+    "title": "Get a role by a non-numeric and a nonexistent id",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "400 ; 404",
+    "actual": "400 / 404",
+    "evidence": "GET /api/v1/admin/roles/abc -> 400 {\"error\":\"not_found\"} | GET /api/v1/admin/roles/999999 -> 404 {\"error\":\"not_found\"}"
+  },
+  {
+    "id": "FT-ROLE-07",
+    "title": "Rename and re-permission a role",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "200; GET shows new name and qc view only",
+    "actual": "200; name=qa-ft-tmp-mwk88f8y-b; on=qc",
+    "evidence": "PUT /api/v1/admin/roles/23 -> 200 {\"id\":23}"
+  },
+  {
+    "id": "FT-ROLE-08",
+    "title": "Delete a system role and a role in use",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "409 system_role ; 409 role_in_use",
+    "actual": "409:system_role / 409:role_in_use",
+    "evidence": "DELETE /api/v1/admin/roles/2 -> 409 {\"error\":\"system_role\"} | DELETE /api/v1/admin/roles/8 -> 409 {\"error\":\"role_in_use\"}"
+  },
+  {
+    "id": "FT-ROLE-09",
+    "title": "Delete an unused role; deleting it again is 404",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "204 then 404",
+    "actual": "204 / 404",
+    "evidence": "DELETE /api/v1/admin/roles/23 -> 204  | DELETE /api/v1/admin/roles/23 -> 404 {\"error\":\"not_found\"}"
+  },
+  {
+    "id": "FT-ROLE-10",
+    "title": "A user without admin rights cannot read roles or users",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "403 forbidden each",
+    "actual": "403 / 403 / 403",
+    "evidence": "GET /api/v1/admin/roles -> 403 {\"error\":\"forbidden\"} | GET /api/v1/admin/users -> 403 {\"error\":\"forbidden\"} | POST /api/v1/admin/roles -> 403 {\"error\":\"forbidden\"}"
+  },
+  {
+    "id": "FT-USER-01",
+    "title": "List and read users",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "200; qa-ft-ops has role qa-ft-ops and sites bekasi + qa-ft-site; no password data",
+    "actual": "list 200, get 200, sites=bekasi,qa-ft-site",
+    "evidence": "GET /api/v1/admin/users/6 -> 200 {\"id\":6,\"username\":\"qa-ft-ops\",\"displayName\":\"qa-ft-ops\",\"email\":\"qa-ft-ops@example.test\",\"isActive\":true,\"roles\":[{\"id\":8,\"name\":\"qa-ft-ops\",\"isSystemRole\":false}],\"sites\":[{\"id\":\"bekasi\",\"name\":\"Bekasi\",\"companyName\":\"…"
+  },
+  {
+    "id": "FT-USER-02",
+    "title": "Get a nonexistent user and a non-numeric id",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "404 ; 400",
+    "actual": "404 / 400",
+    "evidence": "GET /api/v1/admin/users/999999 -> 404 {\"error\":\"not_found\"} | GET /api/v1/admin/users/abc -> 400 {\"error\":\"not_found\"}"
+  },
+  {
+    "id": "FT-USER-03",
+    "title": "Create a user with a role and an activated site",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "201 {id, siteCount:1}; login 200 with site qa-ft-site",
+    "actual": "create 201 siteCount=1; login 200",
+    "evidence": "POST /api/v1/admin/users -> 201 {\"id\":54,\"siteCount\":1}"
+  },
+  {
+    "id": "FT-USER-04",
+    "title": "Create a user: missing username, missing password, short password",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "400 username_required ; 400 password_required ; 400 password_short",
+    "actual": "400:username_required, 400:password_required, 400:password_short",
+    "evidence": "POST /api/v1/admin/users -> 400 {\"error\":\"username_required\"} | POST /api/v1/admin/users -> 400 {\"error\":\"password_required\"} | POST /api/v1/admin/users -> 400 {\"error\":\"password_short\"}"
+  },
+  {
+    "id": "FT-USER-05",
+    "title": "Create a user with a duplicate username or e-mail",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "409 username_taken ; 409 email_taken",
+    "actual": "409:username_taken / 409:email_taken",
+    "evidence": "POST /api/v1/admin/users -> 409 {\"error\":\"username_taken\"} | POST /api/v1/admin/users -> 409 {\"error\":\"email_taken\"}"
+  },
+  {
+    "id": "FT-USER-06",
+    "title": "Create a user with a nonexistent role id",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "400, no user created",
+    "actual": "HTTP 400, rows=0",
+    "evidence": "POST /api/v1/admin/users -> 400 {\"error\":\"not_found\"}"
+  },
+  {
+    "id": "FT-USER-07",
+    "title": "Create a user with roleIds of the wrong type (string instead of array)",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "FAIL",
+    "expected": "400 validation error (not a 500)",
+    "actual": "HTTP 500 error=((intermediate value) ?? []).map is not a function",
+    "evidence": "POST /api/v1/admin/users -> 500 {\"error\":\"((intermediate value) ?? []).map is not a function\"}"
+  },
+  {
+    "id": "FT-USER-08",
+    "title": "Create a user with siteIds of the wrong type (object)",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "FAIL",
+    "expected": "400 validation error (not a 500)",
+    "actual": "HTTP 500 error=((intermediate value) ?? []).map is not a function",
+    "evidence": "POST /api/v1/admin/users -> 500 {\"error\":\"((intermediate value) ?? []).map is not a function\"}"
+  },
+  {
+    "id": "FT-USER-09",
+    "title": "Create a user with an invalid e-mail address",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "FAIL",
+    "expected": "400 invalid e-mail",
+    "actual": "HTTP 201",
+    "evidence": "POST /api/v1/admin/users -> 201 {\"id\":57,\"siteCount\":0}"
+  },
+  {
+    "id": "FT-USER-10",
+    "title": "Update a user with isActive as the string \"false\"",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "FAIL",
+    "expected": "400 (wrong type) or the user deactivated; never silently left active",
+    "actual": "HTTP 200, is_active after=true",
+    "evidence": "PUT /api/v1/admin/users/54 -> 200 {\"id\":54,\"siteCount\":1}"
+  },
+  {
+    "id": "FT-USER-11",
+    "title": "Update a user: display name, password reset, roles",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "200 {siteCount:1}; login 200",
+    "actual": "put 200, login 200, name=Renamed",
+    "evidence": "PUT /api/v1/admin/users/54 -> 200 {\"id\":54,\"siteCount\":1}"
+  },
+  {
+    "id": "FT-USER-12",
+    "title": "Update a user: short password, nonexistent id, non-numeric id",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "400 password_short ; 404 ; 400",
+    "actual": "400:password_short / 404 / 400",
+    "evidence": "PUT /api/v1/admin/users/54 -> 400 {\"error\":\"password_short\"} | PUT /api/v1/admin/users/999999 -> 404 {\"error\":\"not_found\"} | PUT /api/v1/admin/users/abc -> 400 {\"error\":\"not_found\"}"
+  },
+  {
+    "id": "FT-USER-13",
+    "title": "Administrator cannot deactivate or delete their own account",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "400 self_deactivate ; 400 self_delete (nothing changed)",
+    "actual": "400:self_deactivate / 400:self_delete",
+    "evidence": "PUT /api/v1/admin/users/1 -> 400 {\"error\":\"self_deactivate\"} | DELETE /api/v1/admin/users/1 -> 400 {\"error\":\"self_delete\"}"
+  },
+  {
+    "id": "FT-USER-14",
+    "title": "Delete a user: hidden from the list, cannot sign in, second delete is 404",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "204; not listed; login 401; 404",
+    "actual": "del 204, listed=false, login 401, del2 404",
+    "evidence": "DELETE /api/v1/admin/users/54 -> 204 "
+  },
+  {
+    "id": "FT-USER-15",
+    "title": "A deleted user's username can be used again",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "FAIL",
+    "expected": "201 (deleted users are hidden everywhere, so their name should be free) — or a message that says the name belongs to a deleted user",
+    "actual": "HTTP 409 error=username_taken",
+    "evidence": "POST /api/v1/admin/users -> 409 {\"error\":\"username_taken\"}"
+  },
+  {
+    "id": "FT-USER-16",
+    "title": "An activated site of a non-activated company is not grantable",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "200; list contains qa-ft-site and not bekasi (documents the QA-seed state used by the other cases)",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/admin/sites -> 200 [{\"id\":\"qa-ft-site\",\"name\":\"QA FT Site\",\"timezone\":\"Asia/Jakarta\",\"siteCode\":null,\"companyId\":\"qa-ft-co\",\"companyName\":\"QA FT Company\",\"companyCode\":\"QA-FT-CO\"},{\"id\":\"qa-ft-site2\",\"name\":\"QA FT Site 2\",\"timezone\":\"Asia/…"
+  },
+  {
+    "id": "FT-USER-17",
+    "title": "Delegated admin creates a user with a role inside their own rights, only on sites they hold",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "201, siteCount 1 (qa-other silently not granted)",
+    "actual": "HTTP 201",
+    "evidence": "POST /api/v1/admin/users -> 201 {\"id\":59,\"siteCount\":1}"
+  },
+  {
+    "id": "FT-USER-18",
+    "title": "Delegated admin cannot grant the Administrator role or a role with rights they lack",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "403 cannot_grant_role for both, no user created",
+    "actual": "403:cannot_grant_role / 403:cannot_grant_role",
+    "evidence": "POST /api/v1/admin/users -> 403 {\"error\":\"cannot_grant_role\"} | POST /api/v1/admin/users -> 403 {\"error\":\"cannot_grant_role\"}"
+  },
+  {
+    "id": "FT-USER-19",
+    "title": "Delegated admin cannot change their own roles",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "403 cannot_change_own_roles",
+    "actual": "HTTP 403 error=cannot_change_own_roles",
+    "evidence": "PUT /api/v1/admin/users/11 -> 403 {\"error\":\"cannot_change_own_roles\"}"
+  },
+  {
+    "id": "FT-USER-20",
+    "title": "Delegated admin cannot manage a user holding the Administrator role",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "403 cannot_manage_user for both",
+    "actual": "403:cannot_manage_user / 403:cannot_manage_user",
+    "evidence": "PUT /api/v1/admin/users/14 -> 403 {\"error\":\"cannot_manage_user\"} | DELETE /api/v1/admin/users/14 -> 403 {\"error\":\"cannot_manage_user\"}"
+  },
+  {
+    "id": "FT-USER-21",
+    "title": "Delegated admin cannot create a role holding rights they lack, nor edit a system role",
+    "type": "Negative",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "403 cannot_grant_permission ; 403 system_role",
+    "actual": "403:cannot_grant_permission / 403:system_role",
+    "evidence": "POST /api/v1/admin/roles -> 403 {\"error\":\"cannot_grant_permission\"} | PUT /api/v1/admin/roles/3 -> 403 {\"error\":\"system_role\"}"
+  },
+  {
+    "id": "FT-USER-22",
+    "title": "Delegated admin lists only the sites they may grant, and deletes the user they created",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "sites = [qa-ft-site]; 204",
+    "actual": "sites=qa-ft-site; delete 204",
+    "evidence": "GET /api/v1/admin/sites -> 200 [{\"id\":\"qa-ft-site\",\"name\":\"QA FT Site\",\"timezone\":\"Asia/Jakarta\",\"siteCode\":null,\"companyId\":\"qa-ft-co\",\"companyName\":\"QA FT Company\",\"companyCode\":\"QA-FT-CO\"}] | DELETE /api/v1/admin/users/59 -> 204 "
+  },
+  {
+    "id": "FT-SITE-01",
+    "title": "Site list holds only the sites a user has",
+    "type": "Positive",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "qa-ft-ops: [bekasi, qa-ft-site]; qa-ft-nosite: []",
+    "actual": "ops=bekasi,qa-ft-site; nosite=0",
+    "evidence": "GET /api/v1/sites -> 200 [{\"id\":\"bekasi\",\"name\":\"Bekasi\",\"timezone\":\"Asia/Jakarta\",\"companyName\":\"PRC GENERAL HO JAKARTA\"},{\"id\":\"qa-ft-site\",\"name\":\"QA FT Site\",\"timezone\":\"Asia/Jakarta\",\"companyName\":\"QA FT Company\"}]"
+  },
+  {
+    "id": "FT-SITE-02",
+    "title": "Site detail for a held site",
+    "type": "Positive",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "200 {siteName:Bekasi, timezone:Asia/Jakarta}",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi -> 200 {\"companyName\":\"PRC GENERAL HO JAKARTA\",\"companyCode\":\"PRC-HO\",\"siteName\":\"Bekasi\",\"siteCode\":null,\"timezone\":\"Asia/Jakarta\"}"
+  },
+  {
+    "id": "FT-SITE-03",
+    "title": "Any site route for a site the user does not hold, or that does not exist",
+    "type": "Negative",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "403 forbidden for each (no data leak)",
+    "actual": "403 / 403 / 403 / 403",
+    "evidence": "GET /api/v1/sites/qa-other -> 403 {\"error\":\"forbidden\"} | GET /api/v1/sites/qa-other/live/tanks -> 403 {\"error\":\"forbidden\"} | GET /api/v1/sites/qa-other/qc/storage -> 403 {\"error\":\"forbidden\"} | GET /api/v1/sites/nope/snapshot -> 403 {\"error\":\"forbidden\"}"
+  },
+  {
+    "id": "FT-SITE-04",
+    "title": "Site module matrix",
+    "type": "Positive",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "200, modules = [live-ops, qc, utility, daily-production]; qa-ft-site shows [qc]",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/admin/site-modules -> 200 {\"modules\":[\"live-ops\",\"qc\",\"utility\",\"daily-production\"],\"sites\":[{\"id\":\"qa-ft-site\",\"name\":\"QA FT Site\",\"companyName\":\"QA FT Company\",\"siteCode\":null,\"modules\":[\"qc\"]},{\"id\":\"qa-ft-site2\",\"name\":\"QA FT Site 2\",\"company…"
+  },
+  {
+    "id": "FT-SITE-05",
+    "title": "Set site modules with invalid input",
+    "type": "Negative",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "400 invalid_modules ; 400 invalid_modules ; 404 site_not_found",
+    "actual": "400 / 400 / 404",
+    "evidence": "PUT /api/v1/admin/site-modules/qa-ft-site -> 400 {\"error\":\"invalid_modules\"} | PUT /api/v1/admin/site-modules/qa-ft-site -> 400 {\"error\":\"invalid_modules\"} | PUT /api/v1/admin/site-modules/no-such-site -> 404 {\"error\":\"site_not_found\"}"
+  },
+  {
+    "id": "FT-SITE-06",
+    "title": "Pages of a module that is off for the site are refused",
+    "type": "Negative",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "403 module_not_enabled for each",
+    "actual": "403:module_not_enabled / 403:module_not_enabled / 403:module_not_enabled / 403:module_not_enabled",
+    "evidence": "GET /api/v1/sites/qa-ft-site/live/tanks -> 403 {\"error\":\"module_not_enabled\"} | GET /api/v1/sites/qa-ft-site/utility -> 403 {\"error\":\"module_not_enabled\"} | GET /api/v1/sites/qa-ft-site/production -> 403 {\"error\":\"module_not_enabled\"} | GET /api/v1/sites/qa-ft-site/stock-history?from=2026-10-01&to=2026-10-02 -> 403 {\"error\":\"module_not_enabled\"}"
+  },
+  {
+    "id": "FT-SITE-07",
+    "title": "Switching a module on takes effect at once, switching it off blocks again",
+    "type": "Positive",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "PUT 200; live/tanks 200 []; /me lists live-ops; after [] qc/storage 403 module_not_enabled",
+    "actual": "put 200; live 200; me modules=live-ops,qc; put[] 200; qc 403:module_not_enabled",
+    "evidence": "GET /api/v1/sites/qa-ft-site/qc/storage -> 403 {\"error\":\"module_not_enabled\"}"
+  },
+  {
+    "id": "FT-SITE-08",
+    "title": "Module settings need master-sites rights",
+    "type": "Negative",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "403 ; 403",
+    "actual": "403 / 403",
+    "evidence": "GET /api/v1/admin/site-modules -> 403 {\"error\":\"forbidden\"} | PUT /api/v1/admin/site-modules/qa-ft-site -> 403 {\"error\":\"forbidden\"}"
+  },
+  {
+    "id": "FT-SITE-09",
+    "title": "A user with a site but no page rights sees no operational data",
+    "type": "Negative",
+    "area": "Site access & modules",
+    "status": "PASS",
+    "expected": "/me 200 with empty permissions; every other call 403",
+    "actual": "me 200, 9 x 403",
+    "evidence": ""
+  },
+  {
+    "id": "FT-MD-01",
+    "title": "Organisation tree",
+    "type": "Positive",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "200 with companies, sites (bekasi, qa-other, qa-ft-site), plants",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/master/org -> 200 {\"companies\":[{\"id\":\"prc-general-ho-jakarta\",\"code\":\"PRC-HO\",\"name\":\"PRC GENERAL HO JAKARTA\",\"shortName\":null,\"country\":null,\"hubCode\":null,\"isActive\":true,\"isActivated\":false},{\"id\":\"qa-ft-co\",\"code\":\"QA-FT-CO\",\"name\":\"…"
+  },
+  {
+    "id": "FT-MD-02",
+    "title": "Commodity list for a site with rule counts",
+    "type": "Positive",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "200, 9 commodities, cpo has ruleCount 6",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/master/commodities?siteId=bekasi -> 200 {\"site\":{\"id\":\"bekasi\",\"name\":\"Bekasi\"},\"commodities\":[{\"id\":\"cpo\",\"code\":\"CPO\",\"name\":\"Crude palm oil\",\"ruleCount\":6,\"rejectCount\":3,\"watchCount\":3,\"updatedAt\":\"2026-11-17T04:48:33.447Z\",\"aliases\":[\"CPO\",\"cpo\"]},{\"id\":\"…"
+  },
+  {
+    "id": "FT-MD-03",
+    "title": "Commodity list without a site, or for an unknown site",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "400 or 404 site_not_found for both",
+    "actual": "404:site_not_found / 404:site_not_found",
+    "evidence": "GET /api/v1/master/commodities -> 404 {\"error\":\"site_not_found\"} | GET /api/v1/master/commodities?siteId=no-such-site -> 404 {\"error\":\"site_not_found\"}"
+  },
+  {
+    "id": "FT-MD-04",
+    "title": "Read one commodity's storage specs and the parameter catalogue",
+    "type": "Positive",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "200, 14 parameters (incl. lab.odor kind pass), rules list",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/master/commodities/cpo/specs?siteId=bekasi -> 200 {\"site\":{\"id\":\"bekasi\",\"name\":\"Bekasi\"},\"commodity\":{\"id\":\"cpo\",\"code\":\"CPO\",\"name\":\"Crude palm oil\"},\"parameters\":[{\"code\":\"lab.ffa\",\"label\":\"FFA\",\"unit\":\"%\",\"kind\":\"number\"},{\"code\":\"lab.moisture\",\"label\":\"M&I\",\"unit\":…"
+  },
+  {
+    "id": "FT-MD-05",
+    "title": "Specs of a nonexistent commodity",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "404 not_found for both",
+    "actual": "404 / 404",
+    "evidence": "GET /api/v1/master/commodities/nope/specs?siteId=bekasi -> 404 {\"error\":\"not_found\"} | PUT /api/v1/master/commodities/nope/specs?siteId=qa-ft-site -> 404 {\"error\":\"not_found\"}"
+  },
+  {
+    "id": "FT-MD-06",
+    "title": "Save a commodity's storage specs and read them back",
+    "type": "Positive",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "200; 5 rules stored in quality_rules for qa-ft-site/cpo; odour limit null; \"0.5\" stored as 0.5; list ruleCount 5, rejectCount 3",
+    "actual": "HTTP 200; db rows=5; moisture=0.5; list ruleCount=5 reject=3",
+    "evidence": "PUT /api/v1/master/commodities/cpo/specs?siteId=qa-ft-site -> 200 {\"rules\":[{\"parameterCode\":\"lab.ffa\",\"bound\":\"max\",\"limit\":5,\"severity\":\"reject\",\"updatedAt\":\"2026-11-17T05:03:27.097Z\"},{\"parameterCode\":\"lab.moisture\",\"bound\":\"max\",\"limit\":0.5,\"severity\":\"reject\",\"updatedAt\":\"2026-11-…"
+  },
+  {
+    "id": "FT-MD-07",
+    "title": "Spec validation: every invalid input is refused and nothing is changed",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "400 with invalid_rules, unknown_parameter, invalid_severity, invalid_bound, limit_required, limit_required, duplicate_rule, min_above_max; DB still 5 rules",
+    "actual": "400:invalid_rules, 400:unknown_parameter, 400:invalid_severity, 400:invalid_bound, 400:limit_required, 400:limit_required, 400:duplicate_rule, 400:min_above_max; db rows=5",
+    "evidence": ""
+  },
+  {
+    "id": "FT-MD-08",
+    "title": "Spec limit boundaries: negative, zero and non-finite limits",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "Negative limit accepted 200 (cloud point can be below 0 °C); 1e309 (Infinity) refused 400 limit_required; 0 accepted 200",
+    "actual": "-1 -> 200; 1e309 -> 400:limit_required; 0 -> 200",
+    "evidence": "PUT /api/v1/master/commodities/pfad/specs?siteId=qa-ft-site -> 200 {\"rules\":[{\"parameterCode\":\"lab.cloud_point\",\"bound\":\"max\",\"limit\":-1,\"severity\":\"reject\",\"updatedAt\":\"2026-11-17T05:03:27.404Z\"}]} | PUT /api/v1/master/commodities/pfad/specs?siteId=qa-ft-site -> 400 {\"error\":\"limit_required\"}"
+  },
+  {
+    "id": "FT-MD-09",
+    "title": "Clearing all rules leaves the commodity spec-pending",
+    "type": "Positive",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "200 {rules:[]}; DB 0 rows",
+    "actual": "HTTP 200; db rows=0",
+    "evidence": "PUT /api/v1/master/commodities/cpo/specs?siteId=qa-ft-site -> 200 {\"rules\":[]}"
+  },
+  {
+    "id": "FT-MD-10",
+    "title": "Non-admin cannot read or edit specs of a site they do not hold; viewer cannot edit",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "404 site_not_found ; 404 site_not_found ; 403 forbidden",
+    "actual": "404 / 404 / 403",
+    "evidence": "GET /api/v1/master/commodities/cpo/specs?siteId=qa-other -> 404 {\"error\":\"site_not_found\"} | PUT /api/v1/master/commodities/cpo/specs?siteId=qa-other -> 404 {\"error\":\"site_not_found\"} | PUT /api/v1/master/commodities/cpo/specs?siteId=qa-ft-site -> 403 {\"error\":\"forbidden\"}"
+  },
+  {
+    "id": "FT-MD-11",
+    "title": "Non-admin master editor saves specs on a site they hold",
+    "type": "Positive",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "200, 1 rule; clear 200",
+    "actual": "200 rules=1 / 200",
+    "evidence": "PUT /api/v1/master/commodities/rpo/specs?siteId=qa-ft-site -> 200 {\"rules\":[{\"parameterCode\":\"lab.ffa\",\"bound\":\"max\",\"limit\":0.1,\"severity\":\"reject\",\"updatedAt\":\"2026-11-17T05:03:27.669Z\"}]}"
+  },
+  {
+    "id": "FT-MD-12",
+    "title": "Change a site timezone",
+    "type": "Positive",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "200 {ok:true}; DB updated",
+    "actual": "HTTP 200; db=Asia/Makassar",
+    "evidence": "PUT /api/v1/master/org/sites/qa-ft-site -> 200 {\"ok\":true,\"timezone\":\"Asia/Makassar\"}"
+  },
+  {
+    "id": "FT-MD-13",
+    "title": "Site timezone: invalid zone, empty, unknown site",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "400 invalid_timezone ; 400 invalid_timezone ; 404",
+    "actual": "400 / 400 (db tz now 'Asia/Jakarta') / 404",
+    "evidence": "PUT /api/v1/master/org/sites/qa-ft-site -> 400 {\"error\":\"invalid_timezone\"} | PUT /api/v1/master/org/sites/qa-ft-site -> 400 {\"error\":\"invalid_timezone\"} | PUT /api/v1/master/org/sites/no-such-site -> 404 {\"error\":\"not_found\"}"
+  },
+  {
+    "id": "FT-MD-14",
+    "title": "Activation rules: company with an active site, site of an inactive company, bad input",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "409 company_has_active_sites ; site-on under an off company 409 company_not_activated ; 400 invalid_request ; 404",
+    "actual": "409:company_has_active_sites; site-off 200; co-off 200; 409:company_not_activated; 400; 404",
+    "evidence": "PUT /api/v1/master/org/activation -> 409 {\"error\":\"company_not_activated\"}"
+  },
+  {
+    "id": "FT-MD-15",
+    "title": "A non-admin master-sites editor cannot change a site they do not hold",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "FAIL",
+    "expected": "403/404 for both and qa-ft-site2 unchanged — as for commodity specs, tank gauging and site modules, a non-admin may act only on sites they hold",
+    "actual": "timezone PUT 200; activation PUT 200; DB after: timezone=Asia/Makassar, is_activated=false",
+    "evidence": "PUT /api/v1/master/org/sites/qa-ft-site2 -> 200 {\"ok\":true,\"timezone\":\"Asia/Makassar\"} | PUT /api/v1/master/org/activation -> 200 {\"ok\":true}"
+  },
+  {
+    "id": "FT-MD-16",
+    "title": "Org changes need master rights",
+    "type": "Negative",
+    "area": "Master data & commodity specs",
+    "status": "PASS",
+    "expected": "403 ; 403",
+    "actual": "403 / 403",
+    "evidence": "PUT /api/v1/master/org/sites/qa-ft-site -> 403 {\"error\":\"forbidden\"} | PUT /api/v1/master/org/activation -> 403 {\"error\":\"forbidden\"}"
+  },
+  {
+    "id": "FT-OPS-01",
+    "title": "Snapshot of a site with logsheet data",
+    "type": "Positive",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200, soundingAsOf 2026-10-20, soundingDates sorted, hasLabData true",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/snapshot -> 200 {\"dataSource\":\"api\",\"soundingAsOf\":\"2026-10-20\",\"soundingDates\":[\"2026-07-22\",\"2026-07-23\",\"2026-07-24\",\"2026-07-25\",\"2026-07-26\",\"2026-07-27\",\"2026-07-28\",\"2026-07-29\",\"2026-07-30\",\"2026-07-31\",\"2026-08-01\",\"2026-08-02\"…"
+  },
+  {
+    "id": "FT-OPS-02",
+    "title": "Tanks of the latest day",
+    "type": "Positive",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200, one row per tank, all recordedOn = 2026-10-20 or no reading; quantity <= capacity",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/live/tanks -> 200 [{\"tankId\":\"T01\",\"productName\":\"\",\"oilFamily\":\"RPL\",\"soundingLevelM\":null,\"temperatureC\":47,\"operationalStatus\":\"EMPTY\",\"recordedOn\":\"2026-10-20\",\"readingRound\":92,\"capacityKg\":300000,\"quantityKg\":0,\"emptySpaceKg\":300000…"
+  },
+  {
+    "id": "FT-OPS-03",
+    "title": "Tanks of a chosen earlier day",
+    "type": "Positive",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200, rows recordedOn 2026-10-01",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/live/tanks?on=2026-10-01 -> 200 [{\"tankId\":\"T01\",\"productName\":\"OLEIN\",\"oilFamily\":\"RPL\",\"soundingLevelM\":0.04,\"temperatureC\":30,\"operationalStatus\":\"ISI LB\",\"recordedOn\":\"2026-10-01\",\"readingRound\":72,\"capacityKg\":300000,\"quantityKg\":1652.8,\"emptySpac…"
+  },
+  {
+    "id": "FT-OPS-04",
+    "title": "Tanks for a malformed day",
+    "type": "Negative",
+    "area": "Tank & Stock (live-ops)",
+    "status": "FAIL",
+    "expected": "400 invalid date (not 200 with recordedOn \"garbage\")",
+    "actual": "200 (first recordedOn=garbage) / 200",
+    "evidence": "GET /api/v1/sites/bekasi/live/tanks?on=garbage -> 200 [{\"tankId\":\"T01\",\"productName\":\"\",\"oilFamily\":\"RPL\",\"soundingLevelM\":null,\"temperatureC\":null,\"operationalStatus\":\"\",\"recordedOn\":\"garbage\",\"readingRound\":null,… | GET /api/v1/sites/bekasi/live/tanks?on=2026-02-30 -> 200 [{\"tankId\":\"T01\",\"productName\":\"\",\"oilFamily\":\"UNKNOWN\",\"soundingLevelM\":null,\"temperatureC\":null,\"operationalStatus\":\"\"…"
+  },
+  {
+    "id": "FT-OPS-05",
+    "title": "Stock history between two days (Commodity Stock Movement)",
+    "type": "Positive",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200, [{tankId, points}] and every point between the two days",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/stock-history?from=2026-10-01&to=2026-10-20 -> 200 [{\"tankId\":\"BAK CURAH CPO A\",\"points\":[{\"roundIndex\":72,\"recordedOn\":\"2026-10-01\",\"soundingLevelM\":0.13,\"temperatureC\":null,\"operationalStatus\":\"ISI LB\",\"massKg\":null,\"capacityKg\":null,\"quantityKg\":null,\"emptySpaceKg\":nu…"
+  },
+  {
+    "id": "FT-OPS-06",
+    "title": "Stock history: missing range, reversed range, wrong format",
+    "type": "Negative",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "400 invalid_range for each",
+    "actual": "400:invalid_range / 400:invalid_range / 400:invalid_range",
+    "evidence": ""
+  },
+  {
+    "id": "FT-OPS-07",
+    "title": "Stock history with an impossible calendar date",
+    "type": "Negative",
+    "area": "Tank & Stock (live-ops)",
+    "status": "FAIL",
+    "expected": "400 invalid_range (not a 500 with a database error)",
+    "actual": "500 / 500",
+    "evidence": "GET /api/v1/sites/bekasi/stock-history?from=2026-02-30&to=2026-03-01 -> 500 {\"error\":\"date/time field value out of range: \\\"2026-02-30\\\"\"} | GET /api/v1/sites/bekasi/stock-history?from=2026-10-01&to=2026-13-01 -> 500 {\"error\":\"date/time field value out of range: \\\"2026-13-01\\\"\"}"
+  },
+  {
+    "id": "FT-OPS-08",
+    "title": "One tank's sounding history and labs",
+    "type": "Positive",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200, soundings ordered by day; labs list with storageVerdict",
+    "actual": "soundings 200 n=89; labs 200 n=3",
+    "evidence": ""
+  },
+  {
+    "id": "FT-OPS-09",
+    "title": "History of a tank that does not exist",
+    "type": "Negative",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200 [] or 404 for both (no error)",
+    "actual": "200 [] / 200 []",
+    "evidence": ""
+  },
+  {
+    "id": "FT-OPS-10",
+    "title": "Logistics, analytics summary and movements",
+    "type": "Positive",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200 each; summary approvalRate in [0,1]; with tankId approvalRate null",
+    "actual": "200/200/200/200 rate=0.994413407821229",
+    "evidence": ""
+  },
+  {
+    "id": "FT-OPS-11",
+    "title": "Live-ops data needs live-ops or ops-analytics view",
+    "type": "Negative",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "403 forbidden each",
+    "actual": "403 / 403 / 403 / 403",
+    "evidence": ""
+  },
+  {
+    "id": "FT-OPS-12",
+    "title": "A live-ops viewer reads the dashboard of a held site",
+    "type": "Positive",
+    "area": "Tank & Stock (live-ops)",
+    "status": "PASS",
+    "expected": "200, same tank count as for the Administrator",
+    "actual": "200 n=28 (admin n=28)",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-01",
+    "title": "Portfolio totals equal the sum of the sites and of the commodity classes",
+    "type": "Positive",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "200; portfolio.quantityKg = Σ sites.quantityKg; per site Σ classes.quantityKg = site.quantityKg; tanksTotal = Σ counts",
+    "actual": "portfolio=7289816.199999999 Σsites=7289816.199999999; site=7289816.199999999 Σclasses=7289816.2; Σcounts=26 tanksTotal=26",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-02",
+    "title": "Stock movement ends on the same figure as the overview total",
+    "type": "Positive",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "movement site.to = overview site.day and the last series point = overview site.quantityKg; class series sum to the total on each day",
+    "actual": "to=2026-10-20 day=2026-10-20; last=7289816.199999999 overview=7289816.199999999; classes sum ok=true",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-03",
+    "title": "Movement period length follows ?days within 7..92",
+    "type": "Positive",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "days 7 (7 points), 92, 7, 30 (default) respectively",
+    "actual": "7->7/7; 1000->92; 3->7; abc->30/30",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-04",
+    "title": "Overview lists only held sites with the Tank farm module on",
+    "type": "Positive",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "sites = [bekasi] in both",
+    "actual": "stock=bekasi; movement=bekasi",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-05",
+    "title": "A management-only user reads the overview and tank history, but not the operational pages",
+    "type": "Positive",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "200 ; 200 ; 200 ; 403",
+    "actual": "200 / 200 / 200 / 403",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-06",
+    "title": "Overview tank history of a site not held or without the module",
+    "type": "Negative",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "403 ; 403",
+    "actual": "403 / 403",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-07",
+    "title": "Overview needs the management-stock right",
+    "type": "Negative",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "403 ; 403",
+    "actual": "403 / 403",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PF-08",
+    "title": "A user with the right but no site gets an empty overview",
+    "type": "Positive",
+    "area": "Stock Overview / portfolio",
+    "status": "PASS",
+    "expected": "200, sites [], portfolio totals 0 / sitesTotal 0",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/portfolio/stock -> 200 {\"generatedAt\":\"2026-11-17T05:03:30.082Z\",\"portfolio\":{\"nearFull\":0.9,\"quantityKg\":0,\"filledKg\":0,\"capacityKg\":0,\"capacityTotalKg\":0,\"fillRatio\":null,\"tanksTotal\":0,\"tanksReporting\":0,\"sitesTotal\":0,\"sitesFresh\":0,\"count…"
+  },
+  {
+    "id": "FT-QC-01",
+    "title": "Storage certificates with verdicts",
+    "type": "Positive",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "200, rows with verdict in {pass, quarantine, spec-pending}",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/qc/storage -> 200 [{\"commodityId\":\"olein\",\"verdict\":\"pass\",\"breaches\":[],\"tankId\":\"T01\",\"oil\":\"RPL/RPOL\",\"analysisDate\":\"2026-09-14\",\"capacity\":300000,\"quantity\":214786,\"emptySpace\":85214,\"temperatureC\":47,\"ffa\":0.063,\"moisture\":0.038,\"co…"
+  },
+  {
+    "id": "FT-QC-02",
+    "title": "Storage filtered by date range",
+    "type": "Positive",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "200, every snapshotOn within the range, fewer rows than unfiltered",
+    "actual": "n=23 of 225",
+    "evidence": ""
+  },
+  {
+    "id": "FT-QC-03",
+    "title": "Vessels, trucks and oil movements",
+    "type": "Positive",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "200 each; vessels have samples arrays; trucks have rows; movements {periodStart, rows}",
+    "actual": "200/200/200 vessels=3 truckRows=176 movements=0",
+    "evidence": ""
+  },
+  {
+    "id": "FT-QC-04",
+    "title": "Refinery snapshot, history and ledger",
+    "type": "Positive",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "200 each; history has oils[] and points[]",
+    "actual": "200/200/200",
+    "evidence": ""
+  },
+  {
+    "id": "FT-QC-05",
+    "title": "Refinery hourly sheet of a day with data",
+    "type": "Positive",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "200 {productionDate, oil, points[]}",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/qc/refinery/hourly?date=2026-10-20&oil=RPO%2FRBDPO -> 200 {\"productionDate\":\"2026-10-20\",\"oil\":\"RPO/RBDPO\",\"points\":[{\"time\":\"08:00\",\"finishedFfa\":0.043,\"finishedOil\":\"RPO/RBDPO\",\"fromTank\":\"T.12\",\"toTank\":\"RFI T.04\"},{\"time\":\"09:00\",\"finishedFfa\":0.045,\"finishedOil\":\"RPO/RBDPO…"
+  },
+  {
+    "id": "FT-QC-06",
+    "title": "Refinery hourly without a date, without an oil, or for a day with no data",
+    "type": "Negative",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "400 or 404 for the missing parameters; 404 for no data",
+    "actual": "404 / 404 / 404",
+    "evidence": ""
+  },
+  {
+    "id": "FT-QC-07",
+    "title": "Refinery endpoints with a malformed date filter",
+    "type": "Negative",
+    "area": "QC",
+    "status": "FAIL",
+    "expected": "400 for each (not a 500 with a database message)",
+    "actual": "500 / 500 / 500",
+    "evidence": "GET /api/v1/sites/bekasi/qc/refinery?from=garbage -> 500 {\"error\":\"invalid input syntax for type date: \\\"garbage\\\"\"} | GET /api/v1/sites/bekasi/qc/refinery/ledger?to=2026-02-30 -> 500 {\"error\":\"date/time field value out of range: \\\"2026-02-30\\\"\"} | GET /api/v1/sites/bekasi/qc/refinery/hourly?date=bad -> 500 {\"error\":\"invalid input syntax for type date: \\\"bad\\\"\"}"
+  },
+  {
+    "id": "FT-QC-08",
+    "title": "Storage/vessel filters with a malformed date",
+    "type": "Negative",
+    "area": "QC",
+    "status": "FAIL",
+    "expected": "400 (invalid date) — not 200 with silently empty/unfiltered rows",
+    "actual": "200 (n=0) / 200 (n=3)",
+    "evidence": "GET /api/v1/sites/bekasi/qc/storage?from=garbage -> 200 [] | GET /api/v1/sites/bekasi/qc/vessels?to=abc -> 200 [{\"id\":\"F/QCO-009-00035\",\"ship\":\"MT. Seluma Express\",\"supplier\":\"PT. Sil + Bio M…"
+  },
+  {
+    "id": "FT-QC-09",
+    "title": "QC needs the qc right",
+    "type": "Negative",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "403 ; 403",
+    "actual": "403 / 403",
+    "evidence": ""
+  },
+  {
+    "id": "FT-QC-10",
+    "title": "A QC user on an empty site gets empty lists, not errors",
+    "type": "Positive",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "200 each with empty data",
+    "actual": "200/200/200/200/200",
+    "evidence": "GET /api/v1/sites/qa-ft-site/qc/storage -> 200 [] | GET /api/v1/sites/qa-ft-site/qc/vessels -> 200 [] | GET /api/v1/sites/qa-ft-site/qc/trucks -> 200 {\"supplier\":null,\"material\":\"\",\"vessel\":null,\"arrival\":null,… | GET /api/v1/sites/qa-ft-site/qc/movements -> 200 {\"periodStart\":null,\"periodEnd\":null,\"rows\":[]} | GET /api/v1/sites/qa-ft-site/qc/refinery/ledger -> 200 []"
+  },
+  {
+    "id": "FT-QC-11",
+    "title": "Storage verdict follows the commodity spec of the site",
+    "type": "Positive",
+    "area": "QC",
+    "status": "PASS",
+    "expected": "Rows with commodityId pfad and FFA >= 70 are not quarantined for FFA",
+    "actual": "pfad rows=29, wrongly breached=0",
+    "evidence": ""
+  },
+  {
+    "id": "FT-UT-01",
+    "title": "Utility board lists all forms",
+    "type": "Positive",
+    "area": "Utility",
+    "status": "PASS",
+    "expected": "200, 13 forms, from <= to",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/utility -> 200 {\"from\":\"2026-11-17\",\"to\":\"2026-11-17\",\"dates\":[],\"forms\":[{\"code\":\"F/UTI-001\",\"name\":\"Operational Boiler Daily Report Taihu 15 TPH\",\"area\":\"boiler\",\"place\":\"Control Room\",\"daily\":true,\"logged\":[],\"empty\":[],\"latest\":nul…"
+  },
+  {
+    "id": "FT-UT-02",
+    "title": "Utility board with an explicit and a reversed range",
+    "type": "Positive",
+    "area": "Utility",
+    "status": "PASS",
+    "expected": "200 with from/to as given; reversed range is swapped",
+    "actual": "200 2026-10-01..2026-10-20 / 200 2026-10-01..2026-10-20",
+    "evidence": ""
+  },
+  {
+    "id": "FT-UT-03",
+    "title": "Utility board with an impossible calendar date",
+    "type": "Negative",
+    "area": "Utility",
+    "status": "FAIL",
+    "expected": "400 (or the default range) — not a 500",
+    "actual": "HTTP 500 error=date/time field value out of range: \"2026-13-01\"",
+    "evidence": "GET /api/v1/sites/bekasi/utility?from=2026-13-01&to=2026-13-05 -> 500 {\"error\":\"date/time field value out of range: \\\"2026-13-01\\\"\"}"
+  },
+  {
+    "id": "FT-UT-04",
+    "title": "Utility day: missing parameters, unknown form/day, impossible date",
+    "type": "Negative",
+    "area": "Utility",
+    "status": "FAIL",
+    "expected": "400 form_and_date_required ; 404 ; 400 (not 500)",
+    "actual": "400 / 404 / 500",
+    "evidence": "GET /api/v1/sites/bekasi/utility/day?form=F%2FUTI-010&date=2026-02-30 -> 500 {\"error\":\"date/time field value out of range: \\\"2026-02-30\\\"\"}"
+  },
+  {
+    "id": "FT-UT-05",
+    "title": "Utility needs the right, a held site and the module",
+    "type": "Negative",
+    "area": "Utility",
+    "status": "PASS",
+    "expected": "403 forbidden ; 403 module_not_enabled ; 403",
+    "actual": "403:forbidden / 403:module_not_enabled / 403:forbidden",
+    "evidence": ""
+  },
+  {
+    "id": "FT-PR-01",
+    "title": "Daily production days of a site",
+    "type": "Positive",
+    "area": "Production",
+    "status": "PASS",
+    "expected": "200 {days: []} (QA seed has no production days)",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/sites/bekasi/production -> 200 {\"days\":[]}"
+  },
+  {
+    "id": "FT-PR-02",
+    "title": "Production needs the right, a held site and the module",
+    "type": "Negative",
+    "area": "Production",
+    "status": "PASS",
+    "expected": "403 ; 403 module_not_enabled ; 403",
+    "actual": "403 / 403:module_not_enabled / 403:forbidden",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-01",
+    "title": "Tank gauging overview of a site",
+    "type": "Positive",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "200 {site, sources[], settings {roundTimes, toleranceMin, retryMinutes, maxRetries}, rounds[], tanks[]}",
+    "actual": "HTTP 200",
+    "evidence": "GET /api/v1/tank-gauging/sites/bekasi/overview -> 200 {\"site\":{\"id\":\"bekasi\",\"name\":\"Bekasi\",\"timezone\":\"Asia/Jakarta\"},\"sources\":[],\"settings\":{\"roundTimes\":[\"06:30\",\"14:30\"],\"toleranceMin\":30,\"retryMinutes\":20,\"maxRetries\":6},\"rounds\":[],\"tanks\":[]}"
+  },
+  {
+    "id": "FT-TG-02",
+    "title": "Overview of an unknown site, and without master-tanks rights",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "404 ; 403 ; 404 (not held)",
+    "actual": "404 / 403 / 404",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-03",
+    "title": "Save daily round times and tolerance",
+    "type": "Positive",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "200 {roundTimes:[\"06:30\",\"14:30\"], toleranceMin:45}; overview shows them",
+    "actual": "PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 200 {\"roundTimes\":[\"06:30\",\"14:30\"],\"toleranceMin\":45}",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-04",
+    "title": "Daily rounds validation: empty, out-of-range times, tolerance bounds",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "400 each, settings unchanged (06:30,14:30 / 45)",
+    "actual": "400,400,400,400,400,400 now=06:30,14:30/45",
+    "evidence": "PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 400 {\"error\":\"Enter at least one time as HH:MM, separated by commas\"} | PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 400 {\"error\":\"Enter at least one time as HH:MM, separated by commas\"} | PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 400 {\"error\":\"The tolerance must be between 1 and 240 minutes\"} | PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 400 {\"error\":\"The tolerance must be between 1 and 240 minutes\"} | PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 400 {\"error\":\"The tolerance must be between 1 and 240 minutes\"} | PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 400 {\"error\":\"The tolerance must be between 1 and 240 minutes\"}"
+  },
+  {
+    "id": "FT-TG-05",
+    "title": "Daily rounds with one valid and one invalid time",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "FAIL",
+    "expected": "400 naming the invalid entries — not silently saved as [\"06:30\"]",
+    "actual": "HTTP 200",
+    "evidence": "PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 200 {\"roundTimes\":[\"06:30\"],\"toleranceMin\":30}"
+  },
+  {
+    "id": "FT-TG-06",
+    "title": "Daily rounds with a non-number tolerance (boolean)",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "FAIL",
+    "expected": "400 (not saved as 1 minute)",
+    "actual": "HTTP 200",
+    "evidence": "PUT /api/v1/tank-gauging/sites/qa-ft-site/settings -> 200 {\"roundTimes\":[\"06:30\"],\"toleranceMin\":1}"
+  },
+  {
+    "id": "FT-TG-07",
+    "title": "Add a gauge source (unreachable test address); secrets are never returned",
+    "type": "Positive",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "201, baseUrl normalised to http://127.0.0.1:9 (index.esp stripped), secretConfigured true, no secret in any response",
+    "actual": "POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 201 {\"id\":12,\"siteId\":\"qa-ft-site\",\"baseUrl\":\"http://127.0.0.1:9\",\"label\":\"qa-ft gauge\",\"enabled\":true,\"authType\":\"basic\",\"authUser\":\"u\",\"secretConfigured\":true,\"lastPollAt\":null,\"lastPollOk\":null,\"lastError\":null}",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-08",
+    "title": "Gauge source validation: duplicate, missing/invalid/non-http URL, auth rules",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "409 source_exists ; 400 ×6",
+    "actual": "409,400,400,400,400,400,400",
+    "evidence": "POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 409 {\"error\":\"source_exists\"} | POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 400 {\"error\":\"baseUrl is required\"} | POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 400 {\"error\":\"baseUrl must be a valid URL\"} | POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 400 {\"error\":\"baseUrl must be http or https\"} | POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 400 {\"error\":\"A user name is required for basic authentication\"} | POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 400 {\"error\":\"A password or cookie is required for this authentication type\"} | POST /api/v1/tank-gauging/sites/qa-ft-site/sources -> 400 {\"error\":\"authType must be none, basic or cookie\"}"
+  },
+  {
+    "id": "FT-TG-09",
+    "title": "Edit a source; blank secret keeps the stored one; switch to no auth",
+    "type": "Positive",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "200 label changed, secretConfigured still true ; 200 secretConfigured false",
+    "actual": "200 label=qa-ft renamed secret=true / 200 secret=false",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-10",
+    "title": "Test connection to an unreachable gauge",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "200 {ok:false, tankCount:0, error:<message>} within a few seconds",
+    "actual": "HTTP 200 error=fetch failed",
+    "evidence": "POST /api/v1/tank-gauging/sources/12/test -> 200 {\"ok\":false,\"ms\":1,\"tankCount\":0,\"units\":[],\"error\":\"fetch failed\"}"
+  },
+  {
+    "id": "FT-TG-11",
+    "title": "Poll a site whose only gauge is unreachable",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "200 {ok:false, sources:[{error}]}; source last_poll_ok false",
+    "actual": "POST /api/v1/tank-gauging/sites/qa-ft-site/poll -> 200 {\"skipped\":false,\"ok\":false,\"sourceCount\":1,\"stored\":0,\"sources\":[{\"sourceId\":12,\"siteId\":\"qa-ft-site\",\"sourceBaseUrl\":\"http://127.0.0.1:9\",\"ok\":false,\"error\":\"fetch failed\",\"fetched\":0,\"stored\":0}],\"…; db last_poll_ok=false",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-12",
+    "title": "Source routes with a bad id, someone else's source, or without edit rights",
+    "type": "Negative",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "404 ; 404 ; 403 ; 403",
+    "actual": "404 / 404 / 403 / 403",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-13",
+    "title": "Delete a source; deleting it again is 404",
+    "type": "Positive",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "204 then 404",
+    "actual": "204 / 404",
+    "evidence": ""
+  },
+  {
+    "id": "FT-TG-14",
+    "title": "Poll a site with no enabled source is skipped",
+    "type": "Positive",
+    "area": "Tank gauging",
+    "status": "PASS",
+    "expected": "200 {skipped:true, reason:\"no_enabled_sources_for_site\"}",
+    "actual": "HTTP 200",
+    "evidence": "POST /api/v1/tank-gauging/sites/qa-ft-site/poll -> 200 {\"skipped\":true,\"reason\":\"no_enabled_sources_for_site\"}"
+  },
+  {
+    "id": "FT-DH-01",
+    "title": "DataHub configuration and runs are readable by the Administrator, without secrets",
+    "type": "Positive",
+    "area": "Users & roles",
+    "status": "PASS",
+    "expected": "200 ; 200; no plain secret fields",
+    "actual": "200 / 200 leak=false",
+    "evidence": "GET /api/v1/admin/datahub/config -> 200 {\"baseUrl\":\"\",\"publicKey\":\"\",\"enabled\":false,\"privateKeyConfigured\":false,\"source\":\"none\",\"lastSyncAt\":null,\"lastSyncOk\":null,\"lastError\":null}"
+  }
+]
