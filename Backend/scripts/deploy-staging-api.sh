@@ -65,20 +65,38 @@ checkout_deploy_ref() {
   git log -1 --oneline
 }
 
+# A container that was just recreated needs a few seconds before it answers. Wait for a good
+# answer (curl -f fails on an error status), up to about a minute, instead of failing on the first try.
+wait_for_health() {
+  local url="$1"
+  local tries="${HEALTH_TRIES:-30}"
+  for ((i = 1; i <= tries; i++)); do
+    if curl -fsS "$url"; then
+      echo
+      return 0
+    fi
+    sleep 2
+  done
+  echo "Health check failed after $tries tries: $url" >&2
+  return 1
+}
+
 rebuild_api() {
   require_env_file
   compose build --no-cache pid-api
-  compose up -d pid-api
-  compose ps
-  compose logs --tail=25 pid-api
-  curl -sS "http://127.0.0.1:${API_PORT}/api/v1/health"
-  echo
+  # Migrate with the new image before the new code goes live, so the code never runs on an old schema.
+  # The running container keeps serving meanwhile; migrations only add (tables, columns, indexes).
   if [[ "$RUN_MIGRATE" == "1" ]]; then
     echo "=== Running migrations (RUN_MIGRATE=1) ==="
-    compose exec -T pid-api npm run migrate
+    compose run --rm --no-deps pid-api npm run migrate
   else
     echo "Migrations skipped (set RUN_MIGRATE=1 to apply Backend/migrations)."
   fi
+  compose up -d pid-api
+  compose ps
+  # Ready means the API answers and reaches the database.
+  wait_for_health "http://127.0.0.1:${API_PORT}/api/v1/health/ready"
+  compose logs --tail=25 pid-api
 }
 
 cmd_deploy() {

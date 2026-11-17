@@ -8,6 +8,8 @@ const CODES: Record<string, keyof Messages> = {
   username_taken: 'usernameTaken',
   email_taken: 'emailTaken',
   too_many_attempts: 'loginThrottled',
+  too_many_sign_ins_here: 'loginRateLimited',
+  too_many_requests: 'requestRateLimited',
   last_admin: 'lastAdmin',
   cannot_grant_role: 'cannotGrantRole',
   cannot_grant_permission: 'cannotGrantPermission',

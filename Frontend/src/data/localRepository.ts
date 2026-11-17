@@ -2,7 +2,7 @@ import logsheets from './logsheets.json'
 import { presentLogistics, presentSoundingPoint, presentTank } from '../domain/present.ts'
 import type { RawLab, RawLogistics, RawSounding } from '../domain/present.ts'
 import type { AnalyticsSummary, LabHistoryPoint, MovementTotal } from '../domain/types.ts'
-import type { OperationsRepository } from './repository.ts'
+import type { OperationsRepository, TankHistory } from './repository.ts'
 
 interface LogsheetFile {
   periodLabel: string | null
@@ -150,6 +150,19 @@ export class LocalOperationsRepository implements OperationsRepository {
         .sort((a, b) => (a.recordedOn ?? '').localeCompare(b.recordedOn ?? '') || a.roundIndex - b.roundIndex)
         .map((row) => presentSoundingPoint(row, 'spec-pending')),
     )
+  }
+
+  getStockHistory(from: string, to: string): Promise<TankHistory[]> {
+    const byTank = new Map<string, TankHistory['points']>()
+    for (const row of DATA.soundings) {
+      if (!row.recordedOn || row.recordedOn < from || row.recordedOn > to) continue
+      if (!byTank.has(row.tankId)) byTank.set(row.tankId, [])
+      byTank.get(row.tankId)?.push(presentSoundingPoint(row, 'spec-pending'))
+    }
+    return Promise.resolve([...byTank.entries()].map(([tankId, points]) => ({
+      tankId,
+      points: points.sort((a, b) => (a.recordedOn ?? '').localeCompare(b.recordedOn ?? '') || a.roundIndex - b.roundIndex),
+    })))
   }
 
   getLabHistory(tankId: string): Promise<LabHistoryPoint[]> {

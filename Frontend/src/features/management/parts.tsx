@@ -115,7 +115,8 @@ export function DataBadge({ site }: { site: Pick<PortfolioSite, 'kind' | 'asOf' 
     return (
       <span className={site.stale ? 'mg-data mg-data--stale' : 'mg-data mg-data--live'} title={new Date(site.asOf).toLocaleString(locale)}>
         <i aria-hidden="true" />
-        {site.stale ? `${t.lastReading} ${text}` : `${t.liveLabel} · ${text}`}
+        {/* Gauges are read at the site's round times, so an hours-old reading can still be current. */}
+        {`${t.lastReading} ${text}`}
       </span>
     )
   }

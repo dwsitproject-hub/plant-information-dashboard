@@ -27,6 +27,7 @@ import { ClassAtSiteCard, CommodityCard, KpiCard, SiteStockCard } from './Cards.
 import { CardActionsContext, HoverTarget } from './HoverCard.tsx'
 import { MixStrip } from './MixTip.tsx'
 import { ClassDialog } from './ClassDialog.tsx'
+import { SiteMovement } from './SiteMovement.tsx'
 import { ViewOptionsContext, useViewOptions } from './viewOptions.ts'
 import { Count, stagger } from './motion.tsx'
 import { Change, ClassDot, DataBadge, DataStamp, FillText, Kpi, Legend, Skeleton, StatusChip, StockBar, fill, useClassLabel } from './parts.tsx'
@@ -242,6 +243,9 @@ export function StockOverviewPage() {
         {body}
       </div>
 
+      {/* The movement of every site over the last month, on the overview itself (not when drilled in). */}
+      {data && sites.length > 0 && !nav.status && !nav.site && !nav.cls ? <SiteMovement /> : null}
+
       {data ? <p className="mg-foot">{t.mgCapacityNote}</p> : null}
 
       {dialog ? <TankDialog site={dialog.site} tank={dialog.tank} onClose={closeTank} /> : null}
@@ -312,9 +316,9 @@ function Overview({
         <Kpi label={t.mgKpiTanks} value={`${portfolio.tanksReporting} / ${portfolio.tanksTotal}`} count={{ value: portfolio.tanksReporting, format: (n) => `${Math.round(n)} / ${portfolio.tanksTotal}` }} card={(hide) => <KpiCard kind="tanks" portfolio={portfolio} sites={sites} hide={hide} />} />
         <Kpi
           label={t.mgKpiFree}
-          value={formatTonnes(Math.max(0, portfolio.capacityKg - portfolio.quantityKg), locale)}
+          value={formatTonnes(Math.max(0, portfolio.capacityKg - portfolio.filledKg), locale)}
           unit="t"
-          count={{ value: Math.max(0, portfolio.capacityKg - portfolio.quantityKg), format: (n) => formatTonnes(n, locale) }}
+          count={{ value: Math.max(0, portfolio.capacityKg - portfolio.filledKg), format: (n) => formatTonnes(n, locale) }}
           card={(hide) => <KpiCard kind="free" portfolio={portfolio} sites={sites} hide={hide} />}
         />
       </div>

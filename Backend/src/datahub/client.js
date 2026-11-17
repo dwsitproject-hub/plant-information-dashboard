@@ -6,6 +6,8 @@
  * X-DHM-* key headers. Builds without /auth/token fall back to the key pair.
  */
 
+import { assertAllowedUrl } from '../outboundGuard.js'
+
 const DEFAULT_TIMEOUT_MS = 10_000
 export const SYNC_PAGE_LIMIT = 500
 const MAX_PAGES = 100
@@ -49,11 +51,13 @@ export function looksLikeHtml(res, text) {
 }
 
 async function fetchJson(url, headers, fetchImpl = fetch, init = {}) {
+  // The DataHub address is typed in by an administrator; never call loopback or metadata addresses.
+  await assertAllowedUrl(url)
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs())
   let res
   try {
-    res = await fetchImpl(url, { ...init, headers, signal: ctrl.signal })
+    res = await fetchImpl(url, { ...init, headers, signal: ctrl.signal, redirect: 'manual' })
   } catch (error) {
     if (error?.name === 'AbortError') {
       const err = new Error(`DataHub request timed out after ${timeoutMs()}ms`)

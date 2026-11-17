@@ -19,7 +19,34 @@
  * - Tank names are read with or without the space and dash: "TK 5201", "TK5101", "TK-5702".
  */
 
+import { assertAllowedUrl, sameOrigin } from '../outboundGuard.js'
+
 export const DEFAULT_TANK_PARAM_IDS = '622|625|628|717|724|730'
+
+/**
+ * fetch that follows a redirect only within the same origin (the units send /index.esp to their sign-in
+ * page), at most three hops, and refuses addresses outboundGuard.js blocks. Cookies set on the way are
+ * collected and sent on, like a browser. Returns { res, cookies }.
+ */
+async function guardedFetch(fetchImpl, url, init) {
+  let current = String(url)
+  // Cookies already in the request (the session, or a configured cookie) go first.
+  const jar = init.headers?.Cookie ? [init.headers.Cookie] : []
+  for (let hop = 0; hop < 4; hop += 1) {
+    await assertAllowedUrl(current)
+    const headers = { ...(init.headers ?? {}) }
+    if (jar.length) headers.Cookie = jar.join('; ')
+    const res = await fetchImpl(current, { ...init, headers, redirect: 'manual' })
+    const set = typeof res.headers?.getSetCookie === 'function' ? res.headers.getSetCookie() : []
+    for (const c of set) jar.push(c.split(';')[0])
+    const location = res.status >= 300 && res.status < 400 && typeof res.headers?.get === 'function' ? res.headers.get('location') : null
+    if (!location) return { res, cookies: jar.join('; ') }
+    const next = sameOrigin(current, location)
+    if (!next) throw Object.assign(new Error(`The unit redirected to another host (${location}); not followed`), { status: 502, code: 'redirect_refused' })
+    current = next
+  }
+  throw new Error('Too many redirects')
+}
 
 export function trimBaseUrl(raw) {
   return String(raw || '').trim().replace(/\/+$/, '')
@@ -53,14 +80,14 @@ function timeoutMs(opts) {
 export async function openSession(baseUrl, opts = {}) {
   const fetchImpl = opts.fetchImpl ?? fetch
   try {
-    const res = await fetchImpl(`${baseUrl}/index.esp`, {
+    const { cookies } = await guardedFetch(fetchImpl, `${baseUrl}/index.esp`, {
       headers: buildAuthHeaders(baseUrl, opts.auth),
-      redirect: 'follow',
       signal: AbortSignal.timeout(Math.min(timeoutMs(opts), 8000)),
     })
-    const set = typeof res.headers?.getSetCookie === 'function' ? res.headers.getSetCookie() : []
-    return set.map((c) => c.split(';')[0]).join('; ')
-  } catch {
+    return cookies
+  } catch (error) {
+    // A refused address must not be hidden as "no session": the call that follows reports it.
+    if (error?.code === 'blocked_address') throw error
     return ''
   }
 }
@@ -69,14 +96,20 @@ async function gwtGet(searchParams, opts = {}) {
   const baseUrl = trimBaseUrl(opts.baseUrl)
   if (!baseUrl) throw new Error('baseUrl is required')
   const fetchImpl = opts.fetchImpl ?? fetch
-  const url = new URL(`${baseUrl}/GWTHandler.esp`)
+  // A unit behind a gateway (Tanjung Pura) is reached through the gateway's tunnel, by its own address,
+  // the way the TankVision trend page does it. Its archive is only there.
+  const url = new URL(`${baseUrl}/${opts.tunnelIp ? 'WebServerTunnel.esp' : 'GWTHandler.esp'}`)
+  if (opts.tunnelIp) {
+    url.searchParams.set('URL', 'GWTHandler.esp')
+    url.searchParams.set('REMOTEIP', opts.tunnelIp)
+  }
   for (const [key, value] of Object.entries(searchParams)) url.searchParams.set(key, String(value))
+  if (opts.tunnelIp) url.searchParams.set('FGLOGIN', '')
 
   const cookie = opts.cookie ?? (await openSession(baseUrl, opts))
   const attempt = async () => {
-    const res = await fetchImpl(url, {
+    const { res } = await guardedFetch(fetchImpl, url, {
       headers: buildAuthHeaders(baseUrl, opts.auth, cookie),
-      redirect: 'follow',
       signal: AbortSignal.timeout(timeoutMs(opts)),
     })
     return { res, text: await res.text() }
@@ -118,6 +151,73 @@ export function fetchTankParameters(opts = {}) {
  */
 export function fetchTankInfo(opts = {}) {
   return gwtGet({ DATATYPE: '31', TANKID: opts.tankId, ...(opts.remote ? { REMOTE: opts.remote } : {}) }, opts)
+}
+
+/**
+ * DATATYPE=29: which parameters the unit archives for each tank. The archive is the unit's own history,
+ * recorded every few minutes and kept for months.
+ */
+export function fetchArchiveConfig(opts = {}) {
+  return gwtGet({ DATATYPE: '29' }, opts)
+}
+
+/**
+ * DATATYPE=18: one parameter of one tank from the unit's archive, between two instants.
+ * One parameter per call: the unit ignores a list. Times go as Unix seconds.
+ */
+export function fetchArchiveTankData(opts = {}) {
+  return gwtGet(
+    {
+      DATATYPE: '18',
+      ID: opts.tankId,
+      STARTTIME: Math.floor(new Date(opts.from).getTime() / 1000),
+      ENDTIME: Math.ceil(new Date(opts.to).getTime() / 1000),
+      PARAMID: opts.paramId,
+    },
+    opts,
+  )
+}
+
+/** DATATYPE=29 reply as a map of tank number to the parameter ids archived for it. */
+export function parseArchiveConfig(text) {
+  const byTank = new Map()
+  try {
+    const data = JSON.parse(String(text ?? ''))
+    for (const tank of data?.archiveConfiguration?.tanks ?? []) {
+      const id = Number.parseInt(tank.id, 10)
+      if (!Number.isFinite(id)) continue
+      byTank.set(id, new Set((tank.parameters ?? []).map((p) => Number(p.id)).filter(Number.isFinite)))
+    }
+  } catch {
+    // An unreadable reply means no archive is known; the caller falls back to the usual ids.
+  }
+  return byTank
+}
+
+/**
+ * DATATYPE=18 reply as points. `timestamp` is UTC; `localtimestamp` is the unit's own clock and is not used.
+ * @returns {Array<{ paramId: number, value: number, unit: string, at: Date, status: string }>}
+ */
+export function parseArchivePoints(text) {
+  try {
+    const data = JSON.parse(String(text ?? ''))
+    const points = []
+    for (const item of data?.parameterlist ?? []) {
+      const value = Number(item.value)
+      const seconds = Number(item.timestamp)
+      if (!Number.isFinite(value) || !Number.isFinite(seconds)) continue
+      points.push({
+        paramId: Number(item.id),
+        value,
+        unit: String(item.unit ?? ''),
+        at: new Date(seconds * 1000),
+        status: String(item.statusString ?? ''),
+      })
+    }
+    return points
+  } catch {
+    return []
+  }
 }
 
 /**

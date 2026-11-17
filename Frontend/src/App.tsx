@@ -8,7 +8,7 @@ import { MasterProvider } from './data/MasterContext.tsx'
 import { OperationsProvider } from './data/OperationsContext.tsx'
 import { LocaleProvider } from './i18n/LocaleContext.tsx'
 import { AppShell } from './layout/AppShell.tsx'
-import { PageGate, RequireAuth, SiteRequired } from './features/auth/guards.tsx'
+import { NotFoundPage, PageGate, RequireAuth, SiteRequired } from './features/auth/guards.tsx'
 import { LoginPage } from './features/login/LoginPage.tsx'
 import { SsoErrorPage } from './features/login/SsoErrorPage.tsx'
 
@@ -147,6 +147,9 @@ export default function App() {
                       <Route element={<PageGate page="admin-roles" />}>
                         <Route path="admin/roles" element={<RolesPage />} />
                       </Route>
+                    </Route>
+                    <Route element={<AppShell />}>
+                      <Route path="*" element={<NotFoundPage />} />
                     </Route>
                   </Route>
                 </Routes>

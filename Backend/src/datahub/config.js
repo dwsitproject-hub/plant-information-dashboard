@@ -3,6 +3,7 @@
  * The private key is encrypted at rest and never returned by the admin API.
  */
 import crypto from 'node:crypto'
+import { assertAllowedUrlShape } from '../outboundGuard.js'
 import { trimBaseUrl } from './client.js'
 
 function encryptionKey() {
@@ -35,6 +36,7 @@ export function normalizeBaseUrl(raw) {
     throw new Error('baseUrl must be a valid URL')
   }
   if (!/^https?:$/i.test(url.protocol)) throw new Error('baseUrl must be http or https')
+  assertAllowedUrlShape(url.toString())
   return trimBaseUrl(url.origin + url.pathname)
 }
 

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { commodityClassOf } from './commodityClass.js'
-import { isInUse, sameTankDelta, slimQuality, sourceOf, summarisePortfolio, summariseSite, tankStatus } from './portfolio.js'
+import { daysBetween, isInUse, movementSeries, sameTankDelta, slimQuality, sourceOf, summarisePortfolio, summariseSite, tankStatus } from './portfolio.js'
 
 test('products from every site land in the same few classes', () => {
   const expected = {
@@ -59,7 +59,8 @@ test('a site adds up stock, capacity and fill on the tanks that have both, and c
     tank('5', 0, 500, { productName: 'FAME', readingAt: '2026-11-10T02:50:00Z' }),
   ]
   const s = summariseSite(site, tanks, { day: '2026-11-10', live: true, now: NOW })
-  assert.equal(s.quantityKg, 1350, 'tanks without a capacity or a reading are left out of fill')
+  assert.equal(s.quantityKg, 1450, 'stock counts every tank with a reading, with or without a capacity')
+  assert.equal(s.filledKg, 1350, 'tanks without a capacity or a reading are left out of fill')
   assert.equal(s.capacityKg, 2500)
   assert.equal(s.capacityTotalKg, 4500, 'total capacity still includes the tank with no data')
   assert.ok(Math.abs(s.fillRatio - 0.54) < 1e-9)
@@ -96,6 +97,7 @@ test('the portfolio totals the sites and lists what needs attention', () => {
   const b = summariseSite({ id: 'bekasi', name: 'BEKASI', timezone: 'Asia/Jakarta' }, [tank('T1', null, 1000), tank('T2', 500, 1000)], { day: '2026-10-13', live: false, now: NOW })
   const p = summarisePortfolio([a, b])
   assert.equal(p.quantityKg, 1450)
+  assert.equal(p.filledKg, 1450)
   assert.equal(p.capacityKg, 3000)
   assert.equal(p.tanksTotal, 4)
   assert.equal(p.tanksReporting, 3)
@@ -148,4 +150,23 @@ test('a management tank carries its lab result, limits, breaches and yesterday',
 
   const s = summariseSite(site, [tank('T03', 500, 1000, { quality })], { day: '2026-11-16', live: false, now: NOW, previous: [tank('T03', 480, 1000, { quality: before })] })
   assert.deepEqual(s.tanks[0].quality.before, [{ code: 'FFA', value: 0.07 }])
+})
+
+test('daily movement totals sum each tank once per day and leave empty days empty', () => {
+  const days = daysBetween('2026-11-14', '2026-11-17')
+  assert.deepEqual(days, ['2026-11-14', '2026-11-15', '2026-11-16', '2026-11-17'])
+  const histories = [
+    { tankId: 'A', points: [
+      { recordedOn: '2026-11-14', quantityKg: 100 },
+      { recordedOn: '2026-11-15', quantityKg: 110 },
+      { recordedOn: '2026-11-15', quantityKg: 120 },
+      { recordedOn: '2026-11-17', quantityKg: null },
+    ] },
+    { tankId: 'B', points: [{ recordedOn: '2026-11-14', quantityKg: 50 }, { recordedOn: '2026-11-17', quantityKg: 70 }] },
+  ]
+  const series = movementSeries(histories, days, (tankId) => (tankId === 'A' ? 'cpo' : 'refined'))
+  assert.deepEqual(series.total.map((point) => point.quantityKg), [150, 120, null, 70], 'the last reading of a day counts; a blank day stays null')
+  assert.deepEqual(series.total.map((point) => point.tanks), [2, 1, 0, 1])
+  assert.deepEqual(series.groups.map((group) => group.code), ['cpo', 'refined'])
+  assert.deepEqual(series.groups[0].series.map((point) => point.quantityKg), [100, 120, null, null])
 })

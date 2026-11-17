@@ -3,7 +3,8 @@ import { pool } from '../db.js'
 import { requireAuth, requirePermission } from '../access.js'
 import { fetchTankMeta, parseTankMetaResponse, trimBaseUrl } from '../tankgauging/client.js'
 import { runTankGaugingPoll } from '../tankgauging/poll.js'
-import { loadRoundSettings, saveRoundSettings } from '../tankgauging/rounds.js'
+import { dayText, loadRoundSettings, saveRoundSettings } from '../tankgauging/rounds.js'
+import { retryPolicy } from '../tankgauging/schedule.js'
 import {
   createSource,
   deleteSource,
@@ -53,9 +54,16 @@ function bad(res, error) {
 router.get('/sites/:siteId/overview', view, withSite, async (req, res, next) => {
   try {
     const siteId = req.site.id
-    const [sources, settings, tanks] = await Promise.all([
+    const [sources, settings, runs, tanks] = await Promise.all([
       listSources(pool, siteId),
       loadRoundSettings(pool, siteId),
+      // The schedule's recent rounds: when each ran, how many tries, and how it went.
+      pool.query(
+        `SELECT recorded_on, round_index, target_at, status, attempts, first_attempt_at, last_attempt_at,
+                next_attempt_at, written, missing, last_error
+         FROM tank_gauging_round_runs WHERE site_id = $1 ORDER BY target_at DESC LIMIT 8`,
+        [siteId],
+      ),
       pool.query(
         `SELECT t.id, t.code, t.name, t.sort_order, l.source_unit_name, l.source_base_url, l.product_name,
                 l.level_mm, l.temperature_c, l.total_mass, l.observed_density_kg_m3, l.total_observed_volume,
@@ -72,7 +80,20 @@ router.get('/sites/:siteId/overview', view, withSite, async (req, res, next) => 
     res.json({
       site: { id: req.site.id, name: req.site.name, timezone: req.site.timezone },
       sources,
-      settings,
+      settings: { ...settings, ...retryPolicy() },
+      rounds: runs.rows.map((row) => ({
+        day: dayText(row.recorded_on),
+        round: row.round_index,
+        target: row.target_at,
+        status: row.status,
+        attempts: row.attempts,
+        firstAttemptAt: row.first_attempt_at,
+        lastAttemptAt: row.last_attempt_at,
+        nextAttemptAt: row.next_attempt_at,
+        written: row.written,
+        missing: row.missing,
+        error: row.last_error,
+      })),
       tanks: tanks.rows.map((row) => ({
         id: row.id,
         code: row.code,
@@ -168,7 +189,7 @@ router.put('/sites/:siteId/settings', edit, withSite, async (req, res, next) => 
   }
 })
 
-// One poll and the rounds, on demand. The 15 minute schedule is cron.
+// One poll and the rounds, on demand. The schedule (round times, with retries) is cron: scripts/run-tank-gauging-poll.js.
 router.post('/sites/:siteId/poll', edit, withSite, async (req, res, next) => {
   try {
     res.json(await runTankGaugingPoll(pool, { siteId: req.site.id }))

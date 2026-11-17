@@ -1,11 +1,15 @@
 import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from 'jose'
 
+const jwksByUri = new Map()
 let discoveryCache = null
 let discoveryAt = 0
 const DISCOVERY_TTL_MS = 5 * 60 * 1000
 
+// A Hub that does not answer must fail the sign-in in seconds, not hang it.
+const OIDC_TIMEOUT_MS = 10_000
+
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, options)
+  const response = await fetch(url, { ...options, signal: AbortSignal.timeout(OIDC_TIMEOUT_MS) })
   if (!response.ok) {
     throw new Error(`OIDC HTTP ${response.status}`)
   }
@@ -42,7 +46,9 @@ export async function validateIdToken({ idToken, issuer, audience, jwksUri }) {
     error.statusCode = 401
     throw error
   }
-  const jwks = createRemoteJWKSet(new URL(jwksUri))
+  // One key set per URI: jose caches the Hub's keys inside it, so they are not fetched on every sign-in.
+  if (!jwksByUri.has(jwksUri)) jwksByUri.set(jwksUri, createRemoteJWKSet(new URL(jwksUri), { timeoutDuration: OIDC_TIMEOUT_MS }))
+  const jwks = jwksByUri.get(jwksUri)
   const { payload } = await jwtVerify(idToken, jwks, { issuer, audience })
   if (!payload?.sub || typeof payload.sub !== 'string') {
     const error = new Error('id_token sub is required')

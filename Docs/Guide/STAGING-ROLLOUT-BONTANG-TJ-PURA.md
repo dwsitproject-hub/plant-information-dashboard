@@ -14,7 +14,7 @@ This is an **update** of an existing staging (see [STAGING-3-SERVER-DEPLOY-RUNBO
 - **The Bontang and Tanjung Pura gauge data** (tanks, latest readings, samples, capacities, product groups, gauge addresses) goes as **one JSON file** made on your PC and loaded on the API host with `import-gauge-data.js` (step 6). It only touches those two sites' gauge rows, never users, roles or Bekasi data, and it can be repeated safely.
 - **Do not** restore `pid_staging.dump` for this. The restore script runs `pg_restore --clean`, which replaces everything in staging with what is on your PC.
 
-The poller then carries on from the imported rows every 15 minutes, with no duplicate tanks.
+The poller then carries on from the imported rows at each site's round times, with no duplicate tanks.
 
 ## 1. Push the branch (your PC)
 
@@ -136,7 +136,7 @@ Then, for each row: **Test connection**, then **Poll now**. The tanks and readin
 
 ## 8. Schedule the poller (API host)
 
-Use the two cron lines in [TANK-GAUGING-POLLER-CRON.md](TANK-GAUGING-POLLER-CRON.md#schedule-it): the poll every 15 minutes and the purge once a day. Then check the log after the next quarter hour:
+Use the two cron lines in [TANK-GAUGING-POLLER-CRON.md](TANK-GAUGING-POLLER-CRON.md#schedule-it): the schedule check every 5 minutes and the purge once a day. Then check the log after the next round time:
 
 ```bash
 tail -n 20 /var/log/pid-tank-gauging-poll.log

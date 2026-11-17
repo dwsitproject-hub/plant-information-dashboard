@@ -3,11 +3,12 @@ import { requireAuth, requirePermission, requireSiteAccess, requireSiteModule } 
 import { query } from '../db.js'
 import { evaluateStorage, loadStorageRules } from '../qualityRules.js'
 import { finishedOilFromDays, historyFromDays, hourlyFromDays, ledgerFromDays, snapshotFromDays } from '../refineryQuality.js'
+import { rejectBadDays } from '../dates.js'
 
 const router = Router({ mergeParams: true })
 
 // Every quality control route needs a session, the page right, and a site the user holds.
-router.use(requireAuth, requirePermission('qc', 'view'), requireSiteAccess, requireSiteModule('qc'))
+router.use(requireAuth, requirePermission('qc', 'view'), requireSiteAccess, requireSiteModule('qc'), rejectBadDays)
 
 function num(value) {
   if (value == null || value === '') return null

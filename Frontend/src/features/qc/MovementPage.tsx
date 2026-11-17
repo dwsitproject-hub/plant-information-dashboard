@@ -54,7 +54,7 @@ export function MovementPage() {
       start={start}
       end={end}
       setRange={setRange}
-      note={t.gatePeriodNote.replace('{period}', period)}
+      note={period ? t.gatePeriodNote.replace('{period}', period) : undefined}
     >
       <section className="prod-kpis" aria-label={t.qcMovements}>
         <QcKpi label={t.movementCount} value={String(rows.length)} onOpen={() => setDialog('count')} />

@@ -45,7 +45,7 @@ function flags(row) {
 
 export async function loadSession(userId) {
   const user = await query(
-    `SELECT id, username, display_name, email, is_active
+    `SELECT id, username, display_name, email, is_active, session_version
      FROM users
      WHERE id = $1 AND deleted_at IS NULL`,
     [userId],
@@ -92,7 +92,7 @@ export async function loadSession(userId) {
   const permissions = {}
   for (const right of rights.rows) permissions[right.resource_key] = flags(right)
 
-  return {
+  const session = {
     id: Number(row.id),
     username: row.username,
     displayName: row.display_name,
@@ -110,17 +110,32 @@ export async function loadSession(userId) {
     // The system Administrator may grant any activated site. Other users grant only their own.
     isAdministrator: adminRole.rows.length > 0,
   }
+  // For requireAuth only; not enumerable, so it never reaches the browser in /me.
+  Object.defineProperty(session, 'sessionVersion', { value: Number(row.session_version ?? 0), enumerable: false })
+  return session
 }
 
-export function signSession(res, userId) {
-  const token = jwt.sign({ sub: userId }, secret(), { expiresIn: process.env.JWT_EXPIRES_IN || '8h' })
+/**
+ * Sign the user in on this browser. The token carries the user's current session_version, read here so a
+ * caller can never sign with a stale one; the cookie lives exactly as long as the token.
+ */
+export async function signSession(res, userId) {
+  const row = await query('SELECT session_version FROM users WHERE id = $1', [userId])
+  const sv = Number(row.rows[0]?.session_version ?? 0)
+  const token = jwt.sign({ sub: userId, sv }, secret(), { algorithm: 'HS256', expiresIn: process.env.JWT_EXPIRES_IN || '8h' })
+  const { exp } = jwt.decode(token)
   res.cookie(COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.COOKIE_SECURE === 'true',
     path: '/',
-    maxAge: 8 * 60 * 60 * 1000,
+    maxAge: Math.max(0, exp * 1000 - Date.now()),
   })
+}
+
+/** End every session of a user (password changed or reset): tokens signed before stop being accepted. */
+export async function endOtherSessions(db, userId) {
+  await db.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [userId])
 }
 
 export function clearSession(res) {
@@ -131,9 +146,12 @@ export async function requireAuth(req, res, next) {
   const token = req.cookies?.[COOKIE]
   if (!token) return res.status(401).json({ error: 'unauthenticated' })
   try {
-    const payload = jwt.verify(token, secret())
+    // Only the algorithm the API signs with is accepted.
+    const payload = jwt.verify(token, secret(), { algorithms: ['HS256'] })
     const user = await loadSession(payload.sub)
     if (!user) return res.status(401).json({ error: 'unauthenticated' })
+    // A token from before a password change no longer counts.
+    if (Number(payload.sv ?? 0) !== user.sessionVersion) return res.status(401).json({ error: 'unauthenticated' })
     req.sessionUser = user
     next()
   } catch {
@@ -220,7 +238,7 @@ export async function verifyPassword(usernameOrEmail, password) {
   const result = await query(
     `SELECT id, password_hash, is_active, deleted_at
      FROM users
-     WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1)
+     WHERE (LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1)) AND deleted_at IS NULL
      LIMIT 1`,
     [usernameOrEmail.trim()],
   )

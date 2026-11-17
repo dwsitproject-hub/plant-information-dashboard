@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { api } from '../../data/api.ts'
 import { productOf, type CommodityClass, type PortfolioSite } from '../../domain/management.ts'
 import { sampleOf } from '../../domain/qualityView.ts'
-import type { SoundingPoint } from '../../domain/types.ts'
+import type { LabHistoryPoint, SoundingPoint } from '../../domain/types.ts'
 import { CommodityTrendDialog, type TrendTank } from '../live-ops/CommodityTrendDialog.tsx'
 import { useClassLabel } from './parts.tsx'
 
@@ -60,6 +60,10 @@ export function ClassDialog({
     },
     [siteId],
   )
+  const loadLabs = useCallback(
+    (tankId: string) => api<LabHistoryPoint[]>(`/api/v1/portfolio/sites/${encodeURIComponent(siteId)}/tanks/${encodeURIComponent(tankId)}/labs`),
+    [siteId],
+  )
   const tanks = site && code
     ? site.tanks.filter((tank) => tank.commodityClass === code && tank.capacityKg != null && (!product || productOf(tank) === product))
     : []
@@ -83,6 +87,7 @@ export function ClassDialog({
       hasLabData={tanks.some((tank) => tank.quality)}
       showProduct={!product && new Set(sources.map((tank) => tank.productName)).size > 1}
       loadHistory={loadHistory}
+      loadLabs={loadLabs}
       onClose={onClose}
     />
   )

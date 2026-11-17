@@ -18,6 +18,11 @@ services:
     restart: unless-stopped
     ports:
       - "${PID_API_PORT:-3010}:3010"
+    # Every setting in Backend/.env reaches the container at runtime (DataHub keys, PID_SITE_ID /
+    # PID_PLANT_ID, TANK_GAUGING_*, ...). The image no longer carries .env (Backend/.dockerignore), so
+    # without this a setting not listed under `environment` would be lost. `environment` still wins.
+    env_file:
+      - ./Backend/.env
     environment:
       APP_ENV: ${APP_ENV:-testing}
       NODE_ENV: production

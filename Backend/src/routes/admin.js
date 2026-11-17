@@ -413,7 +413,22 @@ async function roleIdsExist(client, roleIds) {
   return found.rows.length === roleIds.length
 }
 
+/**
+ * Field types a user form must send. A string where a list belongs used to fail with a 500, and
+ * isActive "false" (a string) left the user active. Returns an error code, or null when the body is fine.
+ */
+function userBodyProblem(body) {
+  if (body?.roleIds !== undefined && !Array.isArray(body.roleIds)) return 'roleIds_must_be_a_list'
+  if (body?.siteIds !== undefined && !Array.isArray(body.siteIds)) return 'siteIds_must_be_a_list'
+  if (body?.isActive !== undefined && typeof body.isActive !== 'boolean') return 'isActive_must_be_true_or_false'
+  const email = clean(body?.email)
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'invalid_email'
+  return null
+}
+
 router.post('/users', requirePermission('admin-users', 'edit'), async (req, res, next) => {
+  const problem = userBodyProblem(req.body)
+  if (problem) return res.status(400).json({ error: problem })
   const client = await pool.connect()
   try {
     const username = clean(req.body?.username)
@@ -457,6 +472,8 @@ router.post('/users', requirePermission('admin-users', 'edit'), async (req, res,
 })
 
 router.put('/users/:id', requirePermission('admin-users', 'edit'), async (req, res, next) => {
+  const problem = userBodyProblem(req.body)
+  if (problem) return res.status(400).json({ error: problem })
   const client = await pool.connect()
   try {
     const id = numId(req.params.id)
@@ -496,8 +513,9 @@ router.put('/users/:id', requirePermission('admin-users', 'edit'), async (req, r
       [clean(req.body?.displayName), clean(req.body?.email), isActive, id],
     )
     if (password) {
+      // A reset password signs the user out everywhere.
       await client.query(
-        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        'UPDATE users SET password_hash = $1, session_version = session_version + 1, updated_at = NOW() WHERE id = $2',
         [await hashPassword(password), id],
       )
     }
@@ -533,8 +551,11 @@ router.delete('/users/:id', requirePermission('admin-users', 'delete'), async (r
     await client.query('BEGIN')
     await client.query('DELETE FROM user_roles WHERE user_id = $1', [id])
     await client.query('DELETE FROM user_sites WHERE user_id = $1', [id])
+    // The name and e-mail are freed for a new account: the row keeps the old name inside its new one.
     await client.query(
-      'UPDATE users SET deleted_at = NOW(), is_active = FALSE, updated_at = NOW() WHERE id = $1',
+      `UPDATE users SET deleted_at = NOW(), is_active = FALSE, updated_at = NOW(),
+              username = 'deleted-' || id || '-' || username, email = NULL
+       WHERE id = $1`,
       [id],
     )
     await client.query('COMMIT')

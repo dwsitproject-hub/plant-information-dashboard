@@ -38,10 +38,25 @@ interface GaugedTank {
   fetchedAt: string | null
 }
 
+/** One scheduled round: when it was due, how many tries it took, and how it went. */
+interface RoundRun {
+  day: string
+  round: number
+  target: string
+  status: 'ok' | 'retrying' | 'failed'
+  attempts: number
+  lastAttemptAt: string | null
+  nextAttemptAt: string | null
+  written: number
+  missing: number
+  error: string | null
+}
+
 interface Overview {
   site: { id: string; name: string; timezone: string }
   sources: Source[]
-  settings: { roundTimes: string[]; toleranceMin: number }
+  settings: { roundTimes: string[]; toleranceMin: number; retryMinutes?: number; maxRetries?: number }
+  rounds?: RoundRun[]
   tanks: GaugedTank[]
 }
 
@@ -95,6 +110,21 @@ function statusTone(status: string | null): 'ok' | 'bad' | 'plain' {
   if (key === 'OK') return 'ok'
   if (key === 'NODATA' || key === 'FAIL' || key === 'INVALIDDATA') return 'bad'
   return 'plain'
+}
+
+/** A time in the site's own timezone, as HH:MM, with the date when it is not the round's own day. */
+function siteTime(iso: string | null, timeZone: string | undefined, day?: string): string {
+  if (!iso) return '—'
+  const date = new Date(iso)
+  const time = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date)
+  const onDay = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+  return day && onDay !== day ? `${onDay} ${time}` : time
+}
+
+const ROUND_STATUS: Record<RoundRun['status'], { label: string; tone: 'ok' | 'bad' | 'plain' }> = {
+  ok: { label: 'Saved', tone: 'ok' },
+  retrying: { label: 'Retrying', tone: 'plain' },
+  failed: { label: 'Failed', tone: 'bad' },
 }
 
 const fmt = (value: number | null, digits: number) =>
@@ -351,7 +381,12 @@ export function TankGaugingPage() {
         <div className="um-section__head">
           <div>
             <h2>Daily rounds</h2>
-            <p className="um-muted">At these times ({overview?.site.timezone ?? 'site time'}) the nearest reading is saved as a round, so Live Ops and the history charts work as they do for logsheet sites.</p>
+            <p className="um-muted">
+              The gauges are read at these times ({overview?.site.timezone ?? 'site time'}) and each tank's reading is saved as that day's
+              round, kept as the site's history. A read that fails is tried again every {overview?.settings.retryMinutes ?? 20} minutes, up
+              to {overview?.settings.maxRetries ?? 6} times. A late try still saves the value at the round time, from the gauge's own
+              archive. <strong>Match within</strong> is how far from the round time a reading may be.
+            </p>
           </div>
         </div>
         <div className="um-inline-form">
@@ -365,6 +400,34 @@ export function TankGaugingPage() {
           </label>
           {canEdit ? <button type="button" className="btn btn--secondary" disabled={busy !== null} onClick={() => void saveSettings()}>Save</button> : null}
         </div>
+        {overview?.rounds && overview.rounds.length > 0 ? (
+          <div className="um-table-wrap">
+            <table className="um-table">
+              <thead><tr><th>Day</th><th>Round</th><th>Status</th><th className="um-num">Tries</th><th>Last try</th><th className="um-num">Tanks saved</th><th className="um-num">No reading</th><th>Problem</th></tr></thead>
+              <tbody>
+                {overview.rounds.map((run) => {
+                  const status = ROUND_STATUS[run.status]
+                  const zone = overview.site.timezone
+                  return (
+                    <tr key={`${run.day}-${run.round}`}>
+                      <td>{run.day}</td>
+                      <td>{siteTime(run.target, zone)}</td>
+                      <td>
+                        <span className={`um-chip${status.tone === 'ok' ? ' um-chip--ok' : status.tone === 'bad' ? ' um-chip--bad' : ''}`}>{status.label}</span>
+                        {run.status === 'retrying' && run.nextAttemptAt ? <span className="um-muted"> next at {siteTime(run.nextAttemptAt, zone, run.day)}</span> : null}
+                      </td>
+                      <td className="um-num">{run.attempts}</td>
+                      <td>{siteTime(run.lastAttemptAt, zone, run.day)}</td>
+                      <td className="um-num">{run.written}</td>
+                      <td className="um-num">{run.missing}</td>
+                      <td className="um-muted" title={run.error ?? ''}>{run.error ? (run.error.length > 80 ? `${run.error.slice(0, 80)}…` : run.error) : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
       </section>
 
       <section className="um-card">

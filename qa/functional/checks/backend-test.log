@@ -1,0 +1,531 @@
+
+> plant-information-dashboard-api@0.1.0 test
+> node --test src/datahub/datahub.test.js src/tankgauging/tankgauging.test.js src/tankgauging/schedule.test.js src/tankgauging/capacity.test.js src/domain/portfolio.test.js src/domain/lab.test.js src/security.test.js src/dataIntegrity.test.js src/qualityRules.test.js
+
+TAP version 13
+# Subtest: a site reload runs freely in dev and needs the site named anywhere else
+ok 1 - a site reload runs freely in dev and needs the site named anywhere else
+  ---
+  duration_ms: 3.7552
+  type: 'test'
+  ...
+# Subtest: the stale limit defaults to two hours and can be set
+ok 2 - the stale limit defaults to two hours and can be set
+  ---
+  duration_ms: 0.337
+  type: 'test'
+  ...
+# Subtest: a reading is stale when it was fetched too long ago, or never
+ok 3 - a reading is stale when it was fetched too long ago, or never
+  ---
+  duration_ms: 0.5604
+  type: 'test'
+  ...
+# Subtest: a linked reading counts as live stock
+ok 4 - a linked reading counts as live stock
+  ---
+  duration_ms: 1.2399
+  type: 'test'
+  ...
+# Subtest: an old reading keeps its figures; the meta says it is old
+ok 5 - an old reading keeps its figures; the meta says it is old
+  ---
+  duration_ms: 1.6076
+  type: 'test'
+  ...
+# Subtest: a tank no longer on its gauge shows as NO DATA with no mass
+ok 6 - a tank no longer on its gauge shows as NO DATA with no mass
+  ---
+  duration_ms: 0.3411
+  type: 'test'
+  ...
+# Subtest: normalizers read the hub field names
+ok 7 - normalizers read the hub field names
+  ---
+  duration_ms: 5.9058
+  type: 'test'
+  ...
+# Subtest: referenceOf accepts a string or an object
+ok 8 - referenceOf accepts a string or an object
+  ---
+  duration_ms: 0.2857
+  type: 'test'
+  ...
+# Subtest: parseExpiresInSeconds understands durations
+ok 9 - parseExpiresInSeconds understands durations
+  ---
+  duration_ms: 0.5646
+  type: 'test'
+  ...
+# Subtest: slugify makes stable text ids
+ok 10 - slugify makes stable text ids
+  ---
+  duration_ms: 0.3823
+  type: 'test'
+  ...
+# Subtest: diffFields ignores blanks and whitespace
+ok 11 - diffFields ignores blanks and whitespace
+  ---
+  duration_ms: 0.4163
+  type: 'test'
+  ...
+# Subtest: company plan: link by hub code, then by name, else new
+ok 12 - company plan: link by hub code, then by name, else new
+  ---
+  duration_ms: 1.4767
+  type: 'test'
+  ...
+# Subtest: site plan resolves the parent company and flags a missing one
+ok 13 - site plan resolves the parent company and flags a missing one
+  ---
+  duration_ms: 0.5766
+  type: 'test'
+  ...
+# Subtest: site plan matches by name inside the same company
+ok 14 - site plan matches by name inside the same company
+  ---
+  duration_ms: 0.3447
+  type: 'test'
+  ...
+# Subtest: a hub deletion deactivates a linked row and is ignored when unlinked
+ok 15 - a hub deletion deactivates a linked row and is ignored when unlinked
+  ---
+  duration_ms: 1.09
+  type: 'test'
+  ...
+# Subtest: fetchEntityRecords follows the cursor and uses the app token
+ok 16 - fetchEntityRecords follows the cursor and uses the app token
+  ---
+  duration_ms: 40.01
+  type: 'test'
+  ...
+# Subtest: company falls back to the organization slug on 404
+ok 17 - company falls back to the organization slug on 404
+  ---
+  duration_ms: 1.1602
+  type: 'test'
+  ...
+# Subtest: a certificate gives colour under the codes the screens look up
+ok 18 - a certificate gives colour under the codes the screens look up
+  ---
+  duration_ms: 2.9331
+  type: 'test'
+  ...
+# Subtest: tests we do not show, and tests with no number, are left out
+ok 19 - tests we do not show, and tests with no number, are left out
+  ---
+  duration_ms: 0.3599
+  type: 'test'
+  ...
+# Subtest: product-specific tests come through under their short codes
+ok 20 - product-specific tests come through under their short codes
+  ---
+  duration_ms: 0.8737
+  type: 'test'
+  ...
+# Subtest: products from every site land in the same few classes
+ok 21 - products from every site land in the same few classes
+  ---
+  duration_ms: 3.6493
+  type: 'test'
+  ...
+# Subtest: RPOME and POME are their own classes, not refined palm oil, and a missing product falls back to the gauge group
+ok 22 - RPOME and POME are their own classes, not refined palm oil, and a missing product falls back to the gauge group
+  ---
+  duration_ms: 0.4491
+  type: 'test'
+  ...
+# Subtest: a tank is ok, near-full, over, empty or without data, and no data is never empty
+ok 23 - a tank is ok, near-full, over, empty or without data, and no data is never empty
+  ---
+  duration_ms: 0.4382
+  type: 'test'
+  ...
+# Subtest: a site adds up stock, capacity and fill on the tanks that have both, and counts the rest
+ok 24 - a site adds up stock, capacity and fill on the tanks that have both, and counts the rest
+  ---
+  duration_ms: 3.3119
+  type: 'test'
+  ...
+# Subtest: a live site is stale after an hour, a rounds site after two days
+ok 25 - a live site is stale after an hour, a rounds site after two days
+  ---
+  duration_ms: 0.6453
+  type: 'test'
+  ...
+# Subtest: the change since yesterday compares the same tanks, and is left out when too few match
+ok 26 - the change since yesterday compares the same tanks, and is left out when too few match
+  ---
+  duration_ms: 0.526
+  type: 'test'
+  ...
+# Subtest: the portfolio totals the sites and lists what needs attention
+ok 27 - the portfolio totals the sites and lists what needs attention
+  ---
+  duration_ms: 1.6192
+  type: 'test'
+  ...
+# Subtest: a spare gauge slot is not a tank in use, but a faulty tank with a capacity is
+ok 28 - a spare gauge slot is not a tank in use, but a faulty tank with a capacity is
+  ---
+  duration_ms: 0.691
+  type: 'test'
+  ...
+# Subtest: a site says whether its figures come from a gauge system or from logsheets
+ok 29 - a site says whether its figures come from a gauge system or from logsheets
+  ---
+  duration_ms: 0.9234
+  type: 'test'
+  ...
+# Subtest: a management tank carries its lab result, limits, breaches and yesterday
+ok 30 - a management tank carries its lab result, limits, breaches and yesterday
+  ---
+  duration_ms: 1.2712
+  type: 'test'
+  ...
+# Subtest: daily movement totals sum each tank once per day and leave empty days empty
+ok 31 - daily movement totals sum each tank once per day and leave empty days empty
+  ---
+  duration_ms: 2.3334
+  type: 'test'
+  ...
+# Subtest: no rules, or no result for any ruled parameter, stays spec pending
+ok 32 - no rules, or no result for any ruled parameter, stays spec pending
+  ---
+  duration_ms: 3.3563
+  type: 'test'
+  ...
+# Subtest: T.03 refined palm oil is out of spec on FFA and colour
+ok 33 - T.03 refined palm oil is out of spec on FFA and colour
+  ---
+  duration_ms: 1.877
+  type: 'test'
+  ...
+# Subtest: T.22 refined palm oil passes
+ok 34 - T.22 refined palm oil passes
+  ---
+  duration_ms: 0.3212
+  type: 'test'
+  ...
+# Subtest: T.08 olein: PV only watches, colour rejects
+ok 35 - T.08 olein: PV only watches, colour rejects
+  ---
+  duration_ms: 0.4262
+  type: 'test'
+  ...
+# Subtest: a watch breach alone still passes
+ok 36 - a watch breach alone still passes
+  ---
+  duration_ms: 0.4104
+  type: 'test'
+  ...
+# Subtest: T.14 CPO bottoms are out of spec; normal CPO passes
+ok 37 - T.14 CPO bottoms are out of spec; normal CPO passes
+  ---
+  duration_ms: 0.2641
+  type: 'test'
+  ...
+# Subtest: PFAD needs a high FFA, and a failed odour puts it out of spec
+ok 38 - PFAD needs a high FFA, and a failed odour puts it out of spec
+  ---
+  duration_ms: 0.518
+  type: 'test'
+  ...
+# Subtest: certificate tests map onto the fields the rules read
+ok 39 - certificate tests map onto the fields the rules read
+  ---
+  duration_ms: 0.5149
+  type: 'test'
+  ...
+# Subtest: the editor input is checked and normalised
+ok 40 - the editor input is checked and normalised
+  ---
+  duration_ms: 1.4528
+  type: 'test'
+  ...
+# Subtest: every default rule uses a known parameter
+ok 41 - every default rule uses a known parameter
+  ---
+  duration_ms: 1.3285
+  type: 'test'
+  ...
+# Subtest: edit or delete implies view, and empty entries are dropped
+ok 42 - edit or delete implies view, and empty entries are dropped
+  ---
+  duration_ms: 1.2613
+  type: 'test'
+  ...
+# Subtest: rights are within when every requested flag is held
+ok 43 - rights are within when every requested flag is held
+  ---
+  duration_ms: 0.1816
+  type: 'test'
+  ...
+# Subtest: a user manager cannot hand out the Administrator role
+ok 44 - a user manager cannot hand out the Administrator role
+  ---
+  duration_ms: 0.1033
+  type: 'test'
+  ...
+# Subtest: a user manager cannot hand out a role with rights they lack
+ok 45 - a user manager cannot hand out a role with rights they lack
+  ---
+  duration_ms: 0.0828
+  type: 'test'
+  ...
+# Subtest: a user manager can hand out a role inside their own rights
+ok 46 - a user manager can hand out a role inside their own rights
+  ---
+  duration_ms: 0.3208
+  type: 'test'
+  ...
+# Subtest: an Administrator can hand out any role, and an unknown role is refused to others
+ok 47 - an Administrator can hand out any role, and an unknown role is refused to others
+  ---
+  duration_ms: 0.1042
+  type: 'test'
+  ...
+# Subtest: login throttle locks an account after the limit and frees it after the window
+ok 48 - login throttle locks an account after the limit and frees it after the window
+  ---
+  duration_ms: 0.2668
+  type: 'test'
+  ...
+# Subtest: a successful login clears the failure count
+ok 49 - a successful login clears the failure count
+  ---
+  duration_ms: 0.1346
+  type: 'test'
+  ...
+# Subtest: a Hub token signs in once, and is forgotten after it expires
+ok 50 - a Hub token signs in once, and is forgotten after it expires
+  ---
+  duration_ms: 0.6393
+  type: 'test'
+  ...
+# Subtest: the OIDC callback needs the flow cookie from the same browser
+ok 51 - the OIDC callback needs the flow cookie from the same browser
+  ---
+  duration_ms: 0.389
+  type: 'test'
+  ...
+# Subtest: an id_token nonce must match the flow, and a missing one is accepted
+ok 52 - an id_token nonce must match the flow, and a missing one is accepted
+  ---
+  duration_ms: 0.1692
+  type: 'test'
+  ...
+# Subtest: a printed quantity splits into a number and its unit
+ok 53 - a printed quantity splits into a number and its unit
+  ---
+  duration_ms: 2.5226
+  type: 'test'
+  ...
+# Subtest: capacity is read in litres and other volume units are converted, never guessed
+ok 54 - capacity is read in litres and other volume units are converted, never guessed
+  ---
+  duration_ms: 0.32
+  type: 'test'
+  ...
+# Subtest: the tank detail reply gives capacity, height, state and location
+ok 55 - the tank detail reply gives capacity, height, state and location
+  ---
+  duration_ms: 0.3863
+  type: 'test'
+  ...
+# Subtest: gauge products become stock group codes
+ok 56 - gauge products become stock group codes
+  ---
+  duration_ms: 0.3022
+  type: 'test'
+  ...
+# Subtest: stock from a gauge: capacity is litres times density, and the level is volume over capacity
+ok 57 - stock from a gauge: capacity is litres times density, and the level is volume over capacity
+  ---
+  duration_ms: 0.4628
+  type: 'test'
+  ...
+# Subtest: stock from a gauge keeps working without a density, a volume, or a capacity
+ok 58 - stock from a gauge keeps working without a density, a volume, or a capacity
+  ---
+  duration_ms: 0.1989
+  type: 'test'
+  ...
+# Subtest: a capacity saved in the master beats the gauge, and a bottom stock gives loadable stock
+ok 59 - a capacity saved in the master beats the gauge, and a bottom stock gives loadable stock
+  ---
+  duration_ms: 0.2093
+  type: 'test'
+  ...
+# Subtest: Bontang products land in a sensible family, and Bekasi products keep theirs
+ok 60 - Bontang products land in a sensible family, and Bekasi products keep theirs
+  ---
+  duration_ms: 0.3093
+  type: 'test'
+  ...
+# Subtest: a faulty gauge borrows its last good density, or the average of its group
+ok 61 - a faulty gauge borrows its last good density, or the average of its group
+  ---
+  duration_ms: 0.5887
+  type: 'test'
+  ...
+# Subtest: an archive call names the tank, the parameter and the window in Unix seconds
+ok 62 - an archive call names the tank, the parameter and the window in Unix seconds
+  ---
+  duration_ms: 2.0691
+  type: 'test'
+  ...
+# Subtest: archive replies parse into points and archived parameter ids
+ok 63 - archive replies parse into points and archived parameter ids
+  ---
+  duration_ms: 1.5037
+  type: 'test'
+  ...
+# Subtest: a tank is read under the ids it archives, total mass first, product mass otherwise
+ok 64 - a tank is read under the ids it archives, total mass first, product mass otherwise
+  ---
+  duration_ms: 0.1642
+  type: 'test'
+  ...
+# Subtest: archived values come in the round units, and a strange unit is not guessed
+ok 65 - archived values come in the round units, and a strange unit is not guessed
+  ---
+  duration_ms: 0.2369
+  type: 'test'
+  ...
+# Subtest: the nearest good archived point within the tolerance is used
+ok 66 - the nearest good archived point within the tolerance is used
+  ---
+  duration_ms: 0.377
+  type: 'test'
+  ...
+# Subtest: the schedule attempts a passed round once, then retries every 20 minutes up to 6 times
+ok 67 - the schedule attempts a passed round once, then retries every 20 minutes up to 6 times
+  ---
+  duration_ms: 17.2352
+  type: 'test'
+  ...
+# Subtest: a gauge reading is old only when the last round time passed without a poll
+ok 68 - a gauge reading is old only when the last round time passed without a poll
+  ---
+  duration_ms: 2.6271
+  type: 'test'
+  ...
+# Subtest: a gauged site is stale when every tank says its last round was missed
+ok 69 - a gauged site is stale when every tank says its last round was missed
+  ---
+  duration_ms: 1.0555
+  type: 'test'
+  ...
+# Subtest: rounds are read from the archive at the round time, through the gateway, one unit at a time
+ok 70 - rounds are read from the archive at the round time, through the gateway, one unit at a time
+  ---
+  duration_ms: 4.3034
+  type: 'test'
+  ...
+# Subtest: tank names from both sites give the same kind of code
+ok 71 - tank names from both sites give the same kind of code
+  ---
+  duration_ms: 2.1639
+  type: 'test'
+  ...
+# Subtest: numbers with apostrophe separators and placeholders
+ok 72 - numbers with apostrophe separators and placeholders
+  ---
+  duration_ms: 0.2643
+  type: 'test'
+  ...
+# Subtest: a single-unit host lists one unit with its products
+ok 73 - a single-unit host lists one unit with its products
+  ---
+  duration_ms: 0.9778
+  type: 'test'
+  ...
+# Subtest: a controller with several units keeps tank numbers apart
+ok 74 - a controller with several units keeps tank numbers apart
+  ---
+  duration_ms: 0.2229
+  type: 'test'
+  ...
+# Subtest: a host with several units is read one unit at a time, each by name
+ok 75 - a host with several units is read one unit at a time, each by name
+  ---
+  duration_ms: 0.3787
+  type: 'test'
+  ...
+# Subtest: one unit of several answers with ttvData, and reads like the single-unit reply
+ok 76 - one unit of several answers with ttvData, and reads like the single-unit reply
+  ---
+  duration_ms: 0.9698
+  type: 'test'
+  ...
+# Subtest: readings carry values, product, comment and the worst status
+ok 77 - readings carry values, product, comment and the worst status
+  ---
+  duration_ms: 0.321
+  type: 'test'
+  ...
+# Subtest: worst status ranking
+ok 78 - worst status ranking
+  ---
+  duration_ms: 0.1205
+  type: 'test'
+  ...
+# Subtest: a 204 from the unit is retried once, with the session cookie
+ok 79 - a 204 from the unit is retried once, with the session cookie
+  ---
+  duration_ms: 6.9963
+  type: 'test'
+  ...
+# Subtest: source urls are cleaned and checked
+ok 80 - source urls are cleaned and checked
+  ---
+  duration_ms: 1.4113
+  type: 'test'
+  ...
+# Subtest: round times are validated and sorted
+ok 81 - round times are validated and sorted
+  ---
+  duration_ms: 0.321
+  type: 'test'
+  ...
+# Subtest: a round time becomes the right instant in the site timezone
+ok 82 - a round time becomes the right instant in the site timezone
+  ---
+  duration_ms: 16.9822
+  type: 'test'
+  ...
+# Subtest: a round is Empty only when the gauge reads empty
+ok 83 - a round is Empty only when the gauge reads empty
+  ---
+  duration_ms: 0.1433
+  type: 'test'
+  ...
+# Subtest: a lone level of zero is not evidence of an empty tank
+ok 84 - a lone level of zero is not evidence of an empty tank
+  ---
+  duration_ms: 0.0999
+  type: 'test'
+  ...
+# Subtest: a round keeps INIT and Manual values but drops no-data and failed ones
+ok 85 - a round keeps INIT and Manual values but drops no-data and failed ones
+  ---
+  duration_ms: 0.4485
+  type: 'test'
+  ...
+# Subtest: stock from a gauge uses its mass, and needs a capacity for free space
+ok 86 - stock from a gauge uses its mass, and needs a capacity for free space
+  ---
+  duration_ms: 0.1848
+  type: 'test'
+  ...
+1..86
+# tests 86
+# suites 0
+# pass 86
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 411.3948
+EXIT 0

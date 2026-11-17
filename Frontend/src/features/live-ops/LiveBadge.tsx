@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 
-/** A reading older than this is shown as stale rather than live. A poll runs every 15 minutes. */
-const STALE_MINUTES = 60
 
 function age(at: string, now: number, locale: string): { minutes: number; text: string } {
   const minutes = Math.max(0, Math.round((now - new Date(at).getTime()) / 60000))
@@ -13,10 +11,11 @@ function age(at: string, now: number, locale: string): { minutes: number; text: 
 }
 
 /**
- * Says how fresh the gauge readings on screen are. Green while they are recent, amber when the
- * poller seems to have stopped, so a stale screen is never mistaken for a live one.
+ * Says when the gauges were last read. The poller reads them at the site's round times, so the reading
+ * can be hours old and still current. Green while the last round's poll got through, amber when it did
+ * not, so a stopped poller is never mistaken for a working one.
  */
-export function LiveBadge({ readingAt }: { readingAt: string | null }) {
+export function LiveBadge({ readingAt, stale = false }: { readingAt: string | null; stale?: boolean }) {
   const { t, locale } = useLocale()
   const [now, setNow] = useState(() => Date.now())
 
@@ -26,12 +25,11 @@ export function LiveBadge({ readingAt }: { readingAt: string | null }) {
   }, [])
 
   if (!readingAt) return null
-  const { minutes, text } = age(readingAt, now, locale)
-  const stale = minutes > STALE_MINUTES
+  const { text } = age(readingAt, now, locale)
   return (
     <span className={stale ? 'live-badge live-badge--stale' : 'live-badge'} title={new Date(readingAt).toLocaleString(locale)}>
       <i aria-hidden="true" />
-      {stale ? `${t.lastReading} ${text}` : `${t.liveLabel} · ${text}`}
+      {`${t.lastReading} ${text}`}
     </span>
   )
 }

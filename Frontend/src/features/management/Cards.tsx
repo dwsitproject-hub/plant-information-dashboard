@@ -321,10 +321,10 @@ export function SiteStockCard({ site, nearFull, hide }: { site: PortfolioSite; n
         <span className="mg-muted">· {t.mgColStockCap}</span>
         <SourceBadge source={site.source} compact />
       </header>
-      <Big value={formatPercent(site.fillRatio, locale)} side={`${formatTonnes(site.quantityKg, locale)} / ${formatTonnes(site.capacityKg, locale)} t`} />
+      <Big value={formatPercent(site.fillRatio, locale)} side={`${formatTonnes(site.filledKg, locale)} / ${formatTonnes(site.capacityKg, locale)} t`} />
       <Stats
         items={[
-          { label: t.mgCardFreeSpace, value: `${formatTonnes(Math.max(0, site.capacityKg - site.quantityKg), locale)} t` },
+          { label: t.mgCardFreeSpace, value: `${formatTonnes(Math.max(0, site.capacityKg - site.filledKg), locale)} t` },
           { label: t.mgVsYesterday, value: <Change kg={site.changeKg} /> },
           { label: t.mgColTanks, value: `${site.tanksReporting}/${site.tanksTotal}` },
         ]}
@@ -553,11 +553,11 @@ export function KpiCard({ kind, portfolio, sites, hide }: { kind: KpiKind; portf
   // Free space: how much more could be received, tank by tank where there is a reading and a capacity.
   const free = (kg: number, capacityKg: number) => Math.max(0, capacityKg - kg)
   const siteRows = sites
-    .map((site) => ({ site, free: free(site.quantityKg, site.capacityKg) }))
+    .map((site) => ({ site, free: free(site.filledKg, site.capacityKg) }))
     .sort((left, right) => right.free - left.free)
   const classRows = CLASS_ORDER.map((code) => classAcrossSites(sites, code))
     .filter((row) => row.capacityKg > 0)
-    .map((row) => ({ row, free: free(row.quantityKg, row.capacityKg) }))
+    .map((row) => ({ row, free: free(row.filledKg, row.capacityKg) }))
     .sort((left, right) => right.free - left.free)
   const siteTop = Math.max(1, ...siteRows.map((item) => item.free))
   const classTop = Math.max(1, ...classRows.map((item) => item.free))

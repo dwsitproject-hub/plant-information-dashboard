@@ -3,6 +3,7 @@
  */
 import { decryptSecret, encryptSecret } from '../datahub/config.js'
 import { trimBaseUrl } from './client.js'
+import { assertAllowedUrlShape } from '../outboundGuard.js'
 
 export const AUTH_TYPES = new Set(['none', 'basic', 'cookie'])
 
@@ -16,6 +17,8 @@ export function normalizeSourceUrl(raw) {
     throw new Error('baseUrl must be a valid URL')
   }
   if (!/^https?:$/i.test(url.protocol)) throw new Error('baseUrl must be http or https')
+  // Loopback, link-local and metadata addresses are refused here; host names are checked when called.
+  assertAllowedUrlShape(url.toString())
   return trimBaseUrl(url.origin + url.pathname)
 }
 
@@ -26,7 +29,10 @@ function authFromRow(row) {
   if (row.auth_secret_encrypted) {
     try {
       secret = decryptSecret(row.auth_secret_encrypted)
-    } catch {
+    } catch (error) {
+      // Usually the encryption key changed (it follows JWT_SECRET unless DATAHUB_SECRET_KEY is set).
+      // Say so, or the gauge just starts refusing the sign-in with no clue why.
+      console.error(JSON.stringify({ level: 'error', event: 'tank_gauging.secret_decrypt_failed', sourceId: row.id ?? null, error: error?.message ?? String(error) }))
       secret = ''
     }
   }

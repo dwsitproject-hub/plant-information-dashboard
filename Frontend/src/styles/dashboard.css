@@ -3061,3 +3061,115 @@ td.num.num--spec-watch {
   background: color-mix(in srgb, var(--color-sea-mid) 12%, white);
   border-radius: 4px;
 }
+
+/* Commodity dialog: the product's average quality over the period, and per day in the chart tooltip. */
+.qty-quality {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: var(--spacing-2) 0 0;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-lighter);
+}
+
+.qty-quality__label {
+  color: var(--color-text-steel);
+  font-size: var(--font-size-sm);
+}
+
+.chart-tip__quality {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 280px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.chart-tip__quality small {
+  color: var(--color-text-steel);
+}
+
+/* Commodity Stock Movement (Tank & Stock Dashboard) */
+.stock-movement__blurb {
+  margin: 2px 0 0;
+  color: var(--color-text-steel);
+  font-size: var(--font-size-sm);
+}
+
+.stock-movement__chart {
+  margin: var(--spacing-2) 0 var(--spacing-3);
+}
+
+.stock-movement__chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: var(--font-size-sm);
+}
+
+.stock-movement__chosen span {
+  color: var(--color-text-steel);
+}
+
+.stock-movement__note {
+  margin: 2px 0 0;
+  color: var(--color-text-steel);
+  font-size: 11px;
+}
+
+.stock-movement__table td,
+.stock-movement__table th {
+  white-space: nowrap;
+}
+
+.stock-movement__total td {
+  font-weight: var(--font-weight-semibold, 600);
+  background: var(--color-bg-lighter);
+}
+
+.stock-movement__row--on td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-sea-mid);
+}
+
+.stock-movement__change--up {
+  color: #0f7a55;
+}
+
+.stock-movement__change--down {
+  color: var(--color-brand-red-deep);
+}
+
+.sparkline {
+  display: block;
+}
+
+.sparkline polyline {
+  stroke: var(--color-text-steel);
+}
+
+.sparkline circle {
+  fill: var(--color-text-steel);
+}
+
+.sparkline--up polyline {
+  stroke: #0f7a55;
+}
+
+.sparkline--up circle {
+  fill: #0f7a55;
+}
+
+.sparkline--down polyline {
+  stroke: var(--color-brand-red-deep);
+}
+
+.sparkline--down circle {
+  fill: var(--color-brand-red-deep);
+}

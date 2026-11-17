@@ -63,13 +63,28 @@ checkout_deploy_ref() {
   git log -1 --oneline
 }
 
+# A container that was just recreated needs a few seconds before it answers. Wait for a good
+# answer (curl -f fails on an error status), up to about a minute, instead of failing on the first try.
+wait_for_health() {
+  local url="$1"
+  local tries="${HEALTH_TRIES:-30}"
+  for ((i = 1; i <= tries; i++)); do
+    if curl -fsS -o /dev/null "$url"; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "Health check failed after $tries tries: $url" >&2
+  return 1
+}
+
 rebuild_app() {
   require_env_file
   compose build --no-cache pid-web
   compose up -d
   compose ps
-  curl -sS -o /dev/null -w "SPA HTTP %{http_code}\n" "http://127.0.0.1:${FE_PORT}/"
-  curl -sS "http://127.0.0.1:${FE_PORT}/api/v1/health"
+  wait_for_health "http://127.0.0.1:${FE_PORT}/" && echo "SPA OK"
+  wait_for_health "http://127.0.0.1:${FE_PORT}/api/v1/health" && curl -fsS "http://127.0.0.1:${FE_PORT}/api/v1/health"
   echo
 }
 

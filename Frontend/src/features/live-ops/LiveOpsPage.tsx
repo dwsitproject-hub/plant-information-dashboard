@@ -9,6 +9,7 @@ import { DateRangeFilter } from '../daily-production/DateRangeFilter.tsx'
 import { addDays, usePeriodRange } from '../usePeriodRange.ts'
 import { CommodityFilter } from './CommodityFilter.tsx'
 import { CommodityStock } from './CommodityStock.tsx'
+import { StockMovement } from './StockMovement.tsx'
 import { TankCard } from './TankCard.tsx'
 import { TankTable } from './TankTable.tsx'
 import { QuantityHistoryDialog } from './QuantityHistoryDialog.tsx'
@@ -209,6 +210,7 @@ export function LiveOpsPage() {
             </section>
             {!hasLabData && <p className="lab-note">{t.labNotConnected}</p>}
             <CommodityStock tanks={tanks} before={beforeByTank} day={day} averageTemperature={tempValue} hasLabData={hasLabData} />
+            <StockMovement tanks={tanks} day={farmDay ?? day} />
             <section className="prod-panel">
               <div className="section-head">
                 <h2 className="card__title">{t.tanks}</h2>

@@ -8,6 +8,7 @@ import { massToKg, stockFromGauge, stockFromProfile } from '../domain/stock.js'
 import { assessStorage, oilFamilyOf, presentLogistics, presentTank } from '../domain/present.js'
 import { gaugeMeta, liveSounding, loadGaugedTanks, newestReading } from '../tankgauging/live.js'
 import { localDate } from '../tankgauging/rounds.js'
+import { calendarDay, rejectBadDays } from '../dates.js'
 
 const router = Router()
 
@@ -142,9 +143,10 @@ function certificateAsOf(rows, day) {
 // Every route under /sites needs a session. The site in the URL must be one the user holds, and the
 // data routes also need a right on a page that shows operational data.
 router.use('/sites', requireAuth)
+router.use('/sites', rejectBadDays)
 router.use('/sites/:siteId', requireSiteAccess)
 router.use(
-  ['/sites/:siteId/snapshot', '/sites/:siteId/live', '/sites/:siteId/tanks', '/sites/:siteId/analytics'],
+  ['/sites/:siteId/snapshot', '/sites/:siteId/live', '/sites/:siteId/tanks', '/sites/:siteId/analytics', '/sites/:siteId/stock-history'],
   requireAny([['live-ops', 'view'], ['ops-analytics', 'view']]),
   requireSiteModule('live-ops'),
 )
@@ -370,75 +372,146 @@ router.get('/sites/:siteId/live/logistics', async (req, res, next) => {
 })
 
 /** One tank's readings over time, with the capacity at each point. Also used by the management overview. */
-export async function loadTankHistory(siteId, tankId) {
+/** Sounding rows with what stock needs, for one tank or every tank of a site, optionally between two days. */
+async function historyRows(siteId, { tankId = null, from = null, to = null } = {}) {
   const result = await query(
-    `SELECT t.id AS tank_pk, s.recorded_on, s.round_index, s.level_m, s.temperature_c, s.operational_status, s.mass_kg,
-            s.density_kg_m3, s.volume_litre, p.capacity, p.capacity_unit, p.bottom_stock, i.max_capacity_litre
+    `SELECT t.id AS tank_pk, t.code AS tank_code, s.recorded_on, s.round_index, s.level_m, s.temperature_c,
+            s.operational_status, s.mass_kg, s.density_kg_m3, s.volume_litre,
+            p.capacity, p.capacity_unit, p.bottom_stock, i.max_capacity_litre
      FROM soundings s JOIN tanks t ON t.id = s.tank_id
      LEFT JOIN tank_profiles p ON p.tank_id = t.id
      LEFT JOIN tank_gauging_info i ON i.tank_id = t.id
-     WHERE s.site_id = $1 AND t.code = $2
-     ORDER BY s.recorded_on, s.round_index`,
-    [siteId, tankId],
+     WHERE s.site_id = $1
+       AND ($2::text IS NULL OR t.code = $2)
+       AND ($3::date IS NULL OR s.recorded_on >= $3)
+       AND ($4::date IS NULL OR s.recorded_on <= $4)
+     ORDER BY t.code, s.recorded_on, s.round_index`,
+    [siteId, tankId, from, to],
   )
-  // The server works out the stock of every point, gauge or manual, from this site's own calibration.
-  // The browser no longer needs calibration tables, and one tank code at two sites cannot mix.
-  const catalog = await loadCatalog()
-  const stockOfRow = (row) => {
-    const massKg = num(row.mass_kg)
-    if (massKg != null) {
-      return stockFromGauge(
-        massKg,
-        { capacityKg: massToKg(num(row.capacity), row.capacity_unit), bottomStockKg: massToKg(num(row.bottom_stock), row.capacity_unit) },
-        { capacityLitre: num(row.max_capacity_litre), volumeLitre: num(row.volume_litre), densityKgM3: num(row.density_kg_m3) },
-      )
-    }
-    const profile = catalog.profiles.get(row.tank_pk)
-    if (!profile) return NO_STOCK
-    return stockFromProfile(profile, catalog.tables, num(row.level_m), num(row.temperature_c), row.operational_status ?? '')
-  }
-  const points = result.rows.map((row) => {
-    const stock = stockOfRow(row)
-    return {
-      roundIndex: row.round_index,
-      recordedOn: row.recorded_on,
-      soundingLevelM: num(row.level_m),
-      temperatureC: num(row.temperature_c),
-      operationalStatus: row.operational_status ?? '',
-      massKg: num(row.mass_kg),
-      ...stockFields(stock),
-      storageVerdict: 'spec-pending',
-    }
-  })
+  return result.rows
+}
 
-  // A gauged tank also has a reading for today, which is newer than any round.
+/**
+ * One history point with its stock worked out on the server, gauge or manual, from this site's own
+ * calibration. The browser no longer needs calibration tables, and one tank code at two sites cannot mix.
+ */
+function pointFromRow(row, catalog) {
+  let stock = NO_STOCK
+  const massKg = num(row.mass_kg)
+  if (massKg != null) {
+    stock = stockFromGauge(
+      massKg,
+      { capacityKg: massToKg(num(row.capacity), row.capacity_unit), bottomStockKg: massToKg(num(row.bottom_stock), row.capacity_unit) },
+      { capacityLitre: num(row.max_capacity_litre), volumeLitre: num(row.volume_litre), densityKgM3: num(row.density_kg_m3) },
+    )
+  } else {
+    const profile = catalog.profiles.get(row.tank_pk)
+    if (profile) stock = stockFromProfile(profile, catalog.tables, num(row.level_m), num(row.temperature_c), row.operational_status ?? '')
+  }
+  return {
+    roundIndex: row.round_index,
+    recordedOn: row.recorded_on,
+    soundingLevelM: num(row.level_m),
+    temperatureC: num(row.temperature_c),
+    operationalStatus: row.operational_status ?? '',
+    massKg,
+    ...stockFields(stock),
+    storageVerdict: 'spec-pending',
+  }
+}
+
+/** Today's point for a gauged tank, from its latest reading. It is newer than any round. */
+async function livePoint(gauged, today) {
+  const sounding = liveSounding(gauged, today)
+  const profile = (await loadGaugeProfiles([gauged.id])).get(gauged.id)
+  const gauge = {
+    capacityLitre: num(gauged.max_capacity_litre),
+    volumeLitre: sounding.volumeLitre,
+    densityKgM3: sounding.densityKgM3 ?? num(gauged.ref_density_kg_m3),
+  }
+  const stock = sounding.massKg != null
+    ? stockFromGauge(sounding.massKg, profile, gauge)
+    : { ...NO_STOCK, capacityKg: stockFromGauge(0, profile, gauge).capacityKg }
+  return {
+    roundIndex: 0,
+    recordedOn: today,
+    soundingLevelM: sounding.soundingLevelM,
+    temperatureC: sounding.temperatureC,
+    operationalStatus: sounding.operationalStatus,
+    massKg: sounding.massKg,
+    ...stockFields(stock),
+    storageVerdict: 'spec-pending',
+  }
+}
+
+/** One tank's readings over time, with the capacity at each point. Also used by the management overview. */
+export async function loadTankHistory(siteId, tankId) {
+  const catalog = await loadCatalog()
+  const points = (await historyRows(siteId, { tankId })).map((row) => pointFromRow(row, catalog))
   const site = await siteOf(siteId)
   const gauged = site ? (await loadGaugedTanks({ query }, site.id)).find((row) => row.code === tankId) : null
-  if (gauged) {
-    const today = localDate(new Date(), site.timezone)
-    const sounding = liveSounding(gauged, today)
-    const profile = (await loadGaugeProfiles([gauged.id])).get(gauged.id)
-    const gauge = {
-      capacityLitre: num(gauged.max_capacity_litre),
-      volumeLitre: sounding.volumeLitre,
-      densityKgM3: sounding.densityKgM3 ?? num(gauged.ref_density_kg_m3),
-    }
-    const stock = sounding.massKg != null
-      ? stockFromGauge(sounding.massKg, profile, gauge)
-      : { ...NO_STOCK, capacityKg: stockFromGauge(0, profile, gauge).capacityKg }
-    points.push({
-      roundIndex: 0,
-      recordedOn: today,
-      soundingLevelM: sounding.soundingLevelM,
-      temperatureC: sounding.temperatureC,
-      operationalStatus: sounding.operationalStatus,
-      massKg: sounding.massKg,
-      ...stockFields(stock),
-      storageVerdict: 'spec-pending',
-    })
-  }
+  if (gauged) points.push(await livePoint(gauged, localDate(new Date(), site.timezone)))
   return points
 }
+
+/**
+ * Every tank of a site with its daily readings between two days (inclusive), in one query. A gauged
+ * site also gets today's live reading when today is in the range. Feeds the stock movement views.
+ */
+export async function loadSiteHistory(site, from, to) {
+  const catalog = await loadCatalog()
+  const byTank = new Map()
+  for (const row of await historyRows(site.id, { from, to })) {
+    if (!byTank.has(row.tank_code)) byTank.set(row.tank_code, [])
+    byTank.get(row.tank_code).push(pointFromRow(row, catalog))
+  }
+  const today = localDate(new Date(), site.timezone)
+  if ((!from || today >= from) && (!to || today <= to)) {
+    for (const gauged of await loadGaugedTanks({ query }, site.id)) {
+      const points = byTank.get(gauged.code) ?? []
+      // The live reading replaces today's round, if one was already written.
+      byTank.set(gauged.code, [...points.filter((point) => point.recordedOn !== today), await livePoint(gauged, today)])
+    }
+  }
+  return [...byTank.entries()].map(([tankId, points]) => ({ tankId, points }))
+}
+
+/** One tank's lab results over time, newest analysis per day, judged against its product's limits. */
+export async function loadTankLabs(site, tankId) {
+  const rows = (await certificateLabs(site.id)).filter((row) => row.tank_code === tankId)
+  const byAnalysis = new Map()
+  for (const row of rows) {
+    const lab = labFrom({ ...row, tank_code: tankId })
+    byAnalysis.set(lab.analysisDate ?? lab.snapshotOn ?? tankId, lab)
+  }
+  const series = [...byAnalysis.values()].sort((a, b) => (a.analysisDate ?? '').localeCompare(b.analysisDate ?? ''))
+  return series.map((lab) => {
+    const quality = assessStorage(oilFamilyOf(lab.productName), lab.parameters, lab.analysisDate, site.timezone, labJudgement(lab))
+    return {
+      snapshotOn: lab.snapshotOn,
+      analysisDate: lab.analysisDate,
+      parameters: quality.parameters,
+      storageVerdict: quality.storageVerdict,
+    }
+  })
+}
+
+/** A real day as YYYY-MM-DD, or null (2026-02-30 is not one). */
+const isoDay = calendarDay
+
+// Every tank's daily stock between two days, for the Commodity Stock Movement section.
+router.get('/sites/:siteId/stock-history', async (req, res, next) => {
+  try {
+    const site = await siteOf(req.params.siteId)
+    if (!site) return res.status(404).json({ error: 'Site not found' })
+    const from = isoDay(req.query.from)
+    const to = isoDay(req.query.to)
+    if (!from || !to || from > to) return res.status(400).json({ error: 'invalid_range' })
+    res.json(await loadSiteHistory(site, from, to))
+  } catch (error) {
+    next(error)
+  }
+})
 
 router.get('/sites/:siteId/tanks/:tankId/soundings', async (req, res, next) => {
   try {
@@ -452,22 +525,7 @@ router.get('/sites/:siteId/tanks/:tankId/labs', async (req, res, next) => {
   try {
     const site = await siteOf(req.params.siteId)
     if (!site) return res.status(404).json({ error: 'Site not found' })
-    const result = { rows: (await certificateLabs(site.id)).filter((row) => row.tank_code === req.params.tankId) }
-    const byAnalysis = new Map()
-    for (const row of result.rows) {
-      const lab = labFrom({ ...row, tank_code: req.params.tankId })
-      byAnalysis.set(lab.analysisDate ?? lab.snapshotOn ?? req.params.tankId, lab)
-    }
-    const series = [...byAnalysis.values()].sort((a, b) => (a.analysisDate ?? '').localeCompare(b.analysisDate ?? ''))
-    res.json(series.map((lab) => {
-      const quality = assessStorage(oilFamilyOf(lab.productName), lab.parameters, lab.analysisDate, site.timezone, labJudgement(lab))
-      return {
-        snapshotOn: lab.snapshotOn,
-        analysisDate: lab.analysisDate,
-        parameters: quality.parameters,
-        storageVerdict: quality.storageVerdict,
-      }
-    }))
+    res.json(await loadTankLabs(site, req.params.tankId))
   } catch (error) {
     next(error)
   }

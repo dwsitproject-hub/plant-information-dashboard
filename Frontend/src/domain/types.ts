@@ -79,6 +79,8 @@ export interface TankLive {
   readingKind?: 'live' | 'round' | null
   /** When the gauge reading was taken. */
   readingAt?: string | null
+  /** A gauge reading from before the last round time: that round's poll did not get through. */
+  stale?: boolean
   /** The commodity card this gauged tank counts under. It follows the product the gauge assigns. */
   stockGroup?: string | null
   /** Max Tank Capacity the gauge reports, in litres. */
