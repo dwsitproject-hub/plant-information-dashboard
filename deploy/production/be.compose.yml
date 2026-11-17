@@ -1,0 +1,56 @@
+# PRODUCTION - backend server 172.28.80.51 (the PID API: sign-in, tank stock, quality, gauges).
+# Guide: Docs/Guide/PRODUCTION-DEPLOYMENT.md. The image is built on this server by release.sh;
+# this file never builds.
+#
+# Run through deploy/production/dc.sh be (or release.sh), which points Compose at the runtime
+# folder /opt/pid, so the files below are read from there:
+#   .env                     PID_SUBNET (from preflight.sh be), optional PID_API_BIND
+#   production.env           settings (from deploy/production/production.env)
+#   secrets.production.env   secrets (from secrets.production.env.example, chmod 600)
+#
+# THIS HOST IS SHARED. Two rules keep this app from breaking the others:
+#   1. The app network has a FIXED subnet (PID_SUBNET, no default). Left to itself Docker picks a
+#      free 172.x /16, and on staging that once took 172.30.0.0/16 - the Synology NAS's range - and
+#      cut every app on the host off from the NAS.
+#   2. The port is published on the private address only, never 0.0.0.0 / 80 / 443.
+# This app does not use the NAS: no mount, nothing under /mnt is touched.
+#
+# The container is named pid-api on purpose: the gauge cron (/etc/cron.d/pid-production) and the
+# logsheet loader (Backend/scripts/apply-staging-inbox.sh, run by the logsheet PC) call it by name.
+name: pid-prod
+
+services:
+  pid-api:
+    image: pid-api:production
+    container_name: pid-api
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 15s
+    env_file:
+      - ./production.env
+      - path: ./secrets.production.env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+    ports:
+      # Private address only: the frontend container on 172.28.80.50 is the only caller.
+      - "${PID_API_BIND:-172.28.80.51:3011}:3010"
+    # The production Hub (dwshub.kpndomain.com) is served by the FE server's host nginx on 443.
+    # Pin the name so OIDC discovery, token and signing keys are reachable even if this server's
+    # DNS does not know the company domain.
+    extra_hosts:
+      - "dwshub.kpndomain.com:${HUB_HOST_IP:-172.28.80.50}"
+    # Healthcheck: the image's own (GET /api/v1/health/ready, which checks the database).
+    networks: [pid]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+networks:
+  pid:
+    name: pid_net
+    ipam:
+      config:
+        # Required, no default on purpose: see rule 1 above.
+        - subnet: ${PID_SUBNET:?set PID_SUBNET in /opt/pid/.env - run deploy/production/preflight.sh be}

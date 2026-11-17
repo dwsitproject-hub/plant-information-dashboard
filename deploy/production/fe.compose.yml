@@ -1,0 +1,47 @@
+# PRODUCTION - frontend server 172.28.80.50 (nginx: the built pages, and /api + /auth proxied to the
+# backend server). Guide: Docs/Guide/PRODUCTION-DEPLOYMENT.md. The image is built on this server by
+# release.sh; this file never builds.
+#
+# Published on the server's PRIVATE address, 172.28.80.50:3091: users open http://172.28.80.50:3091
+# until a pid.kpndomain.com record exists; then the host nginx vhost (nginx/host-vhost-pid.conf)
+# forwards the name to this same address, so the domain switch changes no container.
+#
+# Run through deploy/production/dc.sh fe, which reads from /opt/pid:
+#   .env    PID_SUBNET (from preflight.sh fe), optional PID_WEB_BIND / PID_BACKEND_URL
+# THIS HOST IS SHARED: fixed subnet (no default), private-address port, never 80/443.
+name: pid-prod
+
+services:
+  pid-web:
+    image: pid-web:production
+    container_name: pid-web
+    restart: unless-stopped
+    environment:
+      # Filled into the nginx template at start (only these names are substituted; nginx's own
+      # $variables are left alone).
+      PID_BACKEND_URL: ${PID_BACKEND_URL:-http://172.28.80.51:3011}
+      # Who may report the visitor's address in X-Forwarded-For: this network (the host nginx
+      # arrives through its gateway) and the server's own address. Anyone else is the visitor.
+      PID_SUBNET: ${PID_SUBNET:?set PID_SUBNET in /opt/pid/.env - run deploy/production/preflight.sh fe}
+      PID_FE_HOST_IP: ${PID_FE_HOST_IP:-172.28.80.50}
+    volumes:
+      # The production site config, from the checkout (rendered to /etc/nginx/conf.d/default.conf).
+      - ./src/deploy/production/nginx/pid-web.conf.template:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${PID_WEB_BIND:-172.28.80.50:3091}:80"
+    networks: [pid]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+networks:
+  pid:
+    name: pid_net
+    ipam:
+      config:
+        - subnet: ${PID_SUBNET:?set PID_SUBNET in /opt/pid/.env - run deploy/production/preflight.sh fe}

@@ -1,0 +1,15 @@
+# /etc/cron.d/pid-production on the BE server 172.28.80.51 (guide §9). Its own file, not root's
+# crontab: this host is shared, and another team rewriting root's crontab would drop these lines.
+# Install:  cp /opt/pid/src/deploy/production/cron.pid-production /etc/cron.d/pid-production && chmod 644 /etc/cron.d/pid-production
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Every 5 minutes: poll the gauge sites whose round time (Master > Tank gauging > Daily rounds) is due,
+# or whose failed attempt is due for a retry (every 20 minutes, up to 6 times). Most runs print "nothing due".
+*/5 * * * * root /opt/pid/src/deploy/production/dc.sh be exec -T pid-api node scripts/run-tank-gauging-poll.js >> /var/log/pid-tank-gauging-poll.log 2>&1
+
+# Daily: archive and delete old gauge samples (the daily rounds, i.e. the history, are never purged).
+20 2 * * * root /opt/pid/src/deploy/production/dc.sh be exec -T pid-api node scripts/purge-tank-gauging-samples.js >> /var/log/pid-tank-gauging-purge.log 2>&1
+
+# Daily: logical backup of the database (guide §13).
+40 1 * * * root /opt/pid/src/deploy/production/backup.sh >> /var/log/pid-backup.log 2>&1

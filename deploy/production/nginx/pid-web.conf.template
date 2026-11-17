@@ -1,0 +1,79 @@
+# PID web container, PRODUCTION (fe.compose.yml mounts this as /etc/nginx/templates/default.conf.template;
+# the nginx image fills ${PID_BACKEND_URL}, ${PID_SUBNET} and ${PID_FE_HOST_IP} at start).
+# Serves the built pages and proxies /api and /auth to the API on the backend server.
+
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+    server_tokens off;
+
+    # The visitor's address. Users reach this container directly (172.28.80.50:3091) or, once the
+    # domain exists, through the host nginx, which sets X-Forwarded-For to the visitor. Only that hop
+    # (this network's gateway, or the server's own address) may say who the visitor is; anyone else
+    # IS the visitor, so a forged header from a browser changes nothing. The API's per-address
+    # sign-in limit depends on this.
+    set_real_ip_from ${PID_SUBNET};
+    set_real_ip_from ${PID_FE_HOST_IP};
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive off;
+
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_vary on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    # A location with its own add_header drops every add_header from this level, so the locations
+    # below repeat them. X-Frame-Options is not sent on index.html: the Hub may open PID in a frame.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /api/ {
+        proxy_pass ${PID_BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # One value: the visitor (after the real-IP rule above). The API trusts only this server.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    location /auth/ {
+        proxy_pass ${PID_BACKEND_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    location /assets/ {
+        alias /usr/share/nginx/html/assets/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

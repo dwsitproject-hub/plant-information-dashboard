@@ -1,0 +1,9 @@
+# /etc/logrotate.d/pid-production on the BE server (guide §9): keep the cron logs from growing forever.
+/var/log/pid-tank-gauging-poll.log /var/log/pid-tank-gauging-purge.log /var/log/pid-backup.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
