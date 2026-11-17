@@ -65,14 +65,29 @@ checkout_deploy_ref() {
   git log -1 --oneline
 }
 
+# A container that was just recreated needs a few seconds before it answers. Wait for a good
+# answer (curl -f fails on an error status), up to about a minute, instead of failing on the first try.
+wait_for_health() {
+  local url="$1"
+  local tries="${HEALTH_TRIES:-30}"
+  for ((i = 1; i <= tries; i++)); do
+    if curl -fsS "$url"; then
+      echo
+      return 0
+    fi
+    sleep 2
+  done
+  echo "Health check failed after $tries tries: $url" >&2
+  return 1
+}
+
 rebuild_api() {
   require_env_file
   compose build --no-cache pid-api
   compose up -d pid-api
   compose ps
+  wait_for_health "http://127.0.0.1:${API_PORT}/api/v1/health"
   compose logs --tail=25 pid-api
-  curl -sS "http://127.0.0.1:${API_PORT}/api/v1/health"
-  echo
   if [[ "$RUN_MIGRATE" == "1" ]]; then
     echo "=== Running migrations (RUN_MIGRATE=1) ==="
     compose exec -T pid-api npm run migrate

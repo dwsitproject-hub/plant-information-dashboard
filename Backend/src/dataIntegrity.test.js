@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { confirmSiteReplace } from '../scripts/guard.js'
-import { isStale, liveSounding, staleAfterMinutes } from './tankgauging/live.js'
+import { gaugeMeta, isStale, liveSounding, staleAfterMinutes } from './tankgauging/live.js'
 
 test('a site reload runs freely in dev and needs the site named anywhere else', () => {
   assert.equal(confirmSiteReplace('seed', 'bekasi', [], { APP_ENV: 'dev' }).ok, true)
@@ -42,18 +42,26 @@ const reading = (extra = {}) => ({
   ...extra,
 })
 
-test('a fresh, linked reading counts as live stock', () => {
-  const s = liveSounding(reading(), '2026-11-16', new Date('2026-11-16T08:00:00Z'))
+test('a linked reading counts as live stock', () => {
+  const s = liveSounding(reading(), '2026-11-16')
   assert.equal(s.massKg, 1_200_000)
   assert.notEqual(s.operationalStatus, 'NO DATA')
 })
 
-test('a stale reading, or a tank no longer on its gauge, shows as NO DATA with no mass', () => {
-  const now = new Date('2026-11-16T08:00:00Z')
-  const stale = liveSounding(reading({ fetched_at: '2026-11-15T20:00:00Z' }), '2026-11-16', now)
-  assert.equal(stale.operationalStatus, 'NO DATA')
-  assert.equal(stale.massKg, null)
-  const unlinked = liveSounding(reading({ linked: false }), '2026-11-16', now)
+test('an old reading keeps its figures; the meta says it is old', () => {
+  // Staging 16 Nov 2026: the poller was hours late and every Bontang tank went blank. Keep the last
+  // known stock on screen and flag its age instead.
+  const old = reading({ fetched_at: '2000-01-01T00:00:00Z' })
+  const s = liveSounding(old, '2026-11-16')
+  assert.equal(s.massKg, 1_200_000)
+  assert.notEqual(s.operationalStatus, 'NO DATA')
+  assert.equal(gaugeMeta(old, 'live', old.fetched_at).stale, true)
+  assert.equal(gaugeMeta(reading({ fetched_at: new Date().toISOString() }), 'live', null).stale, false)
+  assert.equal(gaugeMeta(old, 'round', null).stale, false, 'a daily round is not live, so it is never stale')
+})
+
+test('a tank no longer on its gauge shows as NO DATA with no mass', () => {
+  const unlinked = liveSounding(reading({ linked: false }), '2026-11-16')
   assert.equal(unlinked.operationalStatus, 'NO DATA')
   assert.equal(unlinked.massKg, null)
 })

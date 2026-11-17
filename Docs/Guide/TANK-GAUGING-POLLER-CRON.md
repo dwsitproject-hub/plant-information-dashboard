@@ -18,7 +18,9 @@ The latest reading is never purged, and the daily rounds live in `soundings`, so
 
 The units are slow, about one to two seconds a call, and the poller reads them one after another. Do not poll faster than every five minutes.
 
-Live Ops shows today's tanks from the latest reading. A reading fetched more than **120 minutes** ago shows as NO DATA and stops counting in stock, so a stopped poller is visible instead of freezing the totals. Change the limit with `TANK_GAUGING_STALE_MINUTES` on the API. A tank that no longer appears on its gauge (or whose gauge was removed) also shows as NO DATA; its history stays.
+Live Ops shows today's tanks from the latest reading, and says how old it is. A reading fetched more than **120 minutes** ago keeps its figures and is flagged as old (`stale` on the tank), so a late poller does not blank the site. Change the limit with `TANK_GAUGING_STALE_MINUTES` on the API. A tank that no longer appears on its gauge (or whose gauge was removed) shows as NO DATA and stops counting in stock; its history stays.
+
+If Live Ops shows readings hours old, check the cron job and its log first (see [Check that it works](#check-that-it-works)).
 
 Changing a gauge system's address in Master > Tank gauging moves its tanks to the new address. It does not create new tanks.
 
@@ -52,25 +54,30 @@ Use **Test connection** on each row. It reads the tank list and shows how many u
 
 ## Schedule it
 
-On the backend host (`172.28.92.57`), as the user that runs Docker:
+On the backend host (`172.28.92.57`), as root. The jobs go in their own file under `/etc/cron.d/`, not in root's crontab: that host is shared with other products, and a rewrite of root's crontab by another team would drop PID's lines.
 
 ```bash
-sudo touch /var/log/pid-tank-gauging-poll.log /var/log/pid-tank-gauging-purge.log
-sudo chown "$USER" /var/log/pid-tank-gauging-poll.log /var/log/pid-tank-gauging-purge.log
-crontab -e
+touch /var/log/pid-tank-gauging-poll.log /var/log/pid-tank-gauging-purge.log
+cat > /etc/cron.d/pid-tank-gauging <<'CRON'
+# Plant Information Dashboard: tank gauging. Times are the server's own clock (SIT: Asia/Shanghai, UTC+8).
+SHELL=/bin/bash
+# Poll every gauge source every 15 minutes. Live Ops stays fresh, and a reading always falls within the
+# 30-minute tolerance of each site's round times, so the daily rounds get written.
+*/15 * * * * root cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/run-tank-gauging-poll.js >> /var/log/pid-tank-gauging-poll.log 2>&1
+# Sample purge: every day at 02:20 server time
+20 2 * * * root cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/purge-tank-gauging-samples.js >> /var/log/pid-tank-gauging-purge.log 2>&1
+CRON
+chmod 644 /etc/cron.d/pid-tank-gauging
 ```
 
-Add:
+Change how often it runs by editing the first field, for example `*/30` for every 30 minutes (still inside the round tolerance). Polling less often than the tolerance is risky: a poll must land within 30 minutes of each round time, or that day's round is not written.
 
-```cron
-# Tank gauging poll: every 15 minutes
-*/15 * * * * cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/run-tank-gauging-poll.js >> /var/log/pid-tank-gauging-poll.log 2>&1
+**Cron runs on the server's own clock.** On the SIT API host that is **Asia/Shanghai (UTC+8)**. Check it with `timedatectl`. `CRON_TZ=` lines are ignored by this server's cron, so a time written for WIB runs an hour early.
 
-# Sample purge: every day at 02:20
-20 2 * * * cd /opt/plant-information-dashboard && docker compose --env-file Backend/.env -f docker-compose.backend-api-only.yml exec -T pid-api node scripts/purge-tank-gauging-samples.js >> /var/log/pid-tank-gauging-purge.log 2>&1
-```
+The round times (06:30 and 14:30 by default) are in each site's own timezone and are set on the Tank gauging page under **Daily rounds**, not in cron. With an interval (`*/15`, `*/30`) the clock does not matter. If you schedule polls at fixed times instead, convert them to server time:
 
-Change how often it runs by editing the first field, for example `*/10` for every 10 minutes. The round times are not in cron. They are set on the Tank gauging page under **Daily rounds**.
+- Bontang (WITA, UTC+8): 06:30 is 06:30 server time.
+- Tanjung Pura (WIB, UTC+7): 06:30 is 07:30 server time.
 
 Only one poll runs at a time. If a run is still going when the next starts, the new one exits quietly.
 
