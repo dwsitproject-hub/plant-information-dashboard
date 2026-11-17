@@ -38,6 +38,8 @@ export interface PortfolioQuality {
 export interface ClassTotals {
   code: CommodityClass
   quantityKg: number
+  /** Stock in the tanks that also have a capacity: the part that fill and free space are worked out on. */
+  filledKg: number
   capacityKg: number
   capacityTotalKg: number
   fillRatio: number | null
@@ -58,6 +60,8 @@ export interface PortfolioSite {
   ageDays: number | null
   stale: boolean
   quantityKg: number
+  /** Stock in the tanks that also have a capacity: the part that fill and free space are worked out on. */
+  filledKg: number
   capacityKg: number
   capacityTotalKg: number
   fillRatio: number | null
@@ -77,6 +81,8 @@ export type AttentionItem =
 export interface PortfolioSummary {
   nearFull: number
   quantityKg: number
+  /** Stock in the tanks that also have a capacity: the part that fill and free space are worked out on. */
+  filledKg: number
   capacityKg: number
   capacityTotalKg: number
   fillRatio: number | null
@@ -125,17 +131,18 @@ export function formatPercent(ratio: number | null, locale: string, digits = 1):
 
 /** The totals of one commodity class across every site. */
 export function classAcrossSites(sites: PortfolioSite[], code: CommodityClass): ClassTotals {
-  const total: ClassTotals = { code, quantityKg: 0, capacityKg: 0, capacityTotalKg: 0, fillRatio: null, tanks: 0, reporting: 0 }
+  const total: ClassTotals = { code, quantityKg: 0, filledKg: 0, capacityKg: 0, capacityTotalKg: 0, fillRatio: null, tanks: 0, reporting: 0 }
   for (const site of sites) {
     const row = site.classes.find((item) => item.code === code)
     if (!row) continue
     total.quantityKg += row.quantityKg
+    total.filledKg += row.filledKg
     total.capacityKg += row.capacityKg
     total.capacityTotalKg += row.capacityTotalKg
     total.tanks += row.tanks
     total.reporting += row.reporting
   }
-  total.fillRatio = total.capacityKg > 0 ? total.quantityKg / total.capacityKg : null
+  total.fillRatio = total.capacityKg > 0 ? total.filledKg / total.capacityKg : null
   return total
 }
 
@@ -257,6 +264,8 @@ export function tintOf(product: string, code: CommodityClass): { background: str
 export interface ProductTotals {
   key: string
   quantityKg: number
+  /** Stock in the tanks that also have a capacity: the part that fill and free space are worked out on. */
+  filledKg: number
   capacityKg: number
   capacityTotalKg: number
   fillRatio: number | null
@@ -269,17 +278,20 @@ export function productTotals(tanks: PortfolioTank[]): ProductTotals[] {
   const byProduct = new Map<string, ProductTotals>()
   for (const tank of tanks) {
     const key = productOf(tank)
-    const row = byProduct.get(key) ?? { key, quantityKg: 0, capacityKg: 0, capacityTotalKg: 0, fillRatio: null, tanks: 0, reporting: 0 }
+    const row = byProduct.get(key) ?? { key, quantityKg: 0, filledKg: 0, capacityKg: 0, capacityTotalKg: 0, fillRatio: null, tanks: 0, reporting: 0 }
     row.tanks += 1
     if (tank.capacityKg != null) row.capacityTotalKg += tank.capacityKg
-    if (tank.quantityKg != null) row.reporting += 1
-    if (tank.quantityKg != null && tank.capacityKg != null) {
+    if (tank.quantityKg != null) {
+      row.reporting += 1
       row.quantityKg += tank.quantityKg
+    }
+    if (tank.quantityKg != null && tank.capacityKg != null) {
+      row.filledKg += tank.quantityKg
       row.capacityKg += tank.capacityKg
     }
     byProduct.set(key, row)
   }
   return [...byProduct.values()]
-    .map((row) => ({ ...row, fillRatio: row.capacityKg > 0 ? row.quantityKg / row.capacityKg : null }))
+    .map((row) => ({ ...row, fillRatio: row.capacityKg > 0 ? row.filledKg / row.capacityKg : null }))
     .sort((a, b) => b.quantityKg - a.quantityKg || a.key.localeCompare(b.key))
 }

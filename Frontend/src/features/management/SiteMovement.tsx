@@ -94,13 +94,19 @@ export function SiteMovement() {
   const signed = (kg: number) => `${kg > 0 ? '+' : kg < 0 ? '−' : ''}${tonnes(Math.abs(kg))}`
   const pct = (stats: MovementStats | null) => (stats?.pct == null ? '—' : `${stats.pct >= 0 ? '+' : ''}${(stats.pct * 100).toFixed(1)}%`)
   const toneOf = (stats: MovementStats | null): 'up' | 'down' | 'flat' => (!stats || stats.change === 0 ? 'flat' : stats.change > 0 ? 'up' : 'down')
-  const first = rows[0]?.site
+  // Sites can end on different days (a logsheet site on its latest entered day), so show the whole span.
+  const span = rows.length
+    ? {
+        from: rows.map((row) => row.site.from).sort()[0],
+        to: rows.map((row) => row.site.to).sort().at(-1) as string,
+      }
+    : null
 
   return (
     <section className="mg-attention mg-movement" aria-label={t.stockMovement}>
       <h2>{t.stockMovement}</h2>
       <p className="mg-muted mg-movement__blurb">
-        {first ? `${formatDay(first.from, locale)} – ${formatDay(first.to, locale)}. ` : ''}{t.stockMovementSitesBlurb}
+        {span ? `${formatDay(span.from, locale)} – ${formatDay(span.to, locale)}. ` : ''}{t.stockMovementSitesBlurb}
       </p>
       {failed ? <p className="mg-alert" role="alert">{t.loadFailed}</p> : null}
       {!data && !failed ? <p className="mg-muted">{t.loading}</p> : null}

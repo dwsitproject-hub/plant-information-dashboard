@@ -77,7 +77,7 @@ export function slimTank(tank, nearFull = NEAR_FULL, previous = null) {
 }
 
 function emptyTotals() {
-  return { quantityKg: 0, capacityKg: 0, capacityTotalKg: 0, tanks: 0, reporting: 0 }
+  return { quantityKg: 0, filledKg: 0, capacityKg: 0, capacityTotalKg: 0, tanks: 0, reporting: 0 }
 }
 
 function emptyCounts() {
@@ -87,15 +87,20 @@ function emptyCounts() {
 function addTank(totals, tank) {
   totals.tanks += 1
   if (tank.capacityKg != null) totals.capacityTotalKg += tank.capacityKg
-  if (tank.quantityKg != null) totals.reporting += 1
-  // Fill is stock over capacity for the tanks that have both, so a tank with no data does not drag it down.
-  if (tank.quantityKg != null && tank.capacityKg != null) {
+  if (tank.quantityKg != null) {
+    totals.reporting += 1
+    // Stock counts every tank that reports, with or without a capacity in the master data.
     totals.quantityKg += tank.quantityKg
+  }
+  // Fill and free space use only the tanks that have both, so a tank with no data does not drag it down
+  // and a tank with no capacity does not push it up.
+  if (tank.quantityKg != null && tank.capacityKg != null) {
+    totals.filledKg += tank.quantityKg
     totals.capacityKg += tank.capacityKg
   }
 }
 
-const fillOf = (totals) => (totals.capacityKg > 0 ? totals.quantityKg / totals.capacityKg : null)
+const fillOf = (totals) => (totals.capacityKg > 0 ? totals.filledKg / totals.capacityKg : null)
 
 /** Total stock of the tanks that report in both lists, to compare one day with another like for like. */
 export function sameTankDelta(now, before) {
@@ -159,6 +164,7 @@ export function summariseSite(site, tanks, context) {
     ageDays,
     stale,
     quantityKg: total.quantityKg,
+    filledKg: total.filledKg,
     capacityKg: total.capacityKg,
     capacityTotalKg: total.capacityTotalKg,
     fillRatio: fillOf(total),
@@ -172,6 +178,7 @@ export function summariseSite(site, tanks, context) {
       return {
         code,
         quantityKg: t.quantityKg,
+        filledKg: t.filledKg,
         capacityKg: t.capacityKg,
         capacityTotalKg: t.capacityTotalKg,
         fillRatio: fillOf(t),
@@ -191,6 +198,7 @@ export function summarisePortfolio(sites, nearFull = NEAR_FULL) {
   let changeSites = 0
   for (const site of sites) {
     total.quantityKg += site.quantityKg
+    total.filledKg += site.filledKg
     total.capacityKg += site.capacityKg
     total.capacityTotalKg += site.capacityTotalKg
     total.tanks += site.tanksTotal
@@ -213,6 +221,7 @@ export function summarisePortfolio(sites, nearFull = NEAR_FULL) {
   return {
     nearFull,
     quantityKg: total.quantityKg,
+    filledKg: total.filledKg,
     capacityKg: total.capacityKg,
     capacityTotalKg: total.capacityTotalKg,
     fillRatio: fillOf(total),

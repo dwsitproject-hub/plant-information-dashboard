@@ -316,9 +316,9 @@ function Overview({
         <Kpi label={t.mgKpiTanks} value={`${portfolio.tanksReporting} / ${portfolio.tanksTotal}`} count={{ value: portfolio.tanksReporting, format: (n) => `${Math.round(n)} / ${portfolio.tanksTotal}` }} card={(hide) => <KpiCard kind="tanks" portfolio={portfolio} sites={sites} hide={hide} />} />
         <Kpi
           label={t.mgKpiFree}
-          value={formatTonnes(Math.max(0, portfolio.capacityKg - portfolio.quantityKg), locale)}
+          value={formatTonnes(Math.max(0, portfolio.capacityKg - portfolio.filledKg), locale)}
           unit="t"
-          count={{ value: Math.max(0, portfolio.capacityKg - portfolio.quantityKg), format: (n) => formatTonnes(n, locale) }}
+          count={{ value: Math.max(0, portfolio.capacityKg - portfolio.filledKg), format: (n) => formatTonnes(n, locale) }}
           card={(hide) => <KpiCard kind="free" portfolio={portfolio} sites={sites} hide={hide} />}
         />
       </div>

@@ -106,7 +106,7 @@ function rangeStart(to, days) {
 
 /**
  * Commodity Stock Movement on the Stock Overview: each site's total stock per day over the last month,
- * and per commodity class. A site's "today" is its own local date.
+ * and per commodity class. Each site's period ends on its own data day, the day Tank & Stock shows.
  */
 router.get('/portfolio/movement', async (req, res, next) => {
   try {
@@ -117,10 +117,13 @@ router.get('/portfolio/movement', async (req, res, next) => {
         try {
           const site = await siteOf(held.id)
           if (!site) return null
-          const to = localDate(new Date(), site.timezone)
-          const from = rangeStart(to, days)
           // A tank's class follows the product it holds now, as on the rest of the overview.
-          const { tanks } = await loadSiteTanks(site)
+          const current = await loadSiteTanks(site)
+          const tanks = current.tanks
+          // The period ends on the site's own data day, as on Tank & Stock: today for a gauged site, the
+          // latest logsheet day otherwise. A logsheet day not entered yet does not end the line on a gap.
+          const to = current.day ?? localDate(new Date(), site.timezone)
+          const from = rangeStart(to, days)
           const classOf = new Map(tanks.map((tank) => [tank.tankId, commodityClassOf(tank.productName, tank.stockGroup)]))
           const series = movementSeries(await loadSiteHistory(site, from, to), daysBetween(from, to), (tankId) => classOf.get(tankId) ?? 'other')
           return {
