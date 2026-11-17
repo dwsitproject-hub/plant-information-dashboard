@@ -8,7 +8,7 @@ set -euo pipefail
 RUN="${PID_RUN_DIR:-/opt/pid}"
 DIR="${BACKUP_DIR:-$RUN/backups}"
 KEEP="${KEEP:-14}"
-CLIENT="${PG_CLIENT_IMAGE:-postgres:17-alpine}"
+CLIENT="${PG_CLIENT_IMAGE:-postgres:18-alpine}"   # production runs PostgreSQL 18
 NAME="pid-$(date +%Y%m%d-%H%M%S).dump"
 mkdir -p "$DIR" && chmod 700 "$DIR"
 docker run --rm --env-file "$RUN/secrets.production.env" -v "$DIR:/backups" "$CLIENT" \

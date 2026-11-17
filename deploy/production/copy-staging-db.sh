@@ -20,7 +20,8 @@
 set -euo pipefail
 RUN="${PID_RUN_DIR:-/opt/pid}"
 ENVF="$RUN/copy-db.env"
-CLIENT="${PG_CLIENT_IMAGE:-postgres:17-alpine}"
+# PostgreSQL 18 client: production runs 18.6, and a client reads any server up to its own version.
+CLIENT="${PG_CLIENT_IMAGE:-postgres:18-alpine}"
 stop() { echo "STOP - $*" >&2; exit 1; }
 
 [ -f "$ENVF" ] || stop "$ENVF is missing (guide §6)"
@@ -30,8 +31,11 @@ mkdir -p "$RUN/backups" && chmod 700 "$RUN/backups"
 NAME="staging-copy-$(date +%Y%m%d-%H%M%S).dump"
 
 docker run --rm -i --env-file "$ENVF" -e NAME="$NAME" -v "$RUN/backups:/backups" "$CLIENT" sh -eu <<'INNER'
-echo "staging server:    $(psql "$SOURCE_URL" -Atc 'show server_version')"
-echo "production server: $(psql "$TARGET_URL" -Atc 'show server_version')"
+# Stop at the first login that fails, before anything is dumped or written.
+SV=$(psql "$SOURCE_URL" -Atc 'show server_version') || { echo "STOP - cannot sign in to the STAGING database (SOURCE_URL): user, password (percent-encoded?), database name"; exit 1; }
+PV=$(psql "$TARGET_URL" -Atc 'show server_version') || { echo "STOP - cannot sign in to the PRODUCTION database (TARGET_URL): user, password (percent-encoded?), database name, whitelist"; exit 1; }
+echo "staging server:    $SV"
+echo "production server: $PV"
 n=$(psql "$TARGET_URL" -Atc "select count(*) from information_schema.tables where table_schema = 'public'")
 [ "$n" = 0 ] || { echo "STOP - the production database is not empty ($n tables). This copy is for the first install only."; exit 1; }
 
