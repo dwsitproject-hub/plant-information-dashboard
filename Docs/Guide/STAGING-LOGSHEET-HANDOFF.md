@@ -137,7 +137,7 @@ The same command sends to every server configured on this PC. A file stays in th
 Leave `Frontend/.env.staging-push` pointed at staging (`172.28.92.57`). Add production in a second file so the daily task does not stop updating staging.
 
 1. Copy `Frontend/.env.production-push.example` to `Frontend/.env.production-push`.
-2. Install this PC's SSH key for root on `172.28.80.51`, the same way as for staging. The login check is `ssh -o BatchMode=yes root@172.28.80.51`.
+2. Install this PC's SSH key for root on `172.28.80.51` port `1818`. The login check is `ssh -p 1818 -o BatchMode=yes root@172.28.80.51`.
 3. On that server, `Backend/scripts/apply-staging-inbox.sh` must be at `/opt/pid/src`, and `pid-api` must be running. The loader uses the database login already in the container. Port `3011` is the API. The jump host does not connect to it.
 
 The next `node scripts/sync-and-push-staging.mjs` or scheduled run loads the new days into both databases. `Docs/exports/staging-outbox/push-report.txt` names `staging:` and `production:` on any failure.

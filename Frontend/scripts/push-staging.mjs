@@ -106,6 +106,7 @@ export function pushTargets() {
       user: process.env.PRODUCTION_SSH_USER,
       host: process.env.PRODUCTION_SSH_HOST,
       repo: process.env.PRODUCTION_REPO,
+      port: process.env.PRODUCTION_SSH_PORT || '',
       file: 'Frontend/.env.production-push',
       prefix: 'PRODUCTION',
     })
@@ -127,10 +128,12 @@ function deliver(target, pending) {
   }
 
   const sshTarget = `${target.user}@${target.host}`
+  const sshArgs = target.port ? [...sshOpts, '-p', String(target.port)] : [...sshOpts]
+  const scpArgs = target.port ? [...sshOpts, '-P', String(target.port)] : [...sshOpts]
   const inbox = remotePath(target.repo, 'staging-inbox')
   const dirs = [...new Set(pending.map((item) => remotePath(inbox, item.script)))]
   const mkdir = run('ssh', [
-    ...sshOpts,
+    ...sshArgs,
     sshTarget,
     `mkdir -p ${dirs.map(shQuote).join(' ')} ${shQuote(remotePath(inbox, 'applied'))}`,
   ])
@@ -142,7 +145,7 @@ function deliver(target, pending) {
   const copied = []
   for (const item of pending) {
     const destination = `${sshTarget}:${remotePath(inbox, item.script)}/`
-    const copy = run('scp', [...sshOpts, item.file, destination])
+    const copy = run('scp', [...scpArgs, item.file, destination])
     if (copy.status !== 0) {
       tag(`${item.script}/${item.name}`, commandFailure(copy, 'Copy'))
       continue
@@ -152,7 +155,7 @@ function deliver(target, pending) {
   if (copied.length === 0) return { applied, failed }
 
   const apply = run('ssh', [
-    ...sshOpts,
+    ...sshArgs,
     sshTarget,
     `bash ${shQuote(remotePath(target.repo, 'Backend/scripts/apply-staging-inbox.sh'))} ${shQuote(target.repo)}`,
   ])
