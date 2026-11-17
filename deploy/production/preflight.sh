@@ -29,7 +29,7 @@ if [ "$ROLE" = be ]; then
   URL_CHECKS="${URL_CHECKS:-https://registry.npmjs.org/}"
 else
   PORTS="${PORTS:-3091}"
-  TCP_CHECKS="${TCP_CHECKS:-172.28.80.51:22 github.com:22 registry.npmjs.org:443 registry-1.docker.io:443}"
+  TCP_CHECKS="${TCP_CHECKS:-github.com:22 registry.npmjs.org:443 registry-1.docker.io:443}"
   URL_CHECKS="${URL_CHECKS:-https://registry.npmjs.org/}"
 fi
 UP=$(echo "$APP" | tr '[:lower:]' '[:upper:]')
@@ -152,6 +152,26 @@ if [ "$ROLE" = be ]; then
   ISS=$(printf '%s' "$D" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("issuer",""))' 2>/dev/null)
   [ -n "$ISS" ] && say OK "Hub OIDC discovery answers; issuer = $ISS  (OIDC_ISSUER, byte for byte)" || say FAIL "Hub OIDC discovery not readable via $HUB_HOST_IP:443"
   getent hosts dwshub.kpndomain.com >/dev/null && say INFO "dwshub.kpndomain.com resolves here to $(getent hosts dwshub.kpndomain.com | awk '{print $1}') (the container pins it to $HUB_HOST_IP anyway)" || say INFO "dwshub.kpndomain.com does not resolve here (fine: the container pins it to $HUB_HOST_IP)"
+  # The gauges sit in plant networks (172.16.x). A Docker network on this host with an overlapping subnet
+  # would pull their traffic into its bridge - for PID's container as well as the host.
+  for hp in $GAUGES; do
+    gip="${hp%:*}"
+    R=$(ip route get "$gip" 2>/dev/null | head -1)
+    case "$R" in
+      *" dev br-"*|*" dev docker"*)
+        OWNER=$(docker network ls -q | xargs -r docker network inspect --format '{{.Name}} {{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null | python3 -c "import ipaddress,sys
+ip=ipaddress.ip_address(sys.argv[1])
+for line in sys.stdin:
+    parts=line.split()
+    for net in parts[1:]:
+        try:
+            if ip in ipaddress.ip_network(net, strict=False): print(parts[0], net)
+        except ValueError: pass" "$gip")
+        say FAIL "route to gauge $gip goes into a Docker bridge ($R) - network: ${OWNER:-unknown}" ;;
+      "") say FAIL "no route to gauge $gip" ;;
+      *) say OK "route to gauge $gip: $R" ;;
+    esac
+  done
   docker ps -a --format '{{.Names}}' | grep -qx pid-api && say WARN "a container named pid-api already exists on this host: $(docker ps -a --filter name=^pid-api$ --format '{{.Image}} {{.Status}}')" || say OK "no container named pid-api yet"
   [ -f /etc/cron.d/pid-production ] && say INFO "/etc/cron.d/pid-production exists" || say INFO "/etc/cron.d/pid-production not installed yet (guide §9)"
   grep -q 'ssh-' /root/.ssh/authorized_keys 2>/dev/null && say INFO "root authorized_keys holds $(grep -c 'ssh-' /root/.ssh/authorized_keys) keys (the logsheet PC's is added in guide §9)"
