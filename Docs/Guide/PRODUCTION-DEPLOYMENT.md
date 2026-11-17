@@ -367,7 +367,7 @@ they are not reversed.
 
 Restore a dump into an **empty** database (PuTTY BE; `TARGET_URL` in a chmod-600 file as in §6):
 ```bash
-docker run --rm --env-file /opt/pid/copy-db.env -v /opt/pid/backups:/backups postgres:17-alpine sh -c 'pg_restore --no-owner --no-acl --dbname="$TARGET_URL" /backups/FILL_DUMP_FILE.dump'
+docker run --rm --env-file /opt/pid/copy-db.env -v /opt/pid/backups:/backups postgres:18-alpine sh -c 'pg_restore --no-owner --no-acl --dbname="$TARGET_URL" /backups/FILL_DUMP_FILE.dump'
 ```
 
 ## 14. Running it day to day
@@ -397,7 +397,9 @@ staging compose command.
 | `Pool overlaps with other one on this address space` | the subnet was taken since the preflight: rerun it, use the new suggestion |
 | `copy-staging-db.sh`: `the production database is not empty` | the copy is for the first install only; restoring over data needs a fresh database |
 | `copy-staging-db.sh`: a count `FAIL` | the restore failed: read the pg_restore errors above it (version older than staging? account not owner?) |
-| `pg_dump: error: aborting because of server version mismatch` | `PG_CLIENT_IMAGE=postgres:18-alpine bash …copy-staging-db.sh` (client must be ≥ server) |
+| `pg_dump: error: aborting because of server version mismatch` | the client image must be at least the server's version: `PG_CLIENT_IMAGE=postgres:<version>-alpine bash …` (the scripts use 18; production is 18.6) |
+| `STOP - cannot sign in to the STAGING database` / `PRODUCTION database` | user, password (percent-encoded, §6), database name in `/opt/pid/copy-db.env`; for production also the RDS whitelist |
+| `password authentication failed for user "postgres"` | the URL uses the wrong account: staging's is `POSTGRES_USER` from its `Backend/.env`, production's is the PID account from §3 |
 | `{"ok":false,"db":"unavailable"}` | `DATABASE_URL`, RDS whitelist, password percent-encoding |
 | Hub sign-in returns to an error page `oidc_sub_collision` | the user was linked to another Hub id: Administration → Users, or `update users set hub_user_id = null where id = …` |
 | Hub sign-in error `no_linked_sso_user` | no active PID user with that e-mail: create or fix the user |
