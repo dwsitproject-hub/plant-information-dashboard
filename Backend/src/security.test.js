@@ -3,7 +3,7 @@ import test from 'node:test'
 import { canGrantRole, normalizePermissionList, permissionsWithin } from './access.js'
 import { LoginThrottle } from './loginThrottle.js'
 import { HubTokenReplayGuard } from './sso/replay-guard.js'
-import { nonceMatches, verifierForCallback } from './sso/oidc-flow.js'
+import { RESTART_STATE_PREFIX, nonceMatches, unmatchedCallback, verifierForCallback } from './sso/oidc-flow.js'
 
 const userManager = {
   isAdministrator: false,
@@ -102,4 +102,11 @@ test('an id_token nonce must match the flow, and a missing one is accepted', () 
   assert.equal(nonceMatches(flow, { nonce: 'n-2' }), false)
   assert.equal(nonceMatches(flow, {}), true)
   assert.equal(nonceMatches({}, { nonce: 'n-1' }), false)
+})
+
+test('a callback PID did not start (a Hub tile launch) restarts sign-in once, then fails', () => {
+  assert.equal(unmatchedCallback('hub-made-up-state'), 'restart', 'the Hub launched the app: PID starts its own sign-in')
+  assert.equal(unmatchedCallback(''), 'restart', 'no state at all: start again')
+  assert.equal(unmatchedCallback(undefined), 'restart')
+  assert.equal(unmatchedCallback(`${RESTART_STATE_PREFIX}abc`), 'fail', 'a sign-in PID already restarted: show the error, never loop')
 })

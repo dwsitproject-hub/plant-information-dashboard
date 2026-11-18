@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { resetLanding } from './landing.ts'
 import { api, SESSION_EXPIRED_EVENT } from './api.ts'
 
 export interface SessionSite {
@@ -25,6 +26,8 @@ export interface SessionUser {
   email: string | null
   sites: SessionSite[]
   permissions: Record<string, PageRight>
+  /** The system Administrator role. Sent by the API with the session. */
+  isAdministrator?: boolean
 }
 
 interface AuthState {
@@ -79,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     })
+    resetLanding()
     setUser(next)
   }, [])
 
@@ -87,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api('/api/v1/auth/logout', { method: 'POST' })
     } finally {
       // Sign out on this screen even when the request fails; the cookie expires on its own.
+      resetLanding()
       setUser(null)
     }
   }, [])

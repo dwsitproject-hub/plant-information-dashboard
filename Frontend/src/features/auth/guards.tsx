@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { hasLanded, markLanded } from '../../data/landing.ts'
 import { useActiveSite } from '../../data/ActiveSiteContext.tsx'
 import { useAuth } from '../../data/AuthContext.tsx'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
@@ -62,9 +64,18 @@ const MODULE_HOME: Array<[string, string]> = [
  * first module it has instead of an error.
  */
 export function PageGate({ page, module, landing }: { page: string; module?: string; landing?: boolean }) {
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const { hasModule } = useActiveSite()
   const { t } = useLocale()
+  // Read once, before the shell marks this tab as landed (see data/landing.ts).
+  const [arriving] = useState(() => landing === true && !hasLanded())
+  useEffect(() => {
+    if (landing) markLanded()
+  }, [landing])
+  // Management users start on Stock Overview: anyone with its right who is not the Administrator
+  // (the Management Viewer role, or any role given that right). Only on arrival, so Tank & Stock,
+  // at the same address, still opens from the menu.
+  if (arriving && user?.isAdministrator !== true && can('management-stock', 'view')) return <Navigate to="/management" replace />
   // A user who only holds the management right lands on it instead of on a page they cannot open.
   if (!can(page, 'view') && landing && can('management-stock', 'view')) return <Navigate to="/management" replace />
   if (!can(page, 'view')) {
