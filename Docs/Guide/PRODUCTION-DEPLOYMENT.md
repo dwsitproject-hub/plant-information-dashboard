@@ -298,15 +298,17 @@ domain (§11); nothing changes in the host nginx now.
 8. **Logsheet PC** (site office): install its key for root on the BE server, then point it at production.
    On the PC (PowerShell):
    ```powershell
-   Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh root@172.28.80.51 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+   Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh -p 1818 root@172.28.80.51 "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
    ```
    ```powershell
-   ssh -o BatchMode=yes root@172.28.80.51 "docker exec pid-api node -e 'console.log(1)'"
+   ssh -p 1818 -o BatchMode=yes root@172.28.80.51 "docker exec pid-api node -e 'console.log(1)'"
    ```
-   Expected: `1` with no password prompt. Then in `Frontend/.env.staging-push` on the PC set
-   `STAGING_SSH_HOST=172.28.80.51` and `STAGING_REPO=/opt/pid/src` (keep `STAGING_SSH_USER=root`), and
-   re-enable its scheduled task. Days pushed to staging after the copy: resend them from the PC's sent folder
-   ([STAGING-LOGSHEET-HANDOFF.md](STAGING-LOGSHEET-HANDOFF.md), "Resend without downloading"). Files land in
+   Expected: `1` with no password prompt. Leave `Frontend/.env.staging-push` pointed at staging.
+   Copy `Frontend/.env.production-push.example` to `Frontend/.env.production-push` (host `172.28.80.51`,
+   SSH port `1818`, repo `/opt/pid/src`). The next scheduled run loads each day into both databases. Days already sent to
+   staging stay in `Docs/exports/staging-outbox/sent`; move those JSON files back beside the outbox script
+   folders and run `node scripts/push-staging.mjs` once so production receives them
+   ([STAGING-LOGSHEET-HANDOFF.md](STAGING-LOGSHEET-HANDOFF.md)). Files land in
    `/opt/pid/src/staging-inbox` and are loaded into `pid-api` straight away.
 
 ## 10. Go-live checks

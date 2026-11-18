@@ -84,6 +84,34 @@ node scripts/sync-and-push-staging.mjs
 
 Both commands download any days still missing, store them locally, and send whatever is still in the outbox.
 
+## Run more than once a day
+
+The task can have several run times, for example a midday run at 12:00 as well as the evening run at 16:00. Pass every time to the installer from the repo root. It replaces the task's triggers and keeps the same task name:
+
+```powershell
+.Frontendscriptsinstall-logsheet-sync-task.ps1 12:00 16:00
+```
+
+On a bridge-only PC use `install-logsheet-bridge-task.ps1` the same way. Times are the PC's own clock. The sync decides which day is today in Jakarta time, so use a PC set to WIB, or convert the times.
+
+Check what is registered, and run it once now to test:
+
+```powershell
+(Get-ScheduledTask -TaskName "Plant Dashboard logsheet sync").Triggers | Select-Object StartBoundary, Enabled
+Start-ScheduledTask -TaskName "Plant Dashboard logsheet sync"
+```
+
+What a second run does:
+
+- **It refreshes today.** The run starts from the day after the newest saved workbook, or from today when today is already saved. So the 12:00 run saves today's workbook as it stands, and the 16:00 run downloads it again and sends the complete day. Staging loads each file over the same day, so nothing is duplicated.
+- **Staging shows the partial day between runs.** After 12:00 it holds what was filled in by then, until the 16:00 run replaces it.
+- **A day with no tickets is skipped.** Nothing is downloaded or sent for it.
+- **Two mails a day.** The mail goes out after every run. Turn it off by leaving `SMTP_TO` empty.
+- **A missed run is caught up.** If the PC is off at 12:00 the task starts when it is next on. Runs never overlap.
+- **What it fetches.** The task only fetches what is filled in on the logsheet at that time. A reading appears in staging only if the operators have recorded it by then.
+
+To go back to one run a day: `.Frontendscriptsinstall-logsheet-sync-task.ps1 16:00`.
+
 ## Fill a date gap
 
 From the `Frontend` folder, pass the first and last day to include:
@@ -96,11 +124,23 @@ Use this once for days already saved on this PC that staging does not have yet. 
 
 ## Resend without downloading
 
-Use this when the local store succeeded and only the copy or the staging load failed:
+Use this when the local store succeeded and only the copy or the load failed:
 
 ```powershell
 node scripts/push-staging.mjs
 ```
+
+The same command sends to every server configured on this PC. A file stays in the outbox until all of them have loaded it.
+
+## Production as well as staging
+
+Leave `Frontend/.env.staging-push` pointed at staging (`172.28.92.57`). Add production in a second file so the daily task does not stop updating staging.
+
+1. Copy `Frontend/.env.production-push.example` to `Frontend/.env.production-push`.
+2. Install this PC's SSH key for root on `172.28.80.51` port `1818`. The login check is `ssh -p 1818 -o BatchMode=yes root@172.28.80.51`.
+3. On that server, `Backend/scripts/apply-staging-inbox.sh` must be at `/opt/pid/src`, and `pid-api` must be running. The loader uses the database login already in the container. Port `3011` is the API. The jump host does not connect to it.
+
+The next `node scripts/sync-and-push-staging.mjs` or scheduled run loads the new days into both databases. `Docs/exports/staging-outbox/push-report.txt` names `staging:` and `production:` on any failure.
 
 ## First-time setup
 

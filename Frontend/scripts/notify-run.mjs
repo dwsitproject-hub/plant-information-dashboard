@@ -87,7 +87,7 @@ function messageBody(download, push) {
     'Download',
     reportText(download).trimEnd(),
     '',
-    'Send to staging',
+    'Send',
     pushText(push).trimEnd(),
     '',
     'Reports on this PC',

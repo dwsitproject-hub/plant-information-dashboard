@@ -4,6 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { ApiError, api } from '../../data/api.ts'
 import { useAuth } from '../../data/AuthContext.tsx'
+import { resetLanding } from '../../data/landing.ts'
 import { errorText } from '../admin/errors.ts'
 import { useLocale } from '../../i18n/LocaleContext.tsx'
 import type { Locale } from '../../i18n/messages.ts'
@@ -30,6 +31,11 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false)
   const [oidcEnabled, setOidcEnabled] = useState(false)
   const year = new Date().getFullYear()
+
+  // Whatever signs in next (password or the Hub) starts on the user's start page again.
+  useEffect(() => {
+    resetLanding()
+  }, [])
 
   useEffect(() => {
     let active = true
