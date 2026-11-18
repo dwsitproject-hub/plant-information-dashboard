@@ -10,6 +10,8 @@ import {
   createPkcePair,
   nonceMatches,
   readOidcFlowCookie,
+  RESTART_STATE_PREFIX,
+  unmatchedCallback,
   setOidcFlowCookie,
   verifierForCallback,
 } from '../sso/oidc-flow.js'
@@ -49,7 +51,10 @@ router.get('/oidc/start', async (req, res) => {
     const discovery = await getDiscoveryDocument(config.discoveryUrl)
     if (!discovery?.authorization_endpoint) return redirectToSsoError(res, 'oidc_sign_in_failed')
     const { verifier, challenge, method } = createPkcePair()
-    const { state, nonce } = createFlowValues()
+    const flowValues = createFlowValues()
+    // A restart after an unmatched callback (Hub tile launch) is marked, so it cannot restart again.
+    const state = req.query?.restart === '1' ? `${RESTART_STATE_PREFIX}${flowValues.state}` : flowValues.state
+    const { nonce } = flowValues
     setOidcFlowCookie(res, { state, verifier, nonce })
     const authUrl = new URL(discovery.authorization_endpoint)
     authUrl.searchParams.set('response_type', 'code')
@@ -84,7 +89,15 @@ router.get('/oidc/callback', async (req, res) => {
     const state = typeof req.query?.state === 'string' ? req.query.state : ''
     const flow = readOidcFlowCookie(req)
     const codeVerifier = verifierForCallback(flow, state)
-    if (!codeVerifier) return fail(res, 'invalid_state')
+    if (!codeVerifier) {
+      // Usually a launch from the Hub tile: start PID's own sign-in instead of showing an error.
+      if (unmatchedCallback(state) === 'restart') {
+        console.info(JSON.stringify({ level: 'info', event: 'oidc.callback.restart', reason: flow ? 'state_mismatch' : 'no_flow_cookie' }))
+        clearOidcFlowCookie(res)
+        return res.redirect(302, '/auth/oidc/start?restart=1')
+      }
+      return fail(res, 'invalid_state')
+    }
     if (!code) return fail(res, 'missing_code')
 
     const discovery = await getDiscoveryDocument(config.discoveryUrl)

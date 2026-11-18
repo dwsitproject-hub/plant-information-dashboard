@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useActiveSite } from '../data/ActiveSiteContext.tsx'
 import { useLocale } from '../i18n/LocaleContext.tsx'
 import { PageErrorBoundary } from './PageErrorBoundary.tsx'
+import { markLanded } from '../data/landing.ts'
 import { Sidebar } from './Sidebar.tsx'
 import { Topbar } from './Topbar.tsx'
 
@@ -12,6 +13,10 @@ export function AppShell() {
   const { siteId } = useActiveSite()
   const { t } = useLocale()
   const { pathname } = useLocation()
+  // Any page opened after sign-in counts as the arrival: a later visit to / is Tank & Stock, not a redirect.
+  useEffect(() => {
+    markLanded()
+  }, [])
 
   return (
     <div className="app">

@@ -67,6 +67,24 @@ export function verifierForCallback(flow, state) {
   return flow.verifier
 }
 
+/**
+ * A sign-in PID restarted itself carries this prefix on its `state`, so a second unmatched callback is
+ * recognised and shown as an error instead of restarting again (no loop when cookies are blocked).
+ */
+export const RESTART_STATE_PREFIX = 'r.'
+
+/**
+ * What to do with a callback whose state matches no sign-in this browser started. The DWS Hub, in strict
+ * OIDC mode, launches an app from its tile by sending the browser straight to the app's callback with a
+ * code and state the Hub made up; PID never started that sign-in, so the state cannot match. Restarting
+ * PID's own sign-in then finishes at once (the user is signed in to the Hub) and the Hub's code is never
+ * used. A callback for a sign-in PID already restarted is an error.
+ * @returns {'restart'|'fail'}
+ */
+export function unmatchedCallback(state) {
+  return typeof state === 'string' && state.startsWith(RESTART_STATE_PREFIX) ? 'fail' : 'restart'
+}
+
 /** A nonce in the id_token must match the one this browser sent. A provider that echoes none is accepted. */
 export function nonceMatches(flow, claims) {
   if (claims?.nonce == null) return true
