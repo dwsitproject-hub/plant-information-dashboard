@@ -8,7 +8,7 @@ through the production DWS Hub. Production starts from a **copy of the staging d
 (§11.2).
 
 ```
- Browser ──http──> pid.kpndomain.com = 172.28.80.50:80  host nginx (shared; vhost /etc/nginx/conf.d/pid.conf)
+ Browser ──http──> pid.kpndomain.com = 172.28.80.50:80  host nginx (shared; one vhost file, §11)
     │                       │
     │                       └──http──> 172.28.80.50:3091  pid-web (nginx: pages, /api and /auth proxy)
     │                                      │
@@ -31,7 +31,7 @@ through the production DWS Hub. Production starts from a **copy of the staging d
 | Settings | `/opt/pid/.env` | `/opt/pid/.env`, `/opt/pid/production.env`, `/opt/pid/secrets.production.env` |
 | Deploy command | `/opt/pid/src/deploy/production/release.sh fe v1.0.0` | `/opt/pid/src/deploy/production/release.sh be v1.0.0` |
 | Code | `/opt/pid/src`, at a release tag | `/opt/pid/src`, at a release tag |
-| Also | host nginx vhost `pid.kpndomain.com` (`/etc/nginx/conf.d/pid.conf`, §11) | `/etc/cron.d/pid-production`, `/etc/logrotate.d/pid-production` |
+| Also | host nginx vhost `pid.kpndomain.com` (one file; `/var/tmp/pid-host-vhost/dest` says where, §11) | `/etc/cron.d/pid-production`, `/etc/logrotate.d/pid-production` |
 
 Do the sections in order. Sections 2–6 are one-time preparation; section 7 onwards is the deployment itself.
 
@@ -342,13 +342,19 @@ checked before and after). Users then open **http://pid.kpndomain.com**.
 ### 11.1 The domain over HTTP (now)
 
 The host nginx on 172.28.80.50 is the front door for **every** app on that server (the Hub on 443, other
-`*.kpndomain.com` sites on 80). PID adds one file, `/etc/nginx/conf.d/pid.conf`
-(`deploy/production/nginx/host-vhost-pid.conf`), and nothing else:
+`*.kpndomain.com` sites on 80). PID adds one file (`deploy/production/nginx/host-vhost-pid.conf`), and nothing
+else. The file goes to `/etc/nginx/conf.d/pid.conf`, or to `<folder of the first port-80 site>/zz-pid.conf`
+when the installer finds that `conf.d` is read first (see below). The installer prints which, and remembers it
+for `--remove`.
 
 - it answers the exact name `pid.kpndomain.com` and nothing else. nginx chooses a site by the name in the
   request, and an exact name only matches itself, so every other subdomain, and any `*.kpndomain.com` wildcard
   another app has, keeps going where it went;
-- it is never `default_server`, so unknown names keep reaching whatever answered them before;
+- it is never `default_server`, and it is never the first port-80 site nginx reads. This server declares no
+  `default_server` (preflight 24 Nov 2026), so nginx gives every name no site declares, and requests to the bare
+  IP `http://172.28.80.50/`, to the **first** port-80 site it reads. `conf.d/` is read before `sites-enabled/`,
+  so the installer places PID's file after that first site. Unknown names keep reaching whatever answered
+  them before;
 - port 80 only. It adds nothing on 443, so the HTTPS sites (the Hub) are untouched;
 - it has its own log files (`/var/log/nginx/pid.*.log`);
 - it is installed by `nginx/install-host-vhost.sh`, never by hand. The script stops before any change if
@@ -360,12 +366,13 @@ The host nginx on 172.28.80.50 is the front door for **every** app on that serve
 
 **Before:** infra has created the DNS A record `pid.kpndomain.com` → 172.28.80.50, and `pid-web` is running (§8).
 
-PuTTY on 172.28.80.50 (FE), as root - the checks first, nothing changes:
+PuTTY on 172.28.80.50 (FE), as root - the checks first. Nothing is reloaded; PID's file is put in place for an
+instant, only to see where nginx would read it:
 ```bash
 /opt/pid/src/deploy/production/nginx/install-host-vhost.sh --check
 ```
-Expected: `OK` lines, `INFO` lines that list the listen forms, the default server and any wildcard names, and
-no `STOP`. A `WARN … resolves to …` means DNS is not ready yet. A `WARN … HSTS … includeSubDomains` means
+Expected: `OK` lines, `INFO` lines that list the listen forms, the first port-80 site (or the default server)
+and any wildcard names, an `OK` line saying where PID's file goes, and no `STOP`. A `WARN … resolves to …` means DNS is not ready yet. A `WARN … HSTS … includeSubDomains` means
 browsers will force `https://` on every `*.kpndomain.com` name, so PID needs §11.2 before users can open it:
 send that output back before going on. Then install:
 ```bash
@@ -373,7 +380,7 @@ send that output back before going on. Then install:
 ```
 Expected ending:
 ```
-OK    installed /etc/nginx/conf.d/pid.conf and reloaded nginx (reload keeps serving; no site went down)
+OK    installed /etc/nginx/…/pid.conf (or zz-pid.conf) and reloaded nginx (reload keeps serving; no site went down)
 OK    all N other site names answer exactly as before (http and https, plus an unknown name)
 OK    http://pid.kpndomain.com/healthz -> ok (through the host nginx)
 {"ok":true,"db":"ok"}
@@ -383,7 +390,7 @@ can flip on its own. If the difference stays and comes from this change, roll ba
 ```bash
 /opt/pid/src/deploy/production/nginx/install-host-vhost.sh --remove
 ```
-That takes out only `pid.conf`, reloads, and compares again.
+That takes out only PID's file (wherever it was installed), reloads, and compares again.
 
 **Settings.** `production.env` ships with the domain (`APP_PUBLIC_ORIGIN`, `CORS_ORIGIN`, `OIDC_REDIRECT_URI`).
 If the backend was first deployed with the private address, PuTTY on 172.28.80.51 (BE):
@@ -495,7 +502,8 @@ staging compose command.
 | `install-host-vhost.sh`: `STOP … already declared in: <file>` | another site already claims `pid.kpndomain.com`: find out whose it is; do not edit or delete their file |
 | `install-host-vhost.sh`: `STOP other sites listen on 172.28.80.50:80` | change `listen 80;` in `host-vhost-pid.conf` to the same form, commit, release, run it again |
 | `install-host-vhost.sh`: `STOP nginx -t ALREADY fails before any change` | another site's file is broken right now; tell the server owner; PID changed nothing |
-| http://pid.kpndomain.com opens another app or a 404 | DNS points elsewhere (`getent hosts pid.kpndomain.com` on a user PC), or the vhost is not installed (`ls /etc/nginx/conf.d/pid.conf`) |
+| http://pid.kpndomain.com opens another app or a 404 | DNS points elsewhere (`getent hosts pid.kpndomain.com` on a user PC), or the vhost is not installed (`cat /var/tmp/pid-host-vhost/dest` names the file; `ls` it) |
+| `install-host-vhost.sh`: `STOP at … PID's vhost would be read before …` | `DEST=` was given and points to a file read before the first port-80 site; leave `DEST` out (the script picks a safe place) |
 | The browser switches to `https://pid.kpndomain.com` by itself | HSTS from another `kpndomain.com` site with `includeSubDomains` (the `--check` output says which): PID needs §11.2 |
 | Hub sign-in from http://172.28.80.50:3091 ends on `invalid_state` or starts over | expected: the Hub returns to the domain; open http://pid.kpndomain.com |
 | Every user shares one address / sign-in `too_many_sign_ins_here` for a whole office | `TRUST_PROXY=172.28.80.50` in production.env and the web container from this release; or raise `LOGIN_RATE_LIMIT_PER_MINUTE` |
