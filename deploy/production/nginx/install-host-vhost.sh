@@ -3,13 +3,18 @@
 # the other applications' sites. Guide §11.
 #
 # PuTTY on 172.28.80.50 (FE), as root:
-#   /opt/pid/src/deploy/production/nginx/install-host-vhost.sh --check    checks only, changes nothing
+#   /opt/pid/src/deploy/production/nginx/install-host-vhost.sh --check    checks only, never reloads (it puts
+#                                                                         PID's file in place for an instant to
+#                                                                         see where nginx would read it)
 #   /opt/pid/src/deploy/production/nginx/install-host-vhost.sh            check, install, reload, compare
 #   /opt/pid/src/deploy/production/nginx/install-host-vhost.sh --remove   take it out again (rollback)
 #
 # What it guarantees:
 # - Stops before any change if nginx -t already fails, if another site already claims pid.kpndomain.com,
 #   or if the other sites listen on port 80 in a form this vhost would not match.
+# - Keeps the site that answers unknown names first. With no default_server, nginx gives every name no site
+#   declares (and requests to the bare IP) to the FIRST port-80 server it reads; conf.d/ is usually read
+#   before sites-enabled/, so the file goes where it is read after that server (DEST, or <its folder>/zz-pid.conf).
 # - Never reloads a configuration that fails nginx -t: PID's file is put back as it was (or removed) first.
 # - Asks every other site name (http and https) and an unknown name for its status code before and after,
 #   and prints any difference. It never touches another site's file, never restarts nginx (reload only).
@@ -19,8 +24,11 @@ APP_HOST="${APP_HOST:-pid.kpndomain.com}"
 FE_IP="${FE_IP:-172.28.80.50}"
 WEB="${WEB:-172.28.80.50:3091}"
 SRC="$(cd "$(dirname "$0")" && pwd)/host-vhost-pid.conf"
-DEST="${DEST:-/etc/nginx/conf.d/pid.conf}"
 STATE=/var/tmp/pid-host-vhost
+DEST_SET="${DEST:+yes}"
+DEST="${DEST:-/etc/nginx/conf.d/pid.conf}"
+# Where an earlier run installed it (it may have chosen another folder; see the first-server check).
+[ -z "$DEST_SET" ] && [ -s "$STATE/dest" ] && DEST=$(cat "$STATE/dest")
 MODE="${1:-install}"
 UNKNOWN=pid-vhost-check.invalid
 
@@ -34,6 +42,22 @@ stmts() {
     | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; /^$/d'
 }
 server_names() { stmts | sed -n 's/^server_name[[:space:]]\{1,\}//p' | tr ' \t' '\n\n' | grep -v '^$'; }
+# The file of the first IPv4 port-80 server nginx reads: with no default_server it answers every name no
+# site declares, and requests to the bare IP.
+first80() {
+  stmts | awk '/^# configuration file /{f=$4; sub(/:$/,"",f)}
+    $0=="server"{cur=f; srv=1; next}
+    srv && $1=="listen" && ($2=="80" || $2=="*:80" || $2=="0.0.0.0:80"){print cur; exit}'
+}
+# Would PID's file at $1 be that first server? Puts it there for an instant if it is not there yet (nginx -T
+# only reads; nothing is reloaded), then takes it away again.
+would_be_first() {
+  local cand="$1" placed=0 f
+  if [ ! -f "$cand" ]; then cp "$SRC" "$cand" 2>/dev/null && placed=1; fi
+  f=$(first80)
+  [ "$placed" = 1 ] && rm -f "$cand"
+  [ "$f" = "$cand" ]
+}
 
 case "$MODE" in install|--check|--remove) ;; *) stop "usage: $0 [--check|--remove]";; esac
 [ "$(id -u)" = 0 ] || stop "run as root"
@@ -81,6 +105,7 @@ if [ "$MODE" = --remove ]; then
     cp -p "$STATE/pid.conf.removed" "$DEST"; stop "nginx -t fails without the file (?) - put it back, not reloaded"
   fi
   systemctl reload nginx && say OK "removed $DEST (copy in $STATE/pid.conf.removed) and reloaded"
+  rm -f "$STATE/dest"
   sleep 2; probe_all > "$STATE/after.txt"; compare
   exit 0
 fi
@@ -100,7 +125,22 @@ SPECIFIC=$(echo "$L80" | awk '{print $2}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0
 [ -n "$SPECIFIC" ] && stop "other sites listen on $(echo $SPECIFIC) - change 'listen 80;' in host-vhost-pid.conf to the same address, commit, then run this again"
 echo "$L80" | grep -q '\[::\]:80' && say INFO "other sites also listen on IPv6 [::]:80; PID's vhost is IPv4 only (its DNS record is IPv4) - fine"
 DEF=$(stmts | grep -E '^listen[[:space:]]+([^ ]*:)?80[[:space:]].*default_server' | head -1)
-say INFO "port-80 default server: ${DEF:-none declared (the first block read takes unknown names)} - PID never becomes it"
+if [ -n "$DEF" ]; then
+  say INFO "port-80 default server: $DEF - it keeps unknown names; PID never becomes it"
+else
+  FIRST=$(first80)
+  say INFO "no default_server: unknown names and requests to the bare IP go to the first port-80 server read, in ${FIRST:-?}"
+  if [ -n "$FIRST" ] && would_be_first "$DEST"; then
+    ALT="$(dirname "$FIRST")/zz-pid.conf"
+    if [ -n "$DEST_SET" ] || [ "$FIRST" = "$DEST" ] || would_be_first "$ALT"; then
+      stop "at $DEST PID's vhost would be read before $FIRST and take over the names no site declares - rerun with DEST=<a file read after it>"
+    fi
+    say OK "at $DEST PID would be read first and take those names; installing at $ALT instead (read after $FIRST)"
+    DEST="$ALT"
+  else
+    say OK "at $DEST PID's vhost is read after $FIRST, which keeps the unknown names"
+  fi
+fi
 WILD=$(server_names | grep -E '^(\*\.kpndomain\.com|\.kpndomain\.com|~)' | sort -u)
 [ -n "$WILD" ] && say INFO "wildcard/regex names elsewhere: $(echo $WILD) - an exact name wins over them, so they keep every other subdomain"
 
@@ -135,10 +175,14 @@ fi
 if ! conf | grep -qF "# configuration file $DEST:"; then
   restore; stop "this nginx does not read $(dirname "$DEST")/*.conf - rerun with DEST=<the folder the other vhosts are in>/pid.conf (removed again; nothing changed)"
 fi
+if [ -z "$DEF" ] && [ "$(first80)" = "$DEST" ]; then
+  restore; stop "PID's vhost would become the first port-80 server and take the unknown names - removed again, not reloaded"
+fi
 if ! systemctl reload nginx; then
   restore; nginx -t >/dev/null 2>&1 && systemctl reload nginx
   stop "reload failed - put back as it was"
 fi
+echo "$DEST" > "$STATE/dest"
 say OK "installed $DEST and reloaded nginx (reload keeps serving; no site went down)"
 sleep 2
 probe_all > "$STATE/after.txt"
