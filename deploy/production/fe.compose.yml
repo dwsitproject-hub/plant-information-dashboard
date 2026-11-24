@@ -2,9 +2,9 @@
 # backend server). Guide: Docs/Guide/PRODUCTION-DEPLOYMENT.md. The image is built on this server by
 # release.sh; this file never builds.
 #
-# Published on the server's PRIVATE address, 172.28.80.50:3091: users open http://172.28.80.50:3091
-# until a pid.kpndomain.com record exists; then the host nginx vhost (nginx/host-vhost-pid.conf)
-# forwards the name to this same address, so the domain switch changes no container.
+# Published on the server's PRIVATE address, 172.28.80.50:3091. Users open http://pid.kpndomain.com: the
+# host nginx vhost (nginx/host-vhost-pid.conf, installed by nginx/install-host-vhost.sh) forwards that name to
+# this same address, so the domain changes no container.
 #
 # Run through deploy/production/dc.sh fe, which reads from /opt/pid:
 #   .env    PID_SUBNET (from preflight.sh fe), optional PID_WEB_BIND / PID_BACKEND_URL

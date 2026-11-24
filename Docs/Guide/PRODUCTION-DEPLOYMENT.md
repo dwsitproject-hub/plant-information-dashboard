@@ -4,11 +4,14 @@ The Plant Information Dashboard (PID) shows tank stock, quality and production f
 built the same way as staging ([STAGING-3-SERVER-DEPLOY-RUNBOOK.md](STAGING-3-SERVER-DEPLOY-RUNBOOK.md)): a web
 container on the frontend server, the API on the backend server, an ApsaraDB PostgreSQL database, sign-in
 through the production DWS Hub. Production starts from a **copy of the staging database** and is reached at
-**http://172.28.80.50:3091** until a domain and HTTPS exist (§11).
+**http://pid.kpndomain.com** - plain HTTP, through the FE server's shared host nginx (§11). HTTPS comes later
+(§11.2).
 
 ```
- Browser ──http──> 172.28.80.50:3091  pid-web (nginx: pages, /api and /auth proxy)
+ Browser ──http──> pid.kpndomain.com = 172.28.80.50:80  host nginx (shared; vhost /etc/nginx/conf.d/pid.conf)
     │                       │
+    │                       └──http──> 172.28.80.50:3091  pid-web (nginx: pages, /api and /auth proxy)
+    │                                      │
     │                       └──http──> 172.28.80.51:3011  pid-api (Node API)
     │                                      ├── ApsaraDB PostgreSQL (production PID database)
     │                                      ├── TankVision gauges 172.16.250.15/.16, 172.16.11.77 (Bontang),
@@ -28,7 +31,7 @@ through the production DWS Hub. Production starts from a **copy of the staging d
 | Settings | `/opt/pid/.env` | `/opt/pid/.env`, `/opt/pid/production.env`, `/opt/pid/secrets.production.env` |
 | Deploy command | `/opt/pid/src/deploy/production/release.sh fe v1.0.0` | `/opt/pid/src/deploy/production/release.sh be v1.0.0` |
 | Code | `/opt/pid/src`, at a release tag | `/opt/pid/src`, at a release tag |
-| Also | (later) host nginx vhost `pid.kpndomain.com` | `/etc/cron.d/pid-production`, `/etc/logrotate.d/pid-production` |
+| Also | host nginx vhost `pid.kpndomain.com` (`/etc/nginx/conf.d/pid.conf`, §11) | `/etc/cron.d/pid-production`, `/etc/logrotate.d/pid-production` |
 
 Do the sections in order. Sections 2–6 are one-time preparation; section 7 onwards is the deployment itself.
 
@@ -72,12 +75,17 @@ or touches another app's network, container or mount.
 | Firewall: BE → gauges, logsheet PC → BE, users → FE (table below) | Network | §5, §9 |
 | A read-only GitHub deploy key per server | You (GitHub repo settings) | §5 |
 | Release tag `v1.0.0` on `main` (PR `sit` → `main`, then tag) | You | §5, §12 |
-| (Later) DNS `pid.kpndomain.com` → 172.28.80.50 and a certificate | Infra | §11 |
+| DNS A record `pid.kpndomain.com` → 172.28.80.50 (the name users' PCs resolve) | Infra | §11 |
+| (Later) a certificate covering `pid.kpndomain.com` | Infra | §11.2 |
 
 **Decisions made for this release**
-- **Address:** http://172.28.80.50:3091 (private address, plain HTTP) until the domain exists. The Hub serves
-  over HTTPS, so a Hub tile must open PID **in a new tab**: inside a Hub frame the browser blocks a plain-HTTP
-  page (mixed content). HTTPS is a go-live item for later (§11).
+- **Address:** http://pid.kpndomain.com (plain HTTP), a vhost in the FE server's host nginx - the shared front
+  door of every app on that server - forwarding to the private address 172.28.80.50:3091. The vhost answers
+  that one exact name on port 80 only and is installed by a script that checks the other sites before and after
+  (§11), so no other subdomain changes. Hub sign-in works on the domain only (the Hub returns to
+  `OIDC_REDIRECT_URI`); 172.28.80.50:3091 keeps answering for checks and local sign-in. The Hub serves over
+  HTTPS, so a Hub tile must open PID **in a new tab**: inside a Hub frame the browser blocks a plain-HTTP page
+  (mixed content). HTTPS is a go-live item for later (§11.2).
 - **Data:** production starts from a copy of the staging database (§6), taken at cut-over.
 - **Sign-in:** production Hub OIDC only; the legacy HS256 bridge stays off. Local accounts remain.
 - **Logsheets:** the site-office PC pushes files as root over SSH, as on staging (§9). That PC holds a root key
@@ -88,7 +96,8 @@ or touches another app's network, container or mount.
 
 | From | To | Why |
 |---|---|---|
-| Users (office / VPN) | 172.28.80.50:3091 | the app |
+| Users (office / VPN) | 172.28.80.50:80 (`pid.kpndomain.com`) | the app (already open: other apps use it) |
+| Admins (office / VPN) | 172.28.80.50:3091 | direct checks, local sign-in (optional) |
 | 172.28.80.50 (FE) | 172.28.80.51:3011 | web container → API |
 | 172.28.80.51 (BE) | production RDS :5432 | database |
 | 172.28.80.51 (BE) | staging RDS :5432 | one-time copy (§6), then remove |
@@ -126,12 +135,13 @@ Ask the Hub operator to register PID with:
 |---|---|
 | Application | Plant Information Dashboard |
 | Client type | Public client, PKCE (S256), no client secret |
-| Redirect URI | `http://172.28.80.50:3091/auth/oidc/callback` (byte-exact) |
+| Redirect URI | `http://pid.kpndomain.com/auth/oidc/callback` (byte-exact) |
 | Scopes | `openid profile email` |
-| Tile / launch URL | `http://172.28.80.50:3091/` - **open in a new tab** (see §2) |
+| Tile / launch URL | `http://pid.kpndomain.com/` - **open in a new tab** (see §2) |
 
-They return the **client id** → `OIDC_CLIENT_ID` (§7). When the domain and HTTPS arrive (§11), the redirect URI
-changes and the registration must be updated.
+They return the **client id** → `OIDC_CLIENT_ID` (§7). If PID was registered earlier with the private address
+(`http://172.28.80.50:3091/...`), both values must be changed to the ones above. When HTTPS arrives (§11.2), the
+redirect URI changes again and the registration must be updated.
 
 PID does not use the Hub SDK. Sentinel registration (repository `dwsitproject-hub/plant-information-dashboard`,
 branch `main`) is optional and does not affect the deployment.
@@ -232,7 +242,7 @@ nano /opt/pid/secrets.production.env
 | `.env` | `PID_SUBNET` | `172.16.248.0/24` as shipped (preflight suggestion, confirmed by infra) |
 | `production.env` | `OIDC_ISSUER` | `https://dwshub.kpndomain.com` as shipped (the issuer the preflight printed) |
 | `production.env` | `OIDC_CLIENT_ID` | `plant-information-dashboard` as shipped (the Hub registration) |
-| `production.env` | everything else | as shipped: address http://172.28.80.50:3091, `COOKIE_SECURE=false` (HTTP), `TRUST_PROXY=172.28.80.50`, OIDC on, legacy bridge off |
+| `production.env` | everything else | as shipped: address http://pid.kpndomain.com (`APP_PUBLIC_ORIGIN`, `CORS_ORIGIN`, `OIDC_REDIRECT_URI`), `COOKIE_SECURE=false` (HTTP), `TRUST_PROXY=172.28.80.50`, OIDC on, legacy bridge off |
 | `secrets.production.env` | `DATABASE_URL` | `postgresql://<account>:<password>@<RDS host>:5432/<database>` from §3 |
 | `secrets.production.env` | `JWT_SECRET` | first random value; **not** staging's |
 | `secrets.production.env` | `DATAHUB_SECRET_KEY` | second random value |
@@ -269,16 +279,16 @@ ok
 {"ok":true,"db":"ok"}
 pid-web is running v1.0.0. ...
 ```
-Users now open **http://172.28.80.50:3091**. The host nginx vhost (`nginx/host-vhost-pid.conf`) waits for the
-domain (§11); nothing changes in the host nginx now.
+PID now answers on http://172.28.80.50:3091. Next, put the domain on the host nginx: **§11.1** (one script,
+checked before and after). Users then open **http://pid.kpndomain.com**.
 
 ## 9. First sign-in, admins and the first data load
 
-1. **Sign in** at http://172.28.80.50:3091 with a local Administrator account from staging (same password as
+1. **Sign in** at http://pid.kpndomain.com with a local Administrator account from staging (same password as
    on staging).
 2. **Users** (Administration → Users): deactivate staging-only test accounts; check each real user's roles and
    sites. Users signing in through the Hub are linked by e-mail the first time.
-3. **Hub sign-in:** sign out, open http://172.28.80.50:3091, choose sign-in with the Hub, and confirm you land
+3. **Hub sign-in:** sign out, open http://pid.kpndomain.com, choose sign-in with the Hub, and confirm you land
    back signed in. (On failure the page says which step failed: §15.)
 4. **DataHub** (Administration → DataHub): enter the production URL and key pair, save, run a company and a site
    sync, and check the site list. The copied staging settings cannot be read here (§6).
@@ -318,26 +328,102 @@ domain (§11); nothing changes in the host nginx now.
 | 1 | PuTTY BE: `curl -s http://172.28.80.51:3011/api/v1/health/ready` | `{"ok":true,"db":"ok"}` |
 | 2 | PuTTY FE: `curl -s http://172.28.80.50:3091/api/v1/health/ready` | the same, through the web container |
 | 3 | PuTTY BE: `curl -s -D - -o /dev/null http://172.28.80.51:3011/api/v1/health \| grep -iE 'x-frame\|powered'` | `X-Frame-Options: DENY`, no `X-Powered-By` |
-| 4 | Browser: sign in locally and through the Hub | both land on the app |
+| 4 | Browser: http://pid.kpndomain.com - sign in locally and through the Hub | both land on the app; the address bar stays `http://pid.kpndomain.com` |
+| 4a | The vhost installer's last lines (§11.1) | `all … other site names answer exactly as before`, and `http://pid.kpndomain.com/healthz -> ok` |
+| 4b | Browser: two or three other apps' addresses on this server (e.g. dwshub.kpndomain.com) | they open exactly as before |
 | 5 | Tank & Stock: Bekasi, Bontang, Tanjung Pura | current figures; "Last reading … ago" green for the gauge sites |
 | 6 | Stock Overview → Commodity Stock Movement | 30 days for each site |
 | 7 | Master → Tank gauging → Daily rounds (after a round time) | the round listed as Saved |
 | 8 | The next logsheet push | files under `/opt/pid/src/staging-inbox/applied`, the day visible in the app |
 | 9 | `docker ps` on both servers | `pid-api` / `pid-web` healthy, and **the other applications unchanged** |
 
-## 11. HTTPS (recommended, when the domain exists)
+## 11. Domain pid.kpndomain.com, and HTTPS later
 
-1. DNS `pid.kpndomain.com` → 172.28.80.50. Check the FE preflight's certificate line: if the host nginx's
-   certificate covers `*.kpndomain.com`, reuse it; otherwise request one.
-2. PuTTY FE: install the vhost (`nginx/host-vhost-pid.conf`) with a `listen 443 ssl` server using that
-   certificate and a port-80 server that redirects; `nginx -t && systemctl reload nginx` (never skip `nginx -t`).
+### 11.1 The domain over HTTP (now)
+
+The host nginx on 172.28.80.50 is the front door for **every** app on that server (the Hub on 443, other
+`*.kpndomain.com` sites on 80). PID adds one file, `/etc/nginx/conf.d/pid.conf`
+(`deploy/production/nginx/host-vhost-pid.conf`), and nothing else:
+
+- it answers the exact name `pid.kpndomain.com` and nothing else. nginx chooses a site by the name in the
+  request, and an exact name only matches itself, so every other subdomain, and any `*.kpndomain.com` wildcard
+  another app has, keeps going where it went;
+- it is never `default_server`, so unknown names keep reaching whatever answered them before;
+- port 80 only. It adds nothing on 443, so the HTTPS sites (the Hub) are untouched;
+- it has its own log files (`/var/log/nginx/pid.*.log`);
+- it is installed by `nginx/install-host-vhost.sh`, never by hand. The script stops before any change if
+  `nginx -t` already fails, if another site already declares `pid.kpndomain.com`, or if the other sites listen
+  on port 80 in a form this vhost would not match (for example `listen 172.28.80.50:80;`). If `nginx -t` fails
+  with PID's file, it puts everything back **without reloading**. It only ever reloads, which keeps every site
+  serving, and never restarts. Before and after, it asks every other site name on the server (http and https,
+  plus an unknown name) for its status code, and prints any difference.
+
+**Before:** infra has created the DNS A record `pid.kpndomain.com` → 172.28.80.50, and `pid-web` is running (§8).
+
+PuTTY on 172.28.80.50 (FE), as root - the checks first, nothing changes:
+```bash
+/opt/pid/src/deploy/production/nginx/install-host-vhost.sh --check
+```
+Expected: `OK` lines, `INFO` lines that list the listen forms, the default server and any wildcard names, and
+no `STOP`. A `WARN … resolves to …` means DNS is not ready yet. A `WARN … HSTS … includeSubDomains` means
+browsers will force `https://` on every `*.kpndomain.com` name, so PID needs §11.2 before users can open it:
+send that output back before going on. Then install:
+```bash
+/opt/pid/src/deploy/production/nginx/install-host-vhost.sh
+```
+Expected ending:
+```
+OK    installed /etc/nginx/conf.d/pid.conf and reloaded nginx (reload keeps serving; no site went down)
+OK    all N other site names answer exactly as before (http and https, plus an unknown name)
+OK    http://pid.kpndomain.com/healthz -> ok (through the host nginx)
+{"ok":true,"db":"ok"}
+```
+If it prints `WARN these answered differently…`, run `--check` a minute later: a site that was already down
+can flip on its own. If the difference stays and comes from this change, roll back at once:
+```bash
+/opt/pid/src/deploy/production/nginx/install-host-vhost.sh --remove
+```
+That takes out only `pid.conf`, reloads, and compares again.
+
+**Settings.** `production.env` ships with the domain (`APP_PUBLIC_ORIGIN`, `CORS_ORIGIN`, `OIDC_REDIRECT_URI`).
+If the backend was first deployed with the private address, PuTTY on 172.28.80.51 (BE):
+`nano /opt/pid/production.env` and set the three lines as in the checkout's `deploy/production/production.env`:
+```
+APP_PUBLIC_ORIGIN=http://pid.kpndomain.com
+CORS_ORIGIN=http://pid.kpndomain.com,http://172.28.80.50:3091
+OIDC_REDIRECT_URI=http://pid.kpndomain.com/auth/oidc/callback
+```
+Keep `COOKIE_SECURE=false` (HTTP). Then:
+```bash
+/opt/pid/src/deploy/production/dc.sh be up -d --force-recreate
+```
+Expected: `Container pid-api  Started`, then `curl -s http://172.28.80.51:3011/api/v1/health/ready` →
+`{"ok":true,"db":"ok"}`. **Hub operator:** redirect URI and tile URL as in §4 - until then Hub sign-in fails,
+while local sign-in keeps working.
+
+Nothing changes in the containers or their ports. PID's cookies (`pid_session`, `pid_oidc_flow`) belong to
+`pid.kpndomain.com` alone (no `Domain=`), so they never reach another subdomain and another app's cookies
+cannot replace them. Users who bookmarked `http://172.28.80.50:3091` should switch to the domain: local
+sign-in still works there, but Hub sign-in returns to the domain.
+
+### 11.2 HTTPS (recommended, later)
+
+1. A certificate covering `pid.kpndomain.com`. The FE preflight's certificate line says what the host nginx
+   already has: if it covers `*.kpndomain.com`, reuse it; otherwise request one.
+2. PuTTY FE: in `host-vhost-pid.conf` add a `listen 443 ssl` server for `pid.kpndomain.com` using that
+   certificate (same `location`), and reduce the port-80 server to `return 301 https://$host$request_uri;`.
+   Commit, release the checkout, and install with `install-host-vhost.sh` as in §11.1 (it compares the other
+   sites before and after, on 443 too).
 3. PuTTY BE, `nano /opt/pid/production.env`: `APP_PUBLIC_ORIGIN=https://pid.kpndomain.com`,
    `CORS_ORIGIN=https://pid.kpndomain.com`, `COOKIE_SECURE=true`,
    `OIDC_REDIRECT_URI=https://pid.kpndomain.com/auth/oidc/callback`; then
    `/opt/pid/src/deploy/production/dc.sh be up -d --force-recreate`.
 4. Hub operator: change the redirect URI and tile URL to the HTTPS address; the tile may now open PID inside
    the Hub.
-5. Add `Strict-Transport-Security` at the host nginx once HTTPS is confirmed. Everyone signs in again once.
+5. Once HTTPS is confirmed, add `add_header Strict-Transport-Security "max-age=31536000" always;` inside
+   PID's 443 server only. **Never `includeSubDomains`, and never in a shared `http {}` block:** either one
+   would make browsers force HTTPS on the other `*.kpndomain.com` apps that still run on plain HTTP.
+   Everyone signs in again once.
 
 ## 12. Releasing updates and rolling back
 
@@ -405,7 +491,13 @@ staging compose command.
 | `{"ok":false,"db":"unavailable"}` | `DATABASE_URL`, RDS whitelist, password percent-encoding |
 | Hub sign-in returns to an error page `oidc_sub_collision` | the user was linked to another Hub id: Administration → Users, or `update users set hub_user_id = null where id = …` |
 | Hub sign-in error `no_linked_sso_user` | no active PID user with that e-mail: create or fix the user |
-| PID blank inside the Hub | mixed content (HTTPS Hub, HTTP PID): open PID in a new tab until §11 |
+| PID blank inside the Hub | mixed content (HTTPS Hub, HTTP PID): open PID in a new tab until §11.2 |
+| `install-host-vhost.sh`: `STOP … already declared in: <file>` | another site already claims `pid.kpndomain.com`: find out whose it is; do not edit or delete their file |
+| `install-host-vhost.sh`: `STOP other sites listen on 172.28.80.50:80` | change `listen 80;` in `host-vhost-pid.conf` to the same form, commit, release, run it again |
+| `install-host-vhost.sh`: `STOP nginx -t ALREADY fails before any change` | another site's file is broken right now; tell the server owner; PID changed nothing |
+| http://pid.kpndomain.com opens another app or a 404 | DNS points elsewhere (`getent hosts pid.kpndomain.com` on a user PC), or the vhost is not installed (`ls /etc/nginx/conf.d/pid.conf`) |
+| The browser switches to `https://pid.kpndomain.com` by itself | HSTS from another `kpndomain.com` site with `includeSubDomains` (the `--check` output says which): PID needs §11.2 |
+| Hub sign-in from http://172.28.80.50:3091 ends on `invalid_state` or starts over | expected: the Hub returns to the domain; open http://pid.kpndomain.com |
 | Every user shares one address / sign-in `too_many_sign_ins_here` for a whole office | `TRUST_PROXY=172.28.80.50` in production.env and the web container from this release; or raise `LOGIN_RATE_LIMIT_PER_MINUTE` |
 | Gauge `Test connection`: `… is a loopback address; the server does not call it` | the address is refused on purpose (server-side request forgery guard); use the gauge's own address |
 | Gauge rounds `Retrying` / `Failed`, `archive HTTP …`, timeouts | network BE → gauges (§2); after it is fixed, backfill the day (§9 step 7) |
